@@ -1,0 +1,59 @@
+/**
+ * Mobile shell overrides (web-only, migrated from studio-phone).
+ * Loaded after globals.css; html/body level side effects are scoped to
+ * html[data-shell="mobile"] (set by use-device-shell) so the desktop shell
+ * is unaffected.
+ */
+
+@layer base {
+  html[data-shell="mobile"],
+  html[data-shell="mobile"] body,
+  html[data-shell="mobile"] #root {
+    height: 100%;
+    /* Keep pull-to-refresh / rubber-banding from fighting inner scrollers. */
+    overscroll-behavior: none;
+  }
+
+  html[data-shell="mobile"] body {
+    /* Remove the gray tap flash on iOS/Android WebViews. */
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  /* iOS Safari zooms into inputs with font-size < 16px — pin the floor. */
+  html[data-shell="mobile"] input,
+  html[data-shell="mobile"] select,
+  html[data-shell="mobile"] textarea {
+    font-size: 16px;
+  }
+
+  /* Respect users who opt out of motion. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer utilities {
+  /* Safe-area helpers (notch / home indicator). */
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .pl-safe {
+    padding-left: env(safe-area-inset-left);
+  }
+
+  .pr-safe {
+    padding-right: env(safe-area-inset-right);
+  }
+}

@@ -1,0 +1,85 @@
+spring:
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 50MB
+      max-request-size: 50MB
+  datasource:
+    url: ${DB_URL:jdbc:mysql://127.0.0.1:13306/jy_financial?useUnicode=true&characterEncoding=UTF-8&characterSetResults=UTF-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true}
+    username: ${DB_USER:jy_app}
+    password: ${DB_PASSWORD:jy_password}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:16380}
+      password: ${REDIS_PASSWORD:}
+  flyway:
+    enabled: true
+    clean-on-validation-error: false
+
+# Bootstrap properties — dev 环境自动创建测试账号
+ADMIN_BOOTSTRAP_ENABLED: true
+ADMIN_BOOTSTRAP_USERNAME: sssxuyi
+ADMIN_BOOTSTRAP_PASSWORD: "123456"
+ADMIN_BOOTSTRAP_EMAIL: sssxuyi@example.com
+ADMIN_BOOTSTRAP_FORCE: true
+
+USER_BOOTSTRAP_ENABLED: true
+USER_BOOTSTRAP_USERNAME: xuyi
+USER_BOOTSTRAP_PASSWORD: "123456"
+USER_BOOTSTRAP_EMAIL: xuyi@example.com
+USER_BOOTSTRAP_FORCE: true
+
+logging:
+  level:
+    com.jyfc.backend.module.auth: DEBUG
+    com.jyfc.backend.module.auth.service.UserService: DEBUG
+    com.jyfc.backend.core.security: DEBUG
+
+# JWT 开发密钥（仅本地开发使用，长度 >= 32；生产由 JWT_SECRET 环境变量注入）
+jwt:
+  secret: ${JWT_SECRET:dev-only-jwt-secret-not-for-production-32b+}
+
+# 安全限流（开发环境放宽，便于多 agent 并发测试）
+security:
+  login:
+    max-attempts-per-ip: 100   # 开发环境 100 次/窗口（生产环境默认 10 次）
+    rate-limit-window: 15       # 窗口大小（分钟），与生产保持一致
+
+# M-33: 开发环境 HTTP 下 Secure cookie 不会被设置，显式关闭
+app:
+  cookie:
+    secure: false
+
+# ==================== 第三方集成默认配置（D6/M3'/M2'） ====================
+# 说明：以下键全部保持注释 = 走缺省沙箱/桩/降级通道；
+# 生产值一律来自密钥管理（环境变量/Secret），严禁明文提交到仓库。
+
+# --- 签章只走控制平面的 e签宝。回调令牌须与 CP 的 CP_ESIGN_CALLBACK_TOKEN 一致。
+# jy.sign.callback-token 必须与 CP 的 CP_ESIGN_CALLBACK_TOKEN 一致，否则回调会被拒绝。
+# jy:
+#   sign:
+#     callback-token: ${ESIGN_CALLBACK_TOKEN:}
+
+# --- 语音 RTC 通道（VoiceAdapter）：stub=留痕骨架（缺省），trtc=腾讯云 TRTC 生产 ---
+# jy:
+#   voice:
+#     provider: stub               # 生产切换为 trtc
+#     trtc:
+#       sdk-app-id: ${TRTC_SDK_APP_ID:0}   # 生产由 TRTC_SDK_APP_ID 密钥注入
+#       secret-key: ${TRTC_SECRET_KEY:}    # UserSig 签名密钥，生产由 TRTC_SECRET_KEY 注入
+#       rest-url: https://console.tim.qq.com
+#       admin-identifier: admin
+
+# --- LLM 审查通道（LlmReviewChannel）：api-key 为空 = 通道弃权（缺省），规则通道独立可用 ---
+# jy:
+#   llm:
+#     base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
+#     api-key: ${LLM_API_KEY:}     # 生产由 LLM_API_KEY 密钥注入（DashScope/OpenAI 兼容）
+#     model: qwen3-max
+
+# --- CP 强制点模式（D16）：dev 单机用 DP 本地配额兜底（honor-system）；
+#     要联调 CP chokepoint 时覆盖 CP_MODE=required ---
+jy:
+  cp:
+    mode: ${CP_MODE:local}

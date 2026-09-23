@@ -1,0 +1,59 @@
+{
+  "app": {
+    "about": "Über {{appName}}",
+    "preferences": "Einstellungen...",
+    "services": "Dienste",
+    "hide": "{{appName}} ausblenden",
+    "hideOthers": "Andere ausblenden",
+    "unhide": "Alle anzeigen",
+    "quit": "{{appName}} beenden"
+  },
+  "file": {
+    "label": "Datei",
+    "newChat": "Neuer Chat",
+    "close": "Schließen"
+  },
+  "edit": {
+    "label": "Bearbeiten",
+    "undo": "Widerrufen",
+    "redo": "Wiederholen",
+    "cut": "Ausschneiden",
+    "copy": "Kopieren",
+    "paste": "Einfügen",
+    "pasteAndMatchStyle": "Einfügen und Stil anpassen",
+    "delete": "Löschen",
+    "selectAll": "Alles auswählen"
+  },
+  "view": {
+    "label": "Ansicht",
+    "reload": "Neu laden",
+    "forceReload": "Neuladen erzwingen",
+    "toggleDevTools": "Entwicklertools ein/aus",
+    "resetZoom": "Tatsächliche Größe",
+    "zoomIn": "Vergrößern",
+    "zoomOut": "Verkleinern",
+    "toggleFullscreen": "Vollbild ein/aus"
+  },
+  "navigate": {
+    "label": "Navigation",
+    "dashboard": "Dashboard",
+    "chat": "Chat",
+    "channels": "Kanäle",
+    "skills": "Fähigkeiten",
+    "cronTasks": "Geplante Aufgaben",
+    "settings": "Einstellungen"
+  },
+  "window": {
+    "label": "Fenster",
+    "minimize": "Minimieren",
+    "zoom": "Zoom",
+    "front": "Alle nach vorne bringen",
+    "close": "Schließen"
+  },
+  "help": {
+    "label": "Hilfe",
+    "documentation": "Dokumentation",
+    "reportIssue": "Problem melden",
+    "openClawDocumentation": "OpenClaw-Dokumentation"
+  }
+}

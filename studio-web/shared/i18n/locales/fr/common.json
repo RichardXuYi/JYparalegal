@@ -1,0 +1,51 @@
+{
+    "sidebar": {
+        "chat": "Discussion",
+        "newChat": "Nouvelle discussion",
+        "cronTasks": "Tâches planifiées",
+        "skills": "Compétences",
+        "agents": "Agents",
+        "channels": "Canaux",
+        "dashboard": "Tableau de bord",
+        "settings": "Paramètres",
+        "devConsole": "Console développeur",
+        "models": "Modèles",
+        "deleteSessionConfirm": "Supprimer « {{label}} » ?",
+        "openClawPage": "Page OpenClaw",
+        "openClawDreams": "Rêves",
+        "renameSession": "Renommer",
+        "deleteSession": "Supprimer",
+        "renameSessionPlaceholder": "Titre de la session",
+        "saveSessionRename": "Enregistrer le titre",
+        "cancelSessionRename": "Annuler le renommage",
+        "imageGeneration": "Génération d'images"
+    },
+    "actions": {
+        "save": "Enregistrer", "cancel": "Annuler", "delete": "Supprimer", "edit": "Modifier",
+        "refresh": "Actualiser", "close": "Fermer", "copy": "Copier", "search": "Rechercher",
+        "confirm": "Confirmer", "dismiss": "Ignorer", "load": "Charger", "install": "Installer",
+        "uninstall": "Désinstaller", "enable": "Activer", "disable": "Désactiver",
+        "back": "Retour", "next": "Suivant", "skip": "Passer", "restart": "Redémarrer",
+        "show": "Afficher", "hide": "Masquer", "clear": "Effacer"
+    },
+    "status": {
+        "running": "En cours", "stopped": "Arrêté", "error": "Erreur", "connected": "Connecté",
+        "disconnected": "Déconnecté", "enabled": "Activé", "disabled": "Désactivé", "active": "Actif",
+        "paused": "En pause", "configured": "Configuré", "loading": "Chargement...", "saving": "Enregistrement..."
+    },
+    "gateway": {
+        "notRunning": "La passerelle ne fonctionne pas",
+        "notRunningDesc": "La passerelle OpenClaw doit fonctionner pour utiliser cette fonctionnalité.",
+        "restarting": "Redémarrage de la passerelle",
+        "warning": "La passerelle ne fonctionne pas."
+    },
+    "connection": {
+        "connectingTitle": "Connexion en cours\u2026",
+        "connectingDesc": "Établissement de la connexion à la passerelle. Veuillez patienter.",
+        "reconnectingTitle": "Reconnexion en cours\u2026",
+        "reconnectingDesc": "Tentative de reconnexion à la passerelle. Veuillez patienter.",
+        "switchingModelTitle": "Changement de modèle\u2026",
+        "switchingModelDesc": "Passage à {{model}}. Veuillez patienter.",
+        "runInBackground": "Continuer en arrière-plan"
+    }
+}

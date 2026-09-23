@@ -1,0 +1,102 @@
+{
+    "gatewayNotRunning": "Gateway läuft nicht",
+    "gatewayRequired": "Das OpenClaw-Gateway muss laufen, um den Chat zu nutzen. Es startet automatisch, oder Sie können es in den Einstellungen starten.",
+    "welcome": {
+        "title": "GrandPoem Studio Chat",
+        "subtitle": "Was kann ich für Sie tun?",
+        "askQuestions": "Aufgaben bearbeiten",
+        "askQuestionsDesc": "Aufgabenorientierte Anfragen bearbeiten",
+        "creativeTasks": "Kontinuierliche Ausführung",
+        "creativeTasksDesc": "Mehrstufige Arbeiten fortlaufend ausführen",
+        "brainstorming": "Multi-Agenten parallel"
+    },
+    "noLogs": "(Noch keine Protokolle)",
+    "scrollToLatest": "Nach unten",
+    "loadMoreHistory": "Ältere Nachrichten laden",
+    "loadingMoreHistory": "Laden...",
+    "toolbar": { "refresh": "Chat aktualisieren", "currentAgent": "Gespräch mit {{agent}}", "workspace": "Arbeitsbereich" },
+    "generatedFiles": { "title": "Dateiänderungen ({{count}})", "created": "Erstellt", "modified": "Geändert", "openFolder": "Ordner öffnen", "viewAll": "Alle Änderungen" },
+    "runError": { "title": "Modellaufruf fehlgeschlagen" },
+    "artifactPanel": {
+        "tabs": { "changes": "Änderungen", "preview": "Vorschau", "browser": "Arbeitsbereich" },
+        "actions": { "back": "Zurück zur Liste" },
+        "changes": { "heading": "Dateiänderungen ({{count}})", "empty": "Noch keine Dateiänderungen in diesem Gespräch", "selectFileHint": "Klicken Sie auf eine Dateikarte im Chat oder \"Änderungen anzeigen\", um einen Diff zu öffnen." },
+        "preview": { "emptyTitle": "Keine Datei ausgewählt", "emptyHint": "Klicken Sie zuerst auf eine Dateikarte im Chat; die ausgewählte Datei wird hier angezeigt." }
+    },
+    "filePreview": {
+        "tabs": { "source": "Quellcode", "preview": "Vorschau", "changes": "Änderungen", "info": "Info" },
+        "actions": { "save": "Speichern", "saving": "Speichern...", "revert": "Zurücksetzen", "openInFinder": "Im Dateimanager anzeigen", "openDirectly": "Direkt öffnen", "close": "Schließen" },
+        "info": { "path": "Pfad", "size": "Größe", "type": "Typ" },
+        "toast": { "saved": "Auf Festplatte gespeichert", "saveFailed": "Speichern fehlgeschlagen: {{error}}" },
+        "errors": {
+            "outsideSandbox": "Pfad außerhalb der Sandbox — Zugriff verweigert",
+            "outsideSandboxTitle": "Datei konnte nicht gelesen werden",
+            "outsideSandboxHint": "GrandPoem Studio konnte diesen Pfad nicht lesen. Die Datei wurde möglicherweise verschoben oder gelöscht, oder das Konto hat keine Berechtigung.",
+            "readOnlyRoot": "Datei befindet sich an einem schreibgeschützten Ort und kann nicht geändert werden",
+            "tooLarge": "Datei zu groß ({{size}}); Vorschau deaktiviert",
+            "binary": "Binärdatei — Textvorschau nicht verfügbar",
+            "notFound": "Datei nicht gefunden",
+            "loadFailed": "Laden fehlgeschlagen: {{error}}",
+            "noPreview": "Keine Vorschau für diese Datei verfügbar",
+            "unsupportedFormatTitle": "Dieses Format wird für Vorschau oder Diff nicht unterstützt",
+            "unsupportedFormatHint": "Vorschau und Diff unterstützen nur direkt lesbare Text-/Markdown-Dateien.",
+            "largeBinaryOpenTitle": "Diese Datei ist zu groß für die Vorschau",
+            "largeBinaryOpenHint": "Diese Datei ist {{size}} groß. Öffnen Sie sie mit der Standardanwendung.",
+            "openInFinderFailed": "Datei konnte nicht angezeigt werden",
+            "openFailed": "Öffnen fehlgeschlagen: {{error}}"
+        },
+        "diff": {
+            "noChanges": "Keine Änderungen anzuzeigen",
+            "newFile": "Neue Datei — kein Original zum Vergleichen",
+            "tooLarge": "Datei zu groß — Diff-Ansicht deaktiviert",
+            "unavailable": "Kein Diff verfügbar, da keine Basisdatei erfasst wurde.",
+            "unavailableHint": "Nutzen Sie die Vorschau; verwenden Sie Git für genaue Diffs."
+        },
+        "confirmOpen": { "title": "Datei öffnen", "message": "\"{{fileName}}\" mit der Standardanwendung öffnen?", "detail": "Die Datei wird mit der Standardanwendung geöffnet.", "size": "Dateigröße: {{size}}", "cancel": "Abbrechen" },
+        "pdf": { "loadFailed": "PDF konnte nicht geladen werden: {{error}}", "prev": "Vorherige Seite", "next": "Nächste Seite", "zoomIn": "Vergrößern", "zoomOut": "Verkleinern", "zoomReset": "Breite anpassen", "pageInputAria": "Aktuelle Seite", "singlePageHint": "Toolbar zum Wechseln zwischen {{total}} Seiten" },
+        "sheet": { "loadFailed": "Tabelle konnte nicht geladen werden: {{error}}", "empty": "Keine anzeigbaren Arbeitsblätter", "emptySheet": "Dieses Arbeitsblatt ist leer", "unnamedSheet": "Blatt {{idx}}", "rowRange": "Zeilen {{from}}-{{to}} / {{total}}", "prevPage": "Vorherige Zeilen", "nextPage": "Nächste Zeilen" }
+    },
+    "workspace": {
+        "title": "Arbeitsbereich", "freshBadge": "In diesem Lauf aktualisiert", "pickFile": "Datei links zur Vorschau auswählen",
+        "empty": "Arbeitsbereich ist leer oder nicht zugänglich", "truncated": "Verzeichnis gekürzt — nur die ersten 5000 Einträge",
+        "actions": { "refresh": "Aktualisieren", "openRootInFinder": "Arbeitsbereich im Dateimanager anzeigen", "toggleHidden": "Versteckte Dateien umschalten", "showHidden": "Versteckte anzeigen", "hideHidden": "Versteckte ausblenden" }
+    },
+    "taskPanel": {
+        "eyebrow": "Laufansicht", "title": "Aufgabenübersicht", "emptyTitle": "Noch keine strukturierten Schritte",
+        "emptyBody": "Nach Start zeigt GrandPoem Studio hier Denkprozesse, Tool-Aufrufe und Übergänge.",
+        "status": { "idle": "Leerlauf", "running_one": "1 aktiver Schritt", "running_other": "{{count}} aktive Schritte" },
+        "stepStatus": { "running": "Läuft", "completed": "Fertig", "error": "Fehler" }
+    },
+    "executionGraph": {
+        "title": "Ausführungsgraph", "branchLabel": "Verzweigung", "thinkingLabel": "Denken", "errorLabel": "Fehler",
+        "imageGenerateLabel": "Bildgenerierung", "agentRun": "{{agent}}-Ausführung",
+        "collapsedSummary": "{{toolCount}} Tool-Aufrufe · {{processCount}} Prozessnachrichten", "collapseAction": "Ausführungsgraph einklappen"
+    },
+    "imageGeneration": { "generating": "Bild wird generiert, bitte warten...", "previewLoading": "Bildvorschau wird geladen...", "previewUnavailable": "Bildvorschau vorübergehend nicht verfügbar" },
+    "composer": {
+        "attachFiles": "Dateien anhängen", "pickSkill": "Fähigkeit wählen", "skillButton": "Fähigkeiten",
+        "skillPickerTitle": "Schnellzugriff auf Fähigkeiten für {{agent}}", "skillSearchPlaceholder": "Fähigkeiten suchen",
+        "skillLoading": "Fähigkeiten laden...", "skillEmpty": "Keine passenden Fähigkeiten",
+        "pickAgent": "Agent wählen", "pickModel": "Modell wählen",
+        "pickThinkingLevel": "Thinking mode for this chat",
+        "thinkingPickerTitle": "Thinking mode",
+        "thinkingLevelFailed": "Failed to update thinking mode",
+        "thinkingLevelInherit": "Inherit",
+        "thinkingLevelOff": "Off",
+        "thinkingLevelLow": "Low",
+        "thinkingLevelMedium": "Medium",
+        "thinkingLevelHigh": "High",
+        "thinkingLevelXHigh": "Extra high",
+        "thinkingLevelAdaptive": "Adaptive",
+        "thinkingLevelMax": "Maximum", "clearTarget": "Zielagent löschen",
+        "targetChip": "@{{agent}}", "agentPickerTitle": "Nächste Nachricht an anderen Agenten weiterleiten",
+        "modelPickerTitle": "Modell für diesen Chat wechseln", "modelSwitchFailed": "Modellwechsel fehlgeschlagen: {{error}}",
+        "gatewayDisconnectedPlaceholder": "Gateway nicht verbunden...", "send": "Senden", "stop": "Stopp",
+        "gatewayConnected": "Verbunden", "gatewayStatus": "Gateway {{state}} | Port: {{port}} {{pid}}",
+        "retryFailedAttachments": "Fehlgeschlagene Anhänge wiederholen",
+        "folderDropUnsupported": "Ordner konnte nicht angehängt werden. Erneut ziehen oder Pfad einfügen.",
+        "folderAttachment": "Ordner", "skillPreviewTooltip": "SKILL.md-Vorschau", "skillPreviewNotFound": "Fähigkeit nicht gefunden. Bitte Auswahl öffnen."
+    },
+    "historyBuckets": { "today": "Heute", "withinWeek": "Letzte 7 Tage", "withinMonth": "Letzte 30 Tage", "older": "Älter" },
+    "questionDirectory": { "title": "Fragenkatalog", "fallback": "Frage {{number}}", "moreHint": "{{count}} weitere Fragen nicht angezeigt" }
+}

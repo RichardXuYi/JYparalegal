@@ -1,0 +1,110 @@
+/**
+ * Chat Toolbar
+ * Session selector, new session, refresh. Rendered in the Header when on the Chat page.
+ */
+import { useMemo, useState } from 'react';
+import { RefreshCw, Bot, ListTree } from 'lucide-react';
+import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { useChatStore } from '@/stores/chat';
+import { useAgentsStore } from '@/stores/agents';
+import { cn } from '@/lib/utils';
+import { useTranslation } from 'react-i18next';
+
+type ChatToolbarProps = {
+  questionDirectoryOpen?: boolean;
+  questionDirectoryCount?: number;
+  onToggleQuestionDirectory?: () => void;
+};
+
+export function ChatToolbar({
+  questionDirectoryOpen = false,
+  questionDirectoryCount = 0,
+  onToggleQuestionDirectory,
+}: ChatToolbarProps = {}) {
+  const refresh = useChatStore((s) => s.refresh);
+  const loading = useChatStore((s) => s.loading);
+  const [refreshing, setRefreshing] = useState(false);
+  const currentAgentId = useChatStore((s) => s.currentAgentId);
+  const agents = useAgentsStore((s) => s.agents);
+  const { t } = useTranslation('chat');
+  const currentAgent = useMemo(
+    () => (agents ?? []).find((agent) => agent.id === currentAgentId) ?? null,
+    [agents, currentAgentId],
+  );
+  const currentAgentName = currentAgent?.name ?? currentAgentId;
+
+  const questionDirectoryAvailable = questionDirectoryCount > 1 && !!onToggleQuestionDirectory;
+  const refreshBusy = loading || refreshing;
+
+  const handleRefresh = async (): Promise<void> => {
+    if (refreshBusy) return;
+    setRefreshing(true);
+    try {
+      await refresh();
+      if (useChatStore.getState().error) {
+        toast.error(t('toolbar.refreshFailed'));
+      } else {
+        toast.success(t('toolbar.refreshDone'));
+      }
+    } catch (error) {
+      toast.error(`${t('toolbar.refreshFailed')}: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <div className="hidden sm:flex items-center gap-1.5 rounded-full border border-black/10 bg-white/70 px-3 py-1.5 text-xs font-medium text-foreground/80 dark:border-white/10 dark:bg-white/5">
+        <Bot className="h-3.5 w-3.5 text-primary" />
+        <span>{t('toolbar.currentAgent', { agent: currentAgentName })}</span>
+      </div>
+
+      <Tooltip>
+        <TooltipTrigger asChild>
+          {/* Span wrapper keeps the tooltip reachable while the button is
+              disabled, so users can learn why the toggle is unavailable. */}
+          <span className="inline-flex" tabIndex={questionDirectoryAvailable ? undefined : 0}>
+            <Button
+              data-testid="chat-question-directory-toggle"
+              variant="ghost"
+              size="icon"
+              className={cn(
+                'h-8 w-8 hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10',
+                questionDirectoryOpen && 'bg-foreground/10 text-foreground',
+              )}
+              onClick={onToggleQuestionDirectory}
+              disabled={!questionDirectoryAvailable}
+              aria-label={t('questionDirectory.title')}
+            >
+              <ListTree className="h-4 w-4" />
+            </Button>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>{questionDirectoryAvailable ? t('questionDirectory.title') : t('questionDirectory.disabledHint')}</p>
+        </TooltipContent>
+      </Tooltip>
+      {/* Refresh */}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10"
+            onClick={() => void handleRefresh()}
+            disabled={refreshBusy}
+            aria-label={t('toolbar.refresh')}
+          >
+            <RefreshCw className={cn('h-4 w-4', refreshBusy && 'animate-spin')} />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>{t('toolbar.refresh')}</p>
+        </TooltipContent>
+      </Tooltip>
+    </div>
+  );
+}

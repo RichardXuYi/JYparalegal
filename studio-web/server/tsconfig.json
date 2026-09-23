@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2023"],
+    "types": ["node"],
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "forceConsistentCasingInFileNames": true,
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "electron": ["./src/shims/electron.ts"],
+      "electron-store": ["./src/shims/electron-store.ts"],
+      "electron-updater": ["./src/shims/electron-updater.ts"],
+      "@shared/*": ["../shared/*"]
+    }
+  },
+  "include": ["src/**/*.ts"]
+}
