@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { fmtDateTime, signStatusChipClass, signStatusLabel } from '@/lib/legal-enums';
+import { platformGet, platformProbe, platformSend, notifyIfEntitlement } from '@/lib/platform-api';
 import { LegalPageHeader } from '@/components/legal/LegalPageHeader';
 import { StatusFilterChips } from '@/components/legal/StatusFilterChips';
 import { Pagination } from '@/components/legal/Pagination';
+import { EntitlementGate } from '@/components/legal/EntitlementGate';
 
 type SignTask = {
   id: number; taskNo: string; title: string; status: string;
@@ -34,7 +36,7 @@ function downloadCsv(rows: string[][], filename: string): void {
 
 export default function Signing() {
   const [tasks, setTasks] = useState<SignTask[]>([]);
-  const [listState, setListState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [listState, setListState] = useState<'loading' | 'ready' | 'error' | 'locked'>('loading');
   const [params] = useSearchParams();
   const view = params.get('view') ?? 'CREATED_BY_ME';
   // chip/page 与「它们属于哪个 view」一起存；view 变化时派生值自动回到「全部」/第 1 页，
@@ -54,19 +56,24 @@ export default function Signing() {
   // 顺带加 cancelled 守卫，避免 view 快速切换时旧响应覆盖新数据。
   useEffect(() => {
     let cancelled = false;
-    void fetch(`/platform/sign/tasks?view=${view}`, { credentials: 'include' })
-      .then((r) => r.json())
-      .then((env) => { if (!cancelled) { setTasks(Array.isArray(env?.data) ? env.data : []); setListState('ready'); } })
-      .catch(() => { if (!cancelled) { setTasks([]); setListState('error'); } });
+    void platformProbe<SignTask[]>(`/platform/sign/tasks?view=${view}`)
+      .then((r) => {
+        if (cancelled) return;
+        if (r.locked) { setTasks([]); setListState('locked'); }
+        else if (r.ok) { setTasks(Array.isArray(r.data) ? r.data : []); setListState('ready'); }
+        else { setTasks([]); setListState('error'); }
+      });
     return () => { cancelled = true; };
   }, [view]);
 
   const reload = () => {
     setListState('loading');
-    void fetch(`/platform/sign/tasks?view=${view}`, { credentials: 'include' })
-      .then((r) => r.json())
-      .then((env) => { setTasks(Array.isArray(env?.data) ? env.data : []); setListState('ready'); })
-      .catch(() => { setTasks([]); setListState('error'); });
+    void platformProbe<SignTask[]>(`/platform/sign/tasks?view=${view}`)
+      .then((r) => {
+        if (r.locked) { setTasks([]); setListState('locked'); }
+        else if (r.ok) { setTasks(Array.isArray(r.data) ? r.data : []); setListState('ready'); }
+        else { setTasks([]); setListState('error'); }
+      });
   };
 
   const openTask = (t: SignTask) => nav(t.status === 'DRAFT' ? `/signing/${t.id}/setup` : `/signing/${t.id}`);
@@ -103,19 +110,22 @@ export default function Signing() {
 
   const downloadTask = async (id: number) => {
     try {
-      const res = await fetch(`/platform/sign/tasks/${id}/download`, { credentials: 'include' }).then((r) => r.json());
-      const url = res?.data?.fileUrl ?? res?.data?.url ?? res?.data?.downloadUrl;
-      if (res?.code === 0 && url) { window.open(url, '_blank', 'noopener'); toast.success('已开始下载'); }
-      else toast.error(res?.msg ?? '下载失败');
-    } catch { toast.error('网络错误,下载失败'); }
+      const d = await platformGet<Record<string, string | undefined>>(`/platform/sign/tasks/${id}/download`);
+      const url = d?.fileUrl ?? d?.url ?? d?.downloadUrl;
+      if (url) { window.open(url, '_blank', 'noopener'); toast.success('已开始下载'); }
+      else toast.error('下载失败');
+    } catch (e) {
+      if (!notifyIfEntitlement(e)) toast.error(e instanceof Error ? e.message : '网络错误,下载失败');
+    }
   };
 
   const requestCertificate = async (id: number) => {
     try {
-      const res = await fetch(`/platform/sign/tasks/${id}/certificate`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: '{}' }).then((r) => r.json());
-      if (res?.code === 0) toast.success('出证申请已提交');
-      else toast.error(res?.msg ?? '出证失败');
-    } catch { toast.error('网络错误,出证失败'); }
+      await platformSend(`/platform/sign/tasks/${id}/certificate`, 'POST', {});
+      toast.success('出证申请已提交');
+    } catch (e) {
+      if (!notifyIfEntitlement(e)) toast.error(e instanceof Error ? e.message : '网络错误,出证失败');
+    }
   };
 
   const toggleRow = (id: number) => {
@@ -204,6 +214,9 @@ export default function Signing() {
             </thead>
             <tbody>
               {listState === 'loading' && <tr><td colSpan={10} className="p-10 text-center text-muted-foreground">正在加载…</td></tr>}
+              {listState === 'locked' && (
+                <tr><td colSpan={10}><EntitlementGate onRetry={reload} /></td></tr>
+              )}
               {listState === 'error' && (
                 <tr><td colSpan={10} className="p-10 text-center">
                   <div className="flex flex-col items-center gap-3 text-sm">

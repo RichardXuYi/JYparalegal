@@ -150,6 +150,22 @@ export function planLabel(plan: string | null | undefined): string {
   return label(PLAN_LABEL, plan, '当前套餐');
 }
 
+/* ============================ 联系方式脱敏 ============================ */
+
+/** 手机号脱敏:138****8871;过短或非串给原值兜底。 */
+export function maskPhone(phone: string | null | undefined): string {
+  if (!phone) return '';
+  return phone.length >= 7 ? `${phone.slice(0, 3)}****${phone.slice(-4)}` : phone;
+}
+
+/** 邮箱脱敏:首字符 + *** + @域名。 */
+export function maskEmail(email: string | null | undefined): string {
+  if (!email) return '';
+  const at = email.indexOf('@');
+  if (at <= 0) return email;
+  return `${email.slice(0, 1)}***${email.slice(at)}`;
+}
+
 /* ============================ 时间格式化 ============================ */
 
 /** ISO(含 T / 毫秒 / 时区)→ `YYYY-MM-DD HH:mm`;空值或非法值给中文兜底,绝不裸渲染 ISO。 */

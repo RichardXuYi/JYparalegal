@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { LegalPageHeader } from '@/components/legal/LegalPageHeader';
+import { EntitlementGate } from '@/components/legal/EntitlementGate';
+import { platformGet, platformProbe, platformSend, notifyIfEntitlement } from '@/lib/platform-api';
 import { fmtDateTime } from '@/lib/legal-enums';
 
 type Row = { taskId: number; taskNo: string; title: string; hasEvidence: boolean; createdAt: string | null };
@@ -21,14 +23,16 @@ const FIELD_LABEL: Record<string, string> = {
 /** 证据存证：存证来自 e签宝签署流程的蚂蚁链上链记录（非自建存证库），经 CP 获取与核验。 */
 export default function Evidence() {
   const [rows, setRows] = useState<Row[]>([]);
-  const [listState, setListState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [listState, setListState] = useState<'loading' | 'ready' | 'error' | 'locked'>('loading');
   const [open, setOpen] = useState<{ taskId: number; data: AntInfo } | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
 
   const load = useCallback(() => {
-    void fetch('/platform/evidence', { credentials: 'include' }).then((r) => r.json())
-      .then((e) => { setRows(Array.isArray(e?.data) ? e.data : []); setListState('ready'); })
-      .catch(() => { setRows([]); setListState('error'); });
+    void platformProbe<Row[]>('/platform/evidence').then((r) => {
+      if (r.locked) { setRows([]); setListState('locked'); }
+      else if (r.ok) { setRows(Array.isArray(r.data) ? r.data : []); setListState('ready'); }
+      else { setRows([]); setListState('error'); }
+    });
   }, []);
   useEffect(load, [load]);
   const reload = () => { setListState('loading'); load(); };
@@ -36,25 +40,23 @@ export default function Evidence() {
   const view = async (taskId: number) => {
     setOpen({ taskId, data: {} });
     try {
-      const e = await fetch(`/platform/evidence/${taskId}/antchain`, { credentials: 'include' }).then((r) => r.json());
-      setOpen({ taskId, data: (e?.data as AntInfo) ?? { available: false, message: e?.msg ?? '获取失败' } });
-    } catch {
-      setOpen({ taskId, data: { available: false, message: '网络错误' } });
+      const d = await platformGet<AntInfo>(`/platform/evidence/${taskId}/antchain`);
+      setOpen({ taskId, data: d ?? { available: false, message: '获取失败' } });
+    } catch (e) {
+      if (notifyIfEntitlement(e)) { setOpen(null); return; }
+      setOpen({ taskId, data: { available: false, message: e instanceof Error ? e.message : '网络错误' } });
     }
   };
 
   const verify = async (taskId: number) => {
     setBusyId(taskId);
     try {
-      const e = await fetch(`/platform/evidence/${taskId}/antchain/verify`, {
-        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: '{}',
-      }).then((r) => r.json());
-      const d = (e?.data as AntInfo) ?? { available: false, message: e?.msg ?? '核验失败' };
+      const d = (await platformSend<AntInfo>(`/platform/evidence/${taskId}/antchain/verify`, 'POST', {})) ?? { available: false, message: '核验失败' };
       if (d.available === false) toast.error(String(d.message ?? '核验失败'));
       else toast.success('核验已完成');
       setOpen({ taskId, data: d });
-    } catch {
-      toast.error('网络错误,核验失败');
+    } catch (e) {
+      if (!notifyIfEntitlement(e)) toast.error(e instanceof Error ? e.message : '网络错误,核验失败');
     } finally {
       setBusyId(null);
     }
@@ -83,6 +85,9 @@ export default function Evidence() {
           </thead>
           <tbody>
             {listState === 'loading' && <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">正在加载…</td></tr>}
+            {listState === 'locked' && (
+              <tr><td colSpan={5}><EntitlementGate onRetry={reload} /></td></tr>
+            )}
             {listState === 'error' && (
               <tr><td colSpan={5} className="p-8 text-center">
                 <div className="flex flex-col items-center gap-3 text-sm">

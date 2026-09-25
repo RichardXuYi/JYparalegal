@@ -59,3 +59,6 @@ e签宝sdk/
 .ai-memory/
 backend/db_migration_backup_*/
 backend/jy_financial_predrop_*.sql
+
+# Build tools (downloaded during packaging)
+resources/bin/

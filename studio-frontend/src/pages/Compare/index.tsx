@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { LegalPageHeader } from '@/components/legal/LegalPageHeader';
+import { EntitlementGate } from '@/components/legal/EntitlementGate';
+import { platformSend, notifyIfEntitlement, EntitlementError } from '@/lib/platform-api';
 
 type Seg = { type: 'same' | 'add' | 'del'; text: string };
 
@@ -11,23 +13,38 @@ export default function Compare() {
   const [segs, setSegs] = useState<Seg[] | null>(null);
   const [counts, setCounts] = useState<{ added: number; deleted: number; sameCount: number } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [locked, setLocked] = useState(false);
 
   const run = async () => {
     if (!a.trim() || !b.trim()) { toast.error('请先粘贴或上传两个版本的合同文本'); return; }
     setBusy(true);
-    const res = await fetch('/platform/review/compare', {
-      method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ textA: a, textB: b }),
-    }).then((r) => r.json()).catch(() => null);
-    setBusy(false);
-    if (res?.code === 0) {
-      setSegs(Array.isArray(res.data?.segments) ? res.data.segments : []);
-      setCounts(res.data?.counts ?? null);
-    } else {
-      setSegs(null); setCounts(null);
-      toast.error(`比对失败：${res?.msg ?? '网络错误'}`);
+    try {
+      const d = await platformSend<{ segments?: Seg[]; counts?: { added: number; deleted: number; sameCount: number } }>(
+        '/platform/review/compare', 'POST', { textA: a, textB: b },
+      );
+      setLocked(false);
+      setSegs(Array.isArray(d?.segments) ? d.segments : []);
+      setCounts(d?.counts ?? null);
+    } catch (e) {
+      setSegs(null);
+      setCounts(null);
+      if (e instanceof EntitlementError) setLocked(true);
+      else if (!notifyIfEntitlement(e)) toast.error(`比对失败：${e instanceof Error ? e.message : '网络错误'}`);
+    } finally {
+      setBusy(false);
     }
   };
+
+  if (locked) {
+    return (
+      <div className="h-full overflow-y-auto p-5">
+        <LegalPageHeader title="合同比对" />
+        <div className="rounded-lg border border-border bg-card">
+          <EntitlementGate onRetry={() => setLocked(false)} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full overflow-y-auto p-5">

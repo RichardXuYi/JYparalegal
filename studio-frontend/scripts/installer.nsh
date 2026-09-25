@@ -9,7 +9,7 @@
   !include "nsProcess.nsh"
 !endif
 
-Var /GLOBAL grandpoem-studioRollbackDir
+Var /GLOBAL grandpoem_studioRollbackDir
 
 !macro customHeader
   ; Show install details by default so users can see what stage is running.
@@ -18,7 +18,7 @@ Var /GLOBAL grandpoem-studioRollbackDir
 !macroend
 
 !ifndef BUILD_UNINSTALLER
-Function GrandPoem StudioMoveLegacyInstallDir
+Function GrandPoemStudioMoveLegacyInstallDir
   Exch $R6
 
   ${if} $R6 == ""
@@ -70,7 +70,7 @@ FunctionEnd
 !macro grandpoem-studioMoveLegacyInstallDir ROOT_KEY
   ReadRegStr $R6 ${ROOT_KEY} "${INSTALL_REGISTRY_KEY}" InstallLocation
   Push $R6
-  Call GrandPoem StudioMoveLegacyInstallDir
+  Call GrandPoemStudioMoveLegacyInstallDir
 !macroend
 !endif
 
@@ -200,7 +200,7 @@ FunctionEnd
     ${endIf}
 
   !ifndef BUILD_UNINSTALLER
-    StrCpy $grandpoem-studioRollbackDir ""
+    StrCpy $grandpoem_studioRollbackDir ""
 
     ; Release NSIS's CWD on $INSTDIR BEFORE the rename check.
     ; NSIS sets CWD to $INSTDIR in .onInit; Windows refuses to rename a directory
@@ -267,7 +267,7 @@ FunctionEnd
       CreateDirectory "$INSTDIR"
       Goto _instdir_clean
   _stale_moved:
-    StrCpy $grandpoem-studioRollbackDir "$INSTDIR._stale_$R8"
+    StrCpy $grandpoem_studioRollbackDir "$INSTDIR._stale_$R8"
     CreateDirectory "$INSTDIR"
   _instdir_clean:
 

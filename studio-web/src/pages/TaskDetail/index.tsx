@@ -4,10 +4,14 @@ import { toast } from 'sonner';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
+import { EntitlementGate } from '@/components/legal/EntitlementGate';
+import { EntitlementError, platformGet, platformSend, notifyIfEntitlement } from '@/lib/platform-api';
 import {
   docSourceLabel,
   finalizeModeLabel,
   fmtDateTime,
+  maskEmail,
+  maskPhone,
   partyRoleLabel,
   partyStatusLabel,
   signModeLabel,
@@ -18,14 +22,22 @@ import {
 type SignTask = {
   id: number; taskNo: string; title: string; status: string; signMode: string;
   createdBy: number; createdAt: string; expireAt?: string; finalizeMode?: string; certAuthority?: string;
+  providerFlowId?: string | null;
 };
 type Party = {
-  id: number; userId: number | null; partyRole: string; partyStatus: string; signOrder: number;
-  externalName: string | null; signedAt: string | null; canFill?: boolean; canSign?: boolean;
+  id: number; userId: number | null; memberUserId?: number | null;
+  partyRole: string; partyStatus: string; signOrder: number;
+  externalName: string | null;
+  externalPhone?: string | null;
+  externalEmail?: string | null;
+  signedAt: string | null; canFill?: boolean; canSign?: boolean;
 };
 type Invite = { id: number; taskId: number; partyId: number; inviteStatus: string };
 type BizDoc = { id: number; docName?: string; fileName?: string; sha256?: string | null; source?: string | null; createdAt?: string };
 type Approval = { id?: number; approvalNo?: string; status?: string; createdAt?: string; approverName?: string };
+
+/** 内部签署方=绑定了 studio 用户，可在本站「去签署」；外部签署方走 e签宝 短信/邮件链接。 */
+const isInternal = (p: Party) => p.userId != null || p.memberUserId != null;
 
 /** Date → `<input type="datetime-local">` 的本地值(YYYY-MM-DDTHH:mm)。 */
 function toLocalInput(d: Date): string {
@@ -48,6 +60,7 @@ export default function TaskDetail() {
   const [bizdocs, setBizdocs] = useState<{ docs: BizDoc[]; contractDocs: BizDoc[]; approvals: Approval[] } | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [locked, setLocked] = useState(false);
   const nav = useNavigate();
 
   // 危险操作弹窗状态
@@ -59,61 +72,68 @@ export default function TaskDetail() {
   const [voidOpen, setVoidOpen] = useState(false);
 
   const load = useCallback(() => {
-    void fetch(`/platform/sign/tasks/${id}`, { credentials: 'include' }).then((r) => r.json())
-      .then((env) => { setTask(env?.data ?? null); setLoadError(false); })
-      .catch(() => { setTask(null); setLoadError(true); })
+    void platformGet<SignTask>(`/platform/sign/tasks/${id}`)
+      .then((t) => { setTask(t ?? null); setLoadError(false); setLocked(false); })
+      .catch((e) => {
+        if (e instanceof EntitlementError) { setTask(null); setLoadError(false); setLocked(true); }
+        else { setTask(null); setLoadError(true); }
+      })
       .finally(() => setLoading(false));
-    void fetch(`/platform/sign/tasks/${id}/parties`, { credentials: 'include' }).then((r) => r.json())
-      .then((env) => setParties(Array.isArray(env?.data) ? env.data : [])).catch(() => setParties([]));
-    void fetch('/platform/sign/invites', { credentials: 'include' }).then((r) => r.json())
-      .then((env) => setInvites(Array.isArray(env?.data) ? env.data : [])).catch(() => setInvites([]));
+    void platformGet<Party[]>(`/platform/sign/tasks/${id}/parties`)
+      .then((d) => setParties(Array.isArray(d) ? d : [])).catch(() => setParties([]));
+    void platformGet<Invite[]>('/platform/sign/invites')
+      .then((d) => setInvites(Array.isArray(d) ? d : [])).catch(() => setInvites([]));
     void fetch('/auth/me', { credentials: 'include' }).then((r) => r.json())
       .then((m) => setMe(m?.user?.id ?? m?.id ?? null)).catch(() => setMe(null));
-    void fetch(`/platform/sign/tasks/${id}/bizdocs`, { credentials: 'include' }).then((r) => r.json())
-      .then((env) => setBizdocs(env?.data ?? null)).catch(() => setBizdocs(null));
+    void platformGet<{ docs: BizDoc[]; contractDocs: BizDoc[]; approvals: Approval[] }>(`/platform/sign/tasks/${id}/bizdocs`)
+      .then((d) => setBizdocs(d ?? null)).catch(() => setBizdocs(null));
   }, [id]);
   useEffect(load, [load]);
   const reload = () => { setLoading(true); setLoadError(false); load(); };
 
+  // 签署中静默轮询（完成态只来自 e签宝回调），页面隐藏时暂停
+  useEffect(() => {
+    if (task?.status !== 'SIGNING') return;
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'visible') load();
+    }, 10000);
+    return () => clearInterval(timer);
+  }, [task?.status, load]);
+
   /** 统一提交:成功轻提示并刷新,失败提示原因——不再 alert、不再 dump JSON。 */
   const post = async (path: string, body?: unknown, okMsg?: string): Promise<boolean> => {
     try {
-      const env = await fetch(path, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body ?? {}) }).then((r) => r.json());
-      if (env?.code === 0) {
-        if (okMsg) toast.success(okMsg);
-        load();
-        return true;
-      }
-      toast.error(env?.msg ?? '操作失败');
-      return false;
-    } catch {
-      toast.error('网络错误,操作失败');
+      await platformSend(path, 'POST', body ?? {});
+      if (okMsg) toast.success(okMsg);
+      load();
+      return true;
+    } catch (e) {
+      if (!notifyIfEntitlement(e)) toast.error(e instanceof Error ? e.message : '网络错误,操作失败');
       return false;
     }
   };
 
   const downloadContract = async () => {
     try {
-      const res = await fetch(`/platform/sign/tasks/${id}/download`, { credentials: 'include' }).then((r) => r.json());
-      const url = res?.data?.fileUrl ?? res?.data?.url ?? res?.data?.downloadUrl;
-      if (res?.code === 0 && url) {
+      const d = await platformGet<Record<string, string | undefined>>(`/platform/sign/tasks/${id}/download`);
+      const url = d?.fileUrl ?? d?.url ?? d?.downloadUrl;
+      if (url) {
         window.open(url, '_blank', 'noopener');
         toast.success('已开始下载合同文件');
       } else {
-        toast.error(res?.msg ?? '下载失败,请稍后重试');
+        toast.error('下载失败,请稍后重试');
       }
-    } catch {
-      toast.error('网络错误,下载失败');
+    } catch (e) {
+      if (!notifyIfEntitlement(e)) toast.error(e instanceof Error ? e.message : '网络错误,下载失败');
     }
   };
 
   const requestCertificate = async () => {
     try {
-      const e = await fetch(`/platform/sign/tasks/${id}/certificate`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: '{}' }).then((r) => r.json());
-      if (e?.code === 0) toast.success('出证申请已提交');
-      else toast.error(e?.msg ?? '出证失败');
-    } catch {
-      toast.error('网络错误,出证失败');
+      await platformSend(`/platform/sign/tasks/${id}/certificate`, 'POST', {});
+      toast.success('出证申请已提交');
+    } catch (e) {
+      if (!notifyIfEntitlement(e)) toast.error(e instanceof Error ? e.message : '网络错误,出证失败');
     }
   };
 
@@ -136,6 +156,13 @@ export default function TaskDetail() {
 
   // 加载中 / 失败 / 404 三态分开,不再用 null 初始值闪「任务不存在」
   if (loading) return <div className="p-8 text-center text-sm text-muted-foreground">正在加载…</div>;
+  if (locked) {
+    return (
+      <div className="flex h-full items-center justify-center p-8">
+        <EntitlementGate onRetry={reload} />
+      </div>
+    );
+  }
   if (loadError) {
     return (
       <div className="flex flex-col items-center gap-3 p-8 text-center text-sm">
@@ -156,22 +183,18 @@ export default function TaskDetail() {
   const goSign = async () => {
     if (!myParty) return;
     try {
-      const env = await fetch(`/platform/sign/tasks/${id}/parties/${myParty.id}/sign`, {
-        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: '{}',
-      }).then((r) => r.json());
-      if (env?.code !== 0) {
-        toast.error(env?.msg ?? '无法打开签署页');
-        return;
-      }
-      const url = env?.data?.signUrl as string | undefined;
+      const d = await platformSend<{ signUrl?: string; message?: string }>(
+        `/platform/sign/tasks/${id}/parties/${myParty.id}/sign`, 'POST', {},
+      );
+      const url = d?.signUrl;
       if (url) {
         window.open(url, '_blank', 'noopener');
         toast.success('已打开 e签宝签署页。签完后回到本页刷新状态');
       } else {
-        toast.message(env?.data?.message ?? '尚未配置 e签宝应用，不能完成具有法律效力的签署');
+        toast.message(d?.message ?? '尚未配置 e签宝应用，不能完成具有法律效力的签署');
       }
-    } catch {
-      toast.error('网络错误,无法打开签署页');
+    } catch (e) {
+      if (!notifyIfEntitlement(e)) toast.error(e instanceof Error ? e.message : '网络错误,无法打开签署页');
     }
   };
 
@@ -187,6 +210,9 @@ export default function TaskDetail() {
           {/* Top bar with title + actions */}
           <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3">
             <span className="flex-1 truncate font-semibold text-subtitle">{task.title}</span>
+            {task.status === 'SIGNING' && (
+              <button className="rounded-md border border-border px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted" onClick={() => load()}>刷新状态</button>
+            )}
             <button className="rounded-md border border-border px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted" onClick={() => nav('/')}>去审查</button>
             {task.status === 'COMPLETED' && (
               <>
@@ -259,6 +285,11 @@ export default function TaskDetail() {
                       <div className="flex justify-between border-b border-dashed border-border py-1.5">
                         <span className="text-muted-foreground">任务编号</span><span className="font-mono text-xs">{task.taskNo}</span>
                       </div>
+                      {task.providerFlowId && (
+                        <div className="flex justify-between border-b border-dashed border-border py-1.5">
+                          <span className="text-muted-foreground">签署流程号</span><span className="font-mono text-xs">{task.providerFlowId}</span>
+                        </div>
+                      )}
                       <div className="flex justify-between border-b border-dashed border-border py-1.5">
                         <span className="text-muted-foreground">发起时间</span><span>{fmtDateTime(task.createdAt)}</span>
                       </div>
@@ -291,10 +322,19 @@ export default function TaskDetail() {
                           <div>
                             {p.externalName ?? '未命名参与方'}
                             <span className="ml-1.5 text-tiny text-muted-foreground">{partyRoleLabel(p.partyRole)}</span>
+                            <span className={`ml-1.5 rounded px-1 text-tiny ${isInternal(p) ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
+                              {isInternal(p) ? '内部' : '外部'}
+                            </span>
                             {' · '}
                             {p.partyRole === 'FILLER' && p.partyStatus === 'SIGNED' ? '已填写' : partyStatusLabel(p.partyStatus)}
                           </div>
-                          <div className="mt-0.5 text-tiny text-muted-foreground">{p.signedAt ? fmtDateTime(p.signedAt) : '待签署'}</div>
+                          <div className="mt-0.5 text-tiny text-muted-foreground">
+                            {isInternal(p)
+                              ? (p.signedAt ? fmtDateTime(p.signedAt) : '待签署')
+                              : (p.partyStatus === 'SIGNED' && p.signedAt
+                                ? fmtDateTime(p.signedAt)
+                                : `签署链接已发送至 ${maskPhone(p.externalPhone) || maskEmail(p.externalEmail) || '其手机/邮箱'}`)}
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -320,6 +360,14 @@ export default function TaskDetail() {
                           <button className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground" onClick={() => void goSign()}>去签署</button>
                           <button className="rounded-md border border-border px-4 py-2 text-sm text-red-500" onClick={() => { setRejectReason(''); setRejectOpen(true); }}>拒签</button>
                         </>
+                      )}
+                      {isInitiator && task.status === 'SIGNING' && !canSign && (
+                        <div className="flex items-center gap-2.5 text-meta text-muted-foreground">
+                          <span>
+                            等待 {parties.filter((p) => p.partyStatus === 'PENDING_SIGN').length} 位签署方完成，签好后自动更新
+                          </span>
+                          <button className="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-muted" onClick={() => load()}>刷新</button>
+                        </div>
                       )}
                       {isInitiator && task.status === 'COMPLETED' && (
                         <button className="rounded-md border border-border px-4 py-2 text-sm" onClick={() => setVoidOpen(true)}>申请解约</button>

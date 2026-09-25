@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
+import { EntitlementGate } from '@/components/legal/EntitlementGate';
 import {
-  EMPTY_REQUIREMENT, type PartyDraft, type SignRequirement,
+  EMPTY_REQUIREMENT, EntitlementError, type PartyDraft, type SignRequirement,
   api, defaultExpireLocal, emptyParty, toApiTime,
 } from './api';
 
@@ -30,6 +31,35 @@ function nowLocal(): string {
 
 const inputCls = 'mt-1 h-9 w-full rounded-md border border-border bg-background px-3 text-sm';
 
+const PHONE_RE = /^1[3-9]\d{9}$/;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * 提交前逐参与方校验，与后端 buildParty + e签宝硬约束对齐：
+ * 外部个人签署方手机号必须 11 位（联调中 10 位号被 e签宝拒），手机/邮箱至少其一。
+ * requireComplete=false 用于「保存草稿」：只校验已填内容的格式，不强制齐全。
+ */
+function validateParties(ps: PartyDraft[], requireComplete: boolean): string | null {
+  const rows = ps.filter((p) => p.externalName.trim() || p.externalPhone.trim() || p.externalEmail.trim());
+  if (requireComplete && rows.length === 0) return '请至少添加一名收件人';
+  for (const p of rows) {
+    const name = p.externalName.trim();
+    if (!name) return '请填写收件人名称';
+    if (name.length > 64) return `「${name}」名称过长（最多 64 字）`;
+    if (!p.canFill && !p.canSign) return `「${name}」需勾选填写或签署`;
+    const phone = p.externalPhone.trim();
+    if (phone && !PHONE_RE.test(phone)) return `「${name}」手机号格式不正确（需 11 位大陆手机号）`;
+    const email = p.externalEmail.trim();
+    if (email && !EMAIL_RE.test(email)) return `「${name}」邮箱格式不正确`;
+    const isExternalPsn = p.partyType === 'PERSON' && !p.memberUserId.trim();
+    if (requireComplete && isExternalPsn && !phone && !email) {
+      return `「${name}」需填写手机号或邮箱（用于接收 e签宝签署链接）`;
+    }
+  }
+  if (requireComplete && !rows.some((p) => p.canSign)) return '至少需要一名签署方';
+  return null;
+}
+
 export default function TaskSetup() {
   const { id } = useParams();
   const nav = useNavigate();
@@ -46,6 +76,7 @@ export default function TaskSetup() {
   const [guideStep, setGuideStep] = useState(0);
   const [reqIndex, setReqIndex] = useState<number | null>(null);
   const [error, setError] = useState('');
+  const [locked, setLocked] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -65,7 +96,10 @@ export default function TaskSetup() {
       setSequential(t.signMode === 'SEQUENTIAL');
       setFinalizeMode(t.finalizeMode === 'MANUAL' ? 'MANUAL' : 'AUTO');
       if (t.quotaSnapshot != null) setQuota(t.quotaSnapshot);
-    }).catch((e: Error) => setError(e.message));
+    }).catch((e: unknown) => {
+      if (e instanceof EntitlementError) setLocked(true);
+      else setError(e instanceof Error ? e.message : '加载失败');
+    });
     void api<PartyRow[]>(`/platform/sign/tasks/${id}/parties`).then((rows) => {
       if (rows.length === 0) return;
       setParties(rows.map((p) => ({
@@ -86,6 +120,8 @@ export default function TaskSetup() {
   }, [id, nav]);
 
   const save = async () => {
+    const verr = validateParties(parties, false);
+    if (verr) { setError(verr); throw new Error(verr); }
     setBusy(true);
     setError('');
     try {
@@ -113,7 +149,8 @@ export default function TaskSetup() {
         }),
       });
     } catch (e) {
-      setError(e instanceof Error ? e.message : '保存失败');
+      if (e instanceof EntitlementError) setLocked(true);
+      else setError(e instanceof Error ? e.message : '保存失败');
       throw e;
     } finally {
       setBusy(false);
@@ -122,8 +159,10 @@ export default function TaskSetup() {
 
   const next = async () => {
     setSubmitted(true);
+    setError('');
     if (!title.trim()) { setError('请填写任务主题'); return; }
-    if (parties.filter((p) => p.externalName.trim()).length === 0) { setError('请至少添加一名收件人'); return; }
+    const verr = validateParties(parties, true);
+    if (verr) { setError(verr); return; }
     try {
       await save();
       nav(`/signing/${id}/compose`);
@@ -135,6 +174,14 @@ export default function TaskSetup() {
   const editing = reqIndex != null ? parties[reqIndex] : null;
   const titleError = submitted && !title.trim();
   const minTime = nowLocal();
+
+  if (locked) {
+    return (
+      <div className="flex h-full items-center justify-center p-8">
+        <EntitlementGate />
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -234,8 +281,9 @@ export default function TaskSetup() {
                   <span className="flex items-center gap-2 text-sm">
                     <Switch checked={p.canSign} onCheckedChange={(v) => update(i, { canSign: v })} />签署
                   </span>
-                  <span className="flex items-center gap-2 text-sm">
-                    <Switch checked={p.identityCheck} onCheckedChange={(v) => update(i, { identityCheck: v })} />身份校验
+                  <span className="flex items-center gap-2 text-sm" title="该配置即将支持，当前不会生效">
+                    <Switch checked={p.identityCheck} disabled onCheckedChange={(v) => update(i, { identityCheck: v })} />身份校验
+                    <span className="text-tiny text-muted-foreground">（即将支持）</span>
                   </span>
                   <button className="ml-auto rounded-md border border-border px-3 py-1.5 text-sm hover:bg-muted" onClick={() => setReqIndex(i)}>签署要求</button>
                 </div>
@@ -246,6 +294,9 @@ export default function TaskSetup() {
             <button className="rounded-md border border-border px-3 py-1.5 text-sm" onClick={() => setParties([...parties, { ...emptyParty(), partyType: 'PERSON' }])}>添加个人</button>
             <button className="rounded-md border border-border px-3 py-1.5 text-sm" onClick={() => setParties([...parties, emptyParty()])}>添加企业</button>
           </div>
+          <p className="mt-2 text-xs leading-5 text-muted-foreground">
+            签署人姓名需与其 e签宝实名信息一致；个人手机号需为 11 位大陆号码。外部签署人（非本站成员）通过 e签宝短信/邮件链接完成签署，手机号与邮箱至少填写一项。
+          </p>
         </section>
 
         <section className="mb-4 rounded-lg border border-border bg-card p-4">
@@ -324,12 +375,17 @@ function RequirementDialog({ value, onOk, onCancel }: {
       <DialogContent className="w-[calc(100%-2rem)] max-w-md rounded-2xl border bg-white p-6 shadow-xl dark:bg-card">
         <DialogTitle className="text-lg font-semibold">设置签署要求</DialogTitle>
         <DialogDescription className="sr-only">配置签名方式、签署意愿校验与阅读要求</DialogDescription>
-        <div className="mt-4 mb-3 text-sm">
+        {/* 后端尚未把 signRequirement 映射到 e签宝(见联调方案附录 D),置灰避免用户误以为已生效 */}
+        <div className="mt-3 rounded-md bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+          以下配置即将支持，当前不会生效
+        </div>
+        <div className="pointer-events-none mt-3 opacity-50">
+        <div className="mb-3 text-sm">
           签名方式
           <div className="mt-1 flex flex-wrap gap-3">
             {([['UNLIMITED', '不限制'], ['STANDARD', '标准签名'], ['HANDWRITE', '手绘签名'], ['AI_HANDWRITE', 'AI手绘签名']] as const).map(([code, label]) => (
               <label key={code} className="flex items-center gap-1">
-                <input type="radio" checked={draft.signatureMode === code} onChange={() => setDraft({ ...draft, signatureMode: code })} />{label}
+                <input type="radio" disabled checked={draft.signatureMode === code} onChange={() => setDraft({ ...draft, signatureMode: code })} />{label}
               </label>
             ))}
           </div>
@@ -339,27 +395,28 @@ function RequirementDialog({ value, onOk, onCancel }: {
           <div className="mt-1 flex flex-wrap gap-3">
             {([['PASSWORD', '签署密码'], ['SMS', '短信验证'], ['FACE', '人脸识别']] as const).map(([code, label]) => (
               <label key={code} className="flex items-center gap-1">
-                <input type="checkbox" checked={draft.wills.includes(code)} onChange={() => toggleWill(code)} />{label}
+                <input type="checkbox" disabled checked={draft.wills.includes(code)} onChange={() => toggleWill(code)} />{label}
               </label>
             ))}
           </div>
         </div>
         <label className="mb-2 flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={draft.readToEnd} onChange={(e) => setDraft({ ...draft, readToEnd: e.target.checked })} />
+          <input type="checkbox" disabled checked={draft.readToEnd} onChange={(e) => setDraft({ ...draft, readToEnd: e.target.checked })} />
           所有文件需阅读至末页才可提交签署
         </label>
         <label className="mb-2 flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={draft.readSeconds != null} onChange={(e) => setDraft({ ...draft, readSeconds: e.target.checked ? 5 : null })} />
+          <input type="checkbox" disabled checked={draft.readSeconds != null} onChange={(e) => setDraft({ ...draft, readSeconds: e.target.checked ? 5 : null })} />
           阅读
           <input type="number" min={1} max={3600} className="h-8 w-16 rounded-md border border-border px-2"
-            disabled={draft.readSeconds == null} value={draft.readSeconds ?? 5}
+            disabled value={draft.readSeconds ?? 5}
             onChange={(e) => setDraft({ ...draft, readSeconds: Number(e.target.value) })} />
           秒后才可提交签署
         </label>
         <label className="mb-4 flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={draft.requireAttachment} onChange={(e) => setDraft({ ...draft, requireAttachment: e.target.checked })} />
+          <input type="checkbox" disabled checked={draft.requireAttachment} onChange={(e) => setDraft({ ...draft, requireAttachment: e.target.checked })} />
           要求上传附件
         </label>
+        </div>
         <div className="flex justify-end gap-2">
           <button className="rounded-md border border-border px-3 py-1.5 text-sm" onClick={onCancel}>取消</button>
           <button className="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground" onClick={() => onOk(draft)}>确定</button>

@@ -627,7 +627,7 @@ async function resolveChannelStartupPolicy(): Promise<{
  * legacy `~/.openclaw` dir is left untouched (the Gateway seeds it on
  * first run and sanitization must not race that).
  */
-function ensureScopedStateDirInitialized(): void {
+function ensureScopedStateDirInitialized(businessTools: boolean): void {
   if (isLegacyScope()) return;
   const stateDir = getOpenClawConfigDir();
   const configFile = join(stateDir, 'openclaw.json');
@@ -636,15 +636,40 @@ function ensureScopedStateDirInitialized(): void {
     mkdirSync(fsPath(stateDir), { recursive: true });
     // V3 M2'：注入 JYparalegal 业务工具 MCP server（Java backend /internal/tools 契约，docs/04 §3）。
     // 键位为 openclaw 的 `mcp.servers.<name>`（McpConfig.servers），不是顶层 mcpServers。
-    const seed = {
+    // FREE 套餐下 /internal/tools 被后端 402 拦截，不注入，避免工具静默失效。
+    const seed: Record<string, unknown> = {
       agents: { defaults: { workspace: join(stateDir, 'workspace') } },
-      mcp: { servers: { jyparalegal: buildJyparalegalMcpServer() } },
     };
+    if (businessTools) {
+      seed.mcp = { servers: { jyparalegal: buildJyparalegalMcpServer() } };
+    }
     writeFileSync(fsPath(configFile), `${JSON.stringify(seed, null, 2)}\n`, 'utf-8');
     logger.info(`[scope] Seeded scoped OpenClaw state dir: ${stateDir}`);
   } catch (err) {
     logger.warn('[scope] Failed to seed scoped OpenClaw state dir:', err);
   }
+}
+
+/**
+ * 租户套餐是否允许业务工具：后端 EntitlementInterceptor 对 FREE 套餐拦截
+ * /internal/tools（402），注入的 MCP 工具会静默不可用，故 FREE 时不注入。
+ * 查询失败 fail-open（保持注入），避免网络抖动影响 PRO 租户。
+ */
+async function isBusinessToolsEntitled(): Promise<boolean> {
+  const token = getPersistedAccessToken();
+  if (!token) return true; // 未登录时保持注入，后端自行拦截
+  const base = process.env.BACKEND_URL?.trim() || 'http://localhost:8181';
+  try {
+    const res = await fetch(`${base}/api/account/overview`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(5000),
+    });
+    const env = await res.json() as { code?: number; data?: { plan?: string } };
+    if (env?.code === 0 && typeof env.data?.plan === 'string') return env.data.plan !== 'FREE';
+  } catch {
+    // fail-open
+  }
+  return true;
 }
 
 /** JYparalegal MCP 条目（含当前 scope 的 Bearer token，供 backend /internal/tools 鉴权）。 */
@@ -665,8 +690,9 @@ function buildJyparalegalMcpServer(): Record<string, unknown> {
 /**
  * 幂等注入 `mcp.servers.jyparalegal`：**已存在的 openclaw.json 也要合并写入**。
  * 仅靠首次 seed 会让老环境永远没有该条目（审阅 #17）；每次启动重写可顺带刷新 token。
+ * businessTools=false（FREE 套餐）时反向操作：移除已注入的条目。
  */
-function ensureJyparalegalMcpServer(): void {
+function ensureJyparalegalMcpServer(businessTools: boolean): void {
   if (isLegacyScope()) return;
   const stateDir = getOpenClawConfigDir();
   const configFile = join(stateDir, 'openclaw.json');
@@ -675,6 +701,15 @@ function ensureJyparalegalMcpServer(): void {
     const cfg = JSON.parse(readFileSync(fsPath(configFile), 'utf-8')) as Record<string, unknown>;
     const mcp = isRecordLocal(cfg.mcp) ? cfg.mcp : {};
     const servers = isRecordLocal(mcp.servers) ? mcp.servers : {};
+    if (!businessTools) {
+      if (!('jyparalegal' in servers)) return; // 无可移除条目不写盘
+      delete servers.jyparalegal;
+      mcp.servers = servers;
+      cfg.mcp = mcp;
+      writeFileSync(fsPath(configFile), `${JSON.stringify(cfg, null, 2)}\n`, 'utf-8');
+      logger.info('[mcp] Removed mcp.servers.jyparalegal (FREE plan: /internal/tools gated 402)');
+      return;
+    }
     const next = buildJyparalegalMcpServer();
     if (JSON.stringify(servers.jyparalegal) === JSON.stringify(next)) return; // 无变化不写盘
     servers.jyparalegal = next;
@@ -719,8 +754,9 @@ export async function prepareGatewayLaunchContext(port: number): Promise<Gateway
     throw new Error(`OpenClaw package not found at: ${openclawDir}`);
   }
 
-  ensureScopedStateDirInitialized();
-  ensureJyparalegalMcpServer();
+  const businessToolsEntitled = await isBusinessToolsEntitled();
+  ensureScopedStateDirInitialized(businessToolsEntitled);
+  ensureJyparalegalMcpServer(businessToolsEntitled);
   const appSettings = await measureAsync(timingsMs, 'settingsMs', getAllSettings);
   const prelaunchSummary = await measureAsync(timingsMs, 'prelaunchSyncMs', async () => (
     await syncGatewayConfigBeforeLaunch(appSettings, openclawDir)

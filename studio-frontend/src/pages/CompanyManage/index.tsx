@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { LegalPageHeader } from '@/components/legal/LegalPageHeader';
+import { platformGet, platformSend, notifyIfEntitlement } from '@/lib/platform-api';
 
 type Company = { id: number; name: string; tenantId?: number; unifiedCode?: string | null; esignOrgId?: string | null };
 type Member = { id: number; username: string; phone?: string | null; roleName?: string | null };
@@ -24,8 +25,8 @@ export default function CompanyManage() {
   const setOrgInput = (v: string) => { if (sel != null) setOrgEdit({ sel, value: v }); };
 
   const load = useCallback(() => {
-    void fetch('/platform/companies', { credentials: 'include' }).then((r) => r.json())
-      .then((e) => { setCompanies(Array.isArray(e?.data) ? e.data : []); setListState('ready'); })
+    void platformGet<Company[]>('/platform/companies')
+      .then((d) => { setCompanies(Array.isArray(d) ? d : []); setListState('ready'); })
       .catch(() => { setCompanies([]); setListState('error'); });
   }, []);
   useEffect(load, [load]);
@@ -36,8 +37,8 @@ export default function CompanyManage() {
     let cancelled = false;
     const fetchList = async <T,>(url: string): Promise<T[]> => {
       try {
-        const e = await fetch(url, { credentials: 'include' }).then((r) => r.json());
-        return Array.isArray(e?.data) ? (e.data as T[]) : [];
+        const d = await platformGet<T[]>(url);
+        return Array.isArray(d) ? d : [];
       } catch {
         return [];
       }
@@ -56,14 +57,11 @@ export default function CompanyManage() {
     if (sel == null) return;
     setSaving(true);
     try {
-      const e = await fetch(`/platform/companies/${sel}/esign-org-id`, {
-        method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ esignOrgId: orgInput.trim() }),
-      }).then((r) => r.json());
-      if (e?.code === 0) { toast.success('企业机构号已更新'); load(); }
-      else toast.error(e?.msg ?? '更新失败');
-    } catch {
-      toast.error('网络错误,更新失败');
+      await platformSend(`/platform/companies/${sel}/esign-org-id`, 'PUT', { esignOrgId: orgInput.trim() });
+      toast.success('企业机构号已更新');
+      load();
+    } catch (e) {
+      if (!notifyIfEntitlement(e)) toast.error(e instanceof Error ? e.message : '网络错误,更新失败');
     } finally {
       setSaving(false);
     }

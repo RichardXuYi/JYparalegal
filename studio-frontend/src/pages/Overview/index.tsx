@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Scale, GraduationCap, FileText, FileUp, Sparkles } from 'lucide-react';
+import { Scale, GraduationCap, FileText, FileUp, Lock, Sparkles } from 'lucide-react';
 import { billingRuleLabel, fmtDateTime, planLabel, signStatusLabel } from '@/lib/legal-enums';
+import { platformGet, platformProbe, platformSend, notifyIfEntitlement } from '@/lib/platform-api';
 import { LegalPageHeader } from '@/components/legal/LegalPageHeader';
 import { DropZone } from '@/components/legal/DropZone';
+import { EntitlementGate } from '@/components/legal/EntitlementGate';
 import { MAX_UPLOAD_BYTES, fileToBase64 } from '@/lib/file-base64';
 
 type SignTask = {
@@ -26,7 +28,7 @@ type Account = {
   billingRule: string;
 };
 
-type LoadState = 'loading' | 'ready' | 'error';
+type LoadState = 'loading' | 'ready' | 'error' | 'locked';
 
 function openSignTask(nav: (path: string) => void, task: { id: number; status: string }) {
   nav(task.status === 'DRAFT' ? `/signing/${task.id}/setup` : `/signing/${task.id}`);
@@ -43,31 +45,30 @@ export default function Overview() {
   const nav = useNavigate();
 
   const loadTasks = () => {
-    void fetch('/platform/sign/tasks?view=PENDING_ME', { credentials: 'include' })
-      .then((r) => r.json())
-      .then((env) => { setTasks(Array.isArray(env?.data) ? env.data : []); setTasksState('ready'); })
-      .catch(() => { setTasks([]); setTasksState('error'); });
+    void platformProbe<SignTask[]>('/platform/sign/tasks?view=PENDING_ME').then((r) => {
+      if (r.locked) { setTasks([]); setTasksState('locked'); }
+      else if (r.ok) { setTasks(Array.isArray(r.data) ? r.data : []); setTasksState('ready'); }
+      else { setTasks([]); setTasksState('error'); }
+    });
   };
   const reloadTasks = () => { setTasksState('loading'); loadTasks(); };
 
   const loadRecent = () => {
-    void fetch('/platform/sign/tasks?view=COMPLETED', { credentials: 'include' })
-      .then((r) => r.json())
-      .then((env) => { setRecent(Array.isArray(env?.data) ? env.data.slice(0, 4) : []); setRecentState('ready'); })
-      .catch(() => { setRecent([]); setRecentState('error'); });
+    void platformProbe<SignTask[]>('/platform/sign/tasks?view=COMPLETED').then((r) => {
+      if (r.locked) { setRecent([]); setRecentState('locked'); }
+      else if (r.ok) { setRecent(Array.isArray(r.data) ? r.data.slice(0, 4) : []); setRecentState('ready'); }
+      else { setRecent([]); setRecentState('error'); }
+    });
   };
   const reloadRecent = () => { setRecentState('loading'); loadRecent(); };
 
   useEffect(() => {
     loadTasks();
     loadRecent();
-    void fetch('/platform/sign/tasks/inbox/counts', { credentials: 'include' })
-      .then((r) => r.json())
-      .then((env) => setCounts(env?.data ?? null))
-      .catch(() => setCounts(null));
-    void fetch('/platform/account/overview', { credentials: 'include' })
-      .then((r) => r.json())
-      .then((env) => setAccount(env?.data ?? null))
+    void platformProbe('/platform/sign/tasks/inbox/counts')
+      .then((r) => setCounts(r.ok ? (r.data as { kpi: Record<string, number>; menu: Record<string, number> } | null) : null));
+    void platformGet<Account>('/platform/account/overview')
+      .then((d) => setAccount(d ?? null))
       .catch(() => setAccount(null));
   }, []);
 
@@ -83,13 +84,16 @@ export default function Overview() {
       toast.error(`读取文件失败：${e instanceof Error ? e.message : file.name}`);
       return;
     }
-    const res = await fetch('/platform/sign/tasks/from-file', {
-      method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: file.name.replace(/\.[^.]+$/, ''), fileName: file.name, contentBase64: b64 }),
-    }).then((r) => r.json()).catch(() => null);
-    const taskId = res?.data?.taskId;
-    if (taskId) nav(`/signing/${taskId}/setup`);
-    else toast.error(`发起失败：${res?.msg ?? '网络错误'}`);
+    try {
+      const d = await platformSend<{ taskId?: number }>('/platform/sign/tasks/from-file', 'POST', {
+        title: file.name.replace(/\.[^.]+$/, ''), fileName: file.name, contentBase64: b64,
+      });
+      const taskId = d?.taskId;
+      if (taskId) nav(`/signing/${taskId}/setup`);
+      else toast.error('发起失败');
+    } catch (e) {
+      if (!notifyIfEntitlement(e)) toast.error(`发起失败：${e instanceof Error ? e.message : '网络错误'}`);
+    }
   };
 
   const k = counts?.kpi ?? { pendingMine: 0, pendingOthers: 0, expiringSoon: 0, signing: 0 };
@@ -106,6 +110,13 @@ export default function Overview() {
   return (
     <div className="h-full overflow-y-auto p-5">
       <LegalPageHeader title="工作台" />
+
+      {account?.plan === 'FREE' && (
+        <div className="mb-4 flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-meta text-amber-700 dark:text-amber-400">
+          <Lock className="h-4 w-4 shrink-0" aria-hidden />
+          <span>免费版不含签署功能（当前为{planLabel(account.plan)}），升级套餐后可发起与管理签署任务。</span>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {kpi.map((item) => (
@@ -130,6 +141,7 @@ export default function Overview() {
             {tasksState === 'loading' && (
               <div className="p-8 text-center text-sm text-muted-foreground">正在加载…</div>
             )}
+            {tasksState === 'locked' && <EntitlementGate onRetry={reloadTasks} />}
             {tasksState === 'error' && (
               <div className="flex flex-col items-center gap-3 p-8 text-center text-sm">
                 <span className="text-muted-foreground">待办加载失败</span>
@@ -148,7 +160,7 @@ export default function Overview() {
             ))}
             <div className="grid gap-3 p-4 sm:grid-cols-[1fr_auto] sm:items-stretch">
               <DropZone
-                hint="上传文件开始发起签署 · PDF / DOCX / XLSX · ≤50MB"
+                hint="上传文件开始发起签署 · PDF / DOCX / XLSX（推荐 PDF，其它格式需转换） · ≤50MB"
                 onDropFiles={(files) => { const f = files[0]; if (f) void uploadFile(f); }}
                 actions={[
                   { label: '上传文件', icon: FileUp, onClick: () => fileRef.current?.click() },
@@ -172,6 +184,7 @@ export default function Overview() {
             {recentState === 'loading' && (
               <div className="p-6 text-center text-sm text-muted-foreground">正在加载…</div>
             )}
+            {recentState === 'locked' && <EntitlementGate onRetry={reloadRecent} />}
             {recentState === 'error' && (
               <div className="flex flex-col items-center gap-3 p-6 text-center text-sm">
                 <span className="text-muted-foreground">加载失败</span>

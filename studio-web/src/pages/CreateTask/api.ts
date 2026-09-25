@@ -1,12 +1,13 @@
+import { platformGet, platformSend } from '@/lib/platform-api';
+
+export { EntitlementError } from '@/lib/platform-api';
+
+/** 统一走平台请求客户端：402 抛 EntitlementError，其它非 0 抛 ApiError。 */
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, {
-    credentials: 'include',
-    ...init,
-    headers: init?.body ? { 'Content-Type': 'application/json', ...(init.headers ?? {}) } : init?.headers,
-  });
-  const env = await res.json().catch(() => null);
-  if (!env || env.code !== 0) throw new Error(env?.msg || '请求失败');
-  return env.data as T;
+  const method = init?.method ?? 'GET';
+  if (method === 'GET') return platformGet<T>(path);
+  const body = init?.body != null ? JSON.parse(String(init.body)) : undefined;
+  return platformSend<T>(path, method, body);
 }
 
 export function defaultExpireLocal(): string {

@@ -68,6 +68,7 @@ export default function TaskCompose() {
       <div className="flex flex-1 items-center justify-center p-8">
         <div className="w-full max-w-lg rounded-lg border border-dashed border-border bg-card p-8 text-center">
           <div className="text-sm text-muted-foreground">拖入或选择文件。支持 doc、docx、wps、pdf、xls、xlsx、jpg、jpeg、bmp、png、rtf。</div>
+          <div className="mt-1 text-xs text-muted-foreground">推荐上传 PDF；其它格式将由 e签宝自动转换为 PDF，个别文件可能转换失败。</div>
           <label className="mt-4 inline-block cursor-pointer rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground">
             {busy ? '处理中…' : '从本地上传'}
             <input type="file" accept={ACCEPT} className="hidden" disabled={busy}

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { platformProbe } from '@/lib/platform-api';
 
 type Counts = { menu: Record<string, number> };
 
@@ -23,12 +24,13 @@ export function SigningSidebar({ embedded = false }: { embedded?: boolean }) {
   const nav = useNavigate();
   const location = useLocation();
   const [counts, setCounts] = useState<Counts | null>(null);
+  const [locked, setLocked] = useState(false);
 
   useEffect(() => {
-    void fetch('/platform/sign/tasks/inbox/counts', { credentials: 'include' })
-      .then((r) => r.json())
-      .then((env) => setCounts(env?.data ?? null))
-      .catch(() => setCounts(null));
+    void platformProbe<Counts>('/platform/sign/tasks/inbox/counts').then((r) => {
+      setLocked(r.locked);
+      setCounts(r.ok ? r.data : null);
+    });
   }, [location.pathname]);
 
   const activeView = new URLSearchParams(location.search).get('view') ?? 'CREATED_BY_ME';
@@ -72,13 +74,19 @@ export function SigningSidebar({ embedded = false }: { embedded?: boolean }) {
               }`}
             >
               <span className="flex-1">{m.label}</span>
-              {badgeNum > 0 && (
-                <span className="flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-red-500 px-1 text-2xs text-white">
-                  {badgeNum}
-                </span>
-              )}
-              {countNum > 0 && (
-                <span className="text-tiny text-muted-foreground">{countNum}</span>
+              {locked && (m.badge || m.count) ? (
+                <span className="text-tiny text-muted-foreground" title="当前套餐未包含签署功能">🔒</span>
+              ) : (
+                <>
+                  {badgeNum > 0 && (
+                    <span className="flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-red-500 px-1 text-2xs text-white">
+                      {badgeNum}
+                    </span>
+                  )}
+                  {countNum > 0 && (
+                    <span className="text-tiny text-muted-foreground">{countNum}</span>
+                  )}
+                </>
               )}
             </button>
           );

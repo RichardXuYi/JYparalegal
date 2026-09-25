@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { platformGet, platformProbe } from '@/lib/platform-api';
 import { moduleForPath, type SidebarEntry } from './nav-config';
 
 type Counts = { menu: Record<string, number> };
@@ -22,22 +23,22 @@ export function LegalSidebar() {
   const location = useLocation();
   const module = moduleForPath(location.pathname);
   const [counts, setCounts] = useState<Counts | null>(null);
+  const [locked, setLocked] = useState(false);
   const [account, setAccount] = useState<Account | null>(null);
 
   const isSigning = module?.viewDriven ?? false;
 
   useEffect(() => {
     if (!isSigning) return;
-    void fetch('/platform/sign/tasks/inbox/counts', { credentials: 'include' })
-      .then((r) => r.json())
-      .then((env) => setCounts(env?.data ?? null))
-      .catch(() => setCounts(null));
+    void platformProbe<Counts>('/platform/sign/tasks/inbox/counts').then((r) => {
+      setLocked(r.locked);
+      setCounts(r.ok ? r.data : null);
+    });
   }, [isSigning, location.pathname, location.search]);
 
   useEffect(() => {
-    void fetch('/platform/account/overview', { credentials: 'include' })
-      .then((r) => r.json())
-      .then((env) => setAccount(env?.data ?? null))
+    void platformGet<Account>('/platform/account/overview')
+      .then((d) => setAccount(d ?? null))
       .catch(() => setAccount(null));
   }, []);
 
@@ -96,12 +97,18 @@ export function LegalSidebar() {
                   )}
                 >
                   <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{e.label}</span>
-                  {badgeNum > 0 && (
-                    <span className="flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-red-500 px-1 text-2xs text-white">
-                      {badgeNum}
-                    </span>
+                  {locked && (e.badge || e.count) ? (
+                    <span className="text-tiny text-white/60" title="当前套餐未包含签署功能">🔒</span>
+                  ) : (
+                    <>
+                      {badgeNum > 0 && (
+                        <span className="flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-red-500 px-1 text-2xs text-white">
+                          {badgeNum}
+                        </span>
+                      )}
+                      {countNum > 0 && <span className="text-tiny text-white/60">{countNum}</span>}
+                    </>
                   )}
-                  {countNum > 0 && <span className="text-tiny text-white/60">{countNum}</span>}
                 </button>
               );
             })}
