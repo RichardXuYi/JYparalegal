@@ -20,7 +20,8 @@ import { useProviderStore } from './stores/providers';
 import { rendererExtensionRegistry } from './extensions/registry';
 import { loadExternalRendererExtensions } from './extensions/_ext-bridge.generated';
 import { UpdateNotifier } from './components/update/UpdateNotifier';
-import { ConnectionStatusModal } from './components/common/ConnectionStatusModal';
+import { GatewayConnectOverlay } from './components/common/GatewayConnectOverlay';
+import { GatewayFailureDialog } from './components/common/GatewayFailureDialog';
 import { InitializingScreen } from './components/common/InitializingScreen';
 import { useNewChatAction } from './components/layout/use-new-chat-action';
 import { hostEvents } from './lib/host-events';
@@ -323,7 +324,8 @@ function App() {
         </Suspense>
 
         <UpdateNotifier />
-        <ConnectionStatusModal />
+        <GatewayConnectOverlay />
+        <GatewayFailureDialog />
         {toaster}
       </TooltipProvider>
     </ErrorBoundary>

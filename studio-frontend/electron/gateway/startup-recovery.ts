@@ -4,6 +4,7 @@
  * This module is intentionally dependency-free so it can be unit-tested
  * without Electron/runtime mocks.
  */
+import { isDeterministicGatewayStartupFailure } from './failure-taxonomy';
 
 const INVALID_CONFIG_PATTERNS: RegExp[] = [
   /\binvalid config\b/i,
@@ -135,6 +136,13 @@ export function getGatewayStartupRecoveryAction(options: {
   configRepairAttempted: boolean;
   attempt: number;
   maxAttempts: number;
+  /** Child exit code when the gateway process died (null/undefined if alive). */
+  exitCode?: number | null;
+  /** True when waitForGatewayReady exhausted its poll budget with the process alive. */
+  readyPollExhausted?: boolean;
+  /** Consecutive start-flows that hit "port still occupied". */
+  portOccupiedStreak?: number;
+  phase?: 'spawn' | 'wait-port' | 'wait-ready' | 'connect';
 }): GatewayStartupRecoveryAction {
   if (shouldAttemptConfigAutoRepair(
     options.startupError,
@@ -142,6 +150,27 @@ export function getGatewayStartupRecoveryAction(options: {
     options.configRepairAttempted,
   )) {
     return 'repair';
+  }
+
+  // Deterministic boot failures cannot be fixed by retrying (e.g. openclaw's
+  // legacy workspace-state migration refusing on Windows, exit 78). Fail fast
+  // into the terminal state instead of burning the 3x10 retry budget. Note the
+  // ready-poll itself already spans minutes, so exhausting it counts as
+  // "having retried" and is treated deterministic here.
+  if (isDeterministicGatewayStartupFailure({
+    error: options.startupError,
+    exitCode: options.exitCode ?? null,
+    stderrLines: options.startupStderrLines,
+    configRepairAttempted: options.configRepairAttempted,
+    invalidConfigSignal: hasInvalidConfigFailureSignal(
+      options.startupError,
+      options.startupStderrLines,
+    ),
+    readyPollExhausted: options.readyPollExhausted,
+    portOccupiedStreak: options.portOccupiedStreak,
+    phase: options.phase ?? 'spawn',
+  })) {
+    return 'fail';
   }
 
   if (options.attempt < options.maxAttempts && isTransientGatewayStartError(options.startupError)) {

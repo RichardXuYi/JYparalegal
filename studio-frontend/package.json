@@ -19,6 +19,7 @@
         "bundle:preinstalled-skills": "zx scripts/bundle-preinstalled-skills.mjs",
         "lint": "eslint . --fix",
         "lint:check": "eslint .",
+        "test": "vitest run --passWithNoTests",
         "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
         "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
         "typecheck": "pnpm run typecheck:node && pnpm run typecheck:web",
@@ -160,6 +161,7 @@
         "vite": "catalog:",
         "vite-plugin-electron": "^0.29.0",
         "vite-plugin-electron-renderer": "^0.14.6",
+        "vitest": "catalog:",
         "xlsx": "^0.18.5",
         "zustand": "catalog:",
         "zx": "^8.8.5"

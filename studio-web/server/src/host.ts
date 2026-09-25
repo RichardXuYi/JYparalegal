@@ -27,6 +27,7 @@ import { createDialogApi } from '../host-core/services/dialog-api';
 import { createSettingsApi } from '../host-core/services/settings-api';
 import { createGatewayApi } from '../host-core/services/gateway-api';
 import { createLogsApi } from '../host-core/services/logs-api';
+import { createDiagnosticsApi } from '../host-core/services/diagnostics-api';
 import { createChannelsApi } from '../host-core/services/channels-api';
 import { createAgentsApi } from '../host-core/services/agents-api';
 import { createProvidersApi } from '../host-core/services/providers-api';
@@ -147,6 +148,7 @@ export function createWebHost(appVersion: string): WebHost {
     settings: createSettingsApi(gatewayManager),
     gateway: createGatewayApi(gatewayManager, gatewayRpcBackpressure),
     logs: createLogsApi(),
+    diagnostics: createDiagnosticsApi({ gatewayManager }),
     channels: createChannelsApi({ gatewayManager, mainWindow }),
     agents: createAgentsApi({ gatewayManager }),
     providers: createProvidersApi({ gatewayManager, mainWindow }),

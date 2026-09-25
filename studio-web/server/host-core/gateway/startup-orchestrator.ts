@@ -1,6 +1,7 @@
 import { logger } from '../utils/logger';
 import { LifecycleSupersededError } from './lifecycle-controller';
 import { connectGatewayWithStartupRetry, getGatewayStartupRecoveryAction } from './startup-recovery';
+import { GatewayProcessExitedError, GatewayReadyTimeoutError } from './ws-client';
 
 export interface ExistingGatewayInfo {
   port: number;
@@ -16,6 +17,8 @@ type StartupHooks = {
   hasOwnedProcess: () => boolean;
   resetStartupStderrLines: () => void;
   getStartupStderrLines: () => string[];
+  /** Optional: current child exit code, for exit-code-aware failure classification. */
+  getProcessExitCode?: () => number | null;
   assertLifecycle: (phase: string) => void;
   findExistingGateway: (port: number) => Promise<ExistingGatewayInfo | null>;
   connect: (port: number, externalToken?: string) => Promise<void>;
@@ -112,6 +115,15 @@ export async function runGatewayStartupSequence(hooks: StartupHooks): Promise<vo
         configRepairAttempted,
         attempt: startAttempts,
         maxAttempts: maxStartAttempts,
+        exitCode: error instanceof GatewayProcessExitedError
+          ? error.exitCode
+          : (hooks.getProcessExitCode?.() ?? null),
+        readyPollExhausted: error instanceof GatewayReadyTimeoutError,
+        phase: error instanceof GatewayReadyTimeoutError
+          ? 'wait-ready'
+          : error instanceof GatewayProcessExitedError
+            ? 'spawn'
+            : 'connect',
       });
 
       if (recoveryAction === 'repair') {

@@ -3,9 +3,8 @@
  * Slim mobile top bar: hamburger (session drawer) + logo + gateway status + settings.
  * Honors the iOS notch via safe-area padding.
  */
-import { Menu, Settings as SettingsIcon, Loader2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { useGatewayStore } from '@/stores/gateway';
+import { Menu, Settings as SettingsIcon } from 'lucide-react';
+import { GatewayStatusChip } from '@/components/common/GatewayStatusChip';
 import { useSettingsUiStore } from '@/stores/settings-ui';
 import { useTranslation } from 'react-i18next';
 import logoSvg from '@/assets/logo.svg';
@@ -16,9 +15,6 @@ interface MobileTopBarProps {
 
 export function MobileTopBar({ onOpenDrawer }: MobileTopBarProps) {
   const { t } = useTranslation('common');
-  const gatewayStatus = useGatewayStore((s) => s.status);
-  const isGatewayRunning = gatewayStatus.state === 'running';
-  const isGatewayStarting = gatewayStatus.state === 'starting';
   const openSettings = useSettingsUiStore((s) => s.openSettings);
 
   return (
@@ -46,31 +42,8 @@ export function MobileTopBar({ onOpenDrawer }: MobileTopBarProps) {
           </span>
         </div>
 
-        {/* Gateway status: compact dot (label hidden on very narrow screens) */}
-        <div
-          className="flex shrink-0 items-center gap-1.5 px-2 py-1 rounded-full text-xs"
-          title={
-            isGatewayStarting ? t('gateway.connecting', '连接中') :
-            isGatewayRunning ? t('gateway.connected', '已连接') : t('gateway.disconnected', '未连接')
-          }
-        >
-          {isGatewayStarting ? (
-            <Loader2 className="h-2 w-2 rounded-full animate-spin text-yellow-500" />
-          ) : (
-            <div className={cn(
-              'h-2 w-2 rounded-full',
-              isGatewayRunning ? 'bg-green-500' : 'bg-red-500'
-            )} />
-          )}
-          <span className={cn(
-            'hidden min-[380px]:inline transition-opacity duration-200',
-            isGatewayStarting ? 'text-yellow-700 dark:text-yellow-400' :
-            isGatewayRunning ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'
-          )}>
-            {isGatewayStarting ? t('gateway.connecting', '连接中') :
-             isGatewayRunning ? t('gateway.connected', '已连接') : t('gateway.disconnected', '未连接')}
-          </span>
-        </div>
+        {/* Gateway status chip: opens a details popover, or the failure dialog */}
+        <GatewayStatusChip className="rounded-full px-2 py-1 text-xs" />
 
         {/* Settings button */}
         <button

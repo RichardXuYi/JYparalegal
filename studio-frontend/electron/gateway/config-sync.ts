@@ -642,11 +642,29 @@ function ensureScopedStateDirInitialized(): void {
   }
 }
 
+/**
+ * Dev-only fake-gateway entry override (`GP_GATEWAY_ENTRY_OVERRIDE`) so the
+ * terminal-failure UX can be reproduced deterministically (e.g. exit-78).
+ * Accepts an absolute path or one relative to the app cwd; always ignored in
+ * packaged builds.
+ */
+function resolveGatewayEntryScript(): string {
+  const override = process.env.GP_GATEWAY_ENTRY_OVERRIDE;
+  if (!app.isPackaged && override) {
+    const candidate = path.isAbsolute(override) ? override : path.join(process.cwd(), override);
+    if (existsSync(candidate)) {
+      logger.warn(`[dev] Using fake gateway entry override: ${candidate}`);
+      return candidate;
+    }
+  }
+  return getOpenClawEntryPath();
+}
+
 export async function prepareGatewayLaunchContext(port: number): Promise<GatewayLaunchContext> {
   const timingsMs: Record<string, number> = {};
   const totalStartedAt = Date.now();
   const openclawDir = getOpenClawDir();
-  const entryScript = getOpenClawEntryPath();
+  const entryScript = resolveGatewayEntryScript();
 
   if (!isOpenClawPresent()) {
     throw new Error(`OpenClaw package not found at: ${openclawDir}`);

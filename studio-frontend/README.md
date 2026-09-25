@@ -14,6 +14,7 @@ Electron 工作台。OpenClaw 2026.9.6 随安装包分发，登录后直接使�
 | `pnpm run dev` | 开发 |
 | `pnpm run typecheck` | 主进程与渲染进程类型检查 |
 | `pnpm run lint:check` | ESLint |
+| `pnpm test` | Vitest 单元测试（`tests/unit/`） |
 | `pnpm run package:win` | 打 Windows 安装包（会先准备 Windows 二进制并打入 OpenClaw） |
 
 `pnpm run dev` 只适合开发。发给客户的是 `package:win` / `package:mac` / `package:linux` 的安装包。
@@ -29,6 +30,16 @@ scripts/      打包与 OpenClaw 捆绑
 ```
 
 渲染层通过 `src/lib/host-api.ts` 调用主进程，不直接请求 Gateway 端口。
+
+## Gateway 连接状态
+
+Gateway 生命周期有终态：确定性启动故障（如遗留状态目录迁移失败 exit 78）在**一个启动流程内**进入 `failed` 终态，不再空转 3×10 次重试；终态只响应显式重试，不自动恢复。界面按 `src/lib/connection-status.ts` 的单一判定函数分三层呈现：有界启动遮罩（≤6 秒后降级）、非阻塞状态横幅（重连计数 + 倒计时）、终态故障对话框（本地化原因、就绪层级、日志末尾、重试 / 查看日志 / 复制启动报告 / Doctor 修复）。顶栏状态胶囊常驻可点击。
+
+确定性复现故障路径（仅 dev 构建生效）：
+
+```bash
+GP_GATEWAY_ENTRY_OVERRIDE="scripts/dev/fake-gateway-exit78.mjs" pnpm dev
+```
 
 ## 模型
 

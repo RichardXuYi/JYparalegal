@@ -11,6 +11,7 @@
  * CSS opacity/pointer-events. The parent should stop rendering it once the
  * fade-out animation is complete to free resources.
  */
+import { useTranslation } from 'react-i18next';
 
 interface InitializingScreenProps {
   /** Whether the loading overlay is visible. CSS transition handles fade-out. */
@@ -20,6 +21,7 @@ interface InitializingScreenProps {
 const FADE_DURATION_MS = 300;
 
 export function InitializingScreen({ visible }: InitializingScreenProps) {
+  const { t } = useTranslation('common');
   return (
     <div
       className="fixed inset-0 z-[99999] flex items-center justify-center overflow-hidden"
@@ -58,8 +60,8 @@ export function InitializingScreen({ visible }: InitializingScreenProps) {
             <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent dark:from-blue-400 dark:to-purple-400">
               JYparalegal
             </h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-              给中国法律人用的 AI 合同工作台
+            <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+              {t('init.tagline')}
             </p>
           </div>
         </div>
@@ -79,12 +81,12 @@ export function InitializingScreen({ visible }: InitializingScreenProps) {
         </div>
 
         {/* Text */}
-        <div className="text-center space-y-2">
+        <div className="space-y-2 text-center">
           <p className="text-base font-medium text-slate-700 dark:text-slate-200">
-            正在配置环境...
+            {t('init.configuring')}
           </p>
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            首次加载可能需要片刻时间
+            {t('init.firstLoadHint')}
           </p>
         </div>
       </div>

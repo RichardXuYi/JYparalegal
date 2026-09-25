@@ -18,7 +18,8 @@ import { useProviderStore } from './stores/providers';
 import { rendererExtensionRegistry } from './extensions/registry';
 import { loadExternalRendererExtensions } from './extensions/_ext-bridge.generated';
 
-import { ConnectionStatusModal } from './components/common/ConnectionStatusModal';
+import { GatewayConnectOverlay } from './components/common/GatewayConnectOverlay';
+import { GatewayFailureDialog } from './components/common/GatewayFailureDialog';
 import { InitializingScreen } from './components/common/InitializingScreen';
 import { useNewChatAction } from './components/layout/use-new-chat-action';
 import { hostEvents } from './lib/host-events';
@@ -336,8 +337,9 @@ function App() {
           </Routes>
         </Suspense>
 
-        {/* Global blocking overlay for slow connect / reconnect / model-switch operations */}
-        <ConnectionStatusModal />
+        {/* Bounded startup overlay + non-blocking banner + terminal failure dialog */}
+        <GatewayConnectOverlay />
+        <GatewayFailureDialog />
 
         {/* Global toast notifications (mobile: bottom is taken by tab bar / input) */}
         <Toaster

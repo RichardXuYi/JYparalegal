@@ -30,7 +30,12 @@ import {
 import { dispatchJsonRpcNotification, dispatchProtocolEvent } from './event-dispatch';
 import { GatewayStateController } from './state';
 import { prepareGatewayLaunchContext } from './config-sync';
-import { connectGatewaySocket, waitForGatewayReady } from './ws-client';
+import {
+  connectGatewaySocket,
+  waitForGatewayReady,
+  GatewayProcessExitedError,
+  GatewayReadyTimeoutError,
+} from './ws-client';
 import {
   findExistingGatewayProcess,
   runOpenClawDoctorRepair,
@@ -51,6 +56,19 @@ import {
 } from './reload-policy';
 import { classifyGatewayStderrMessage, recordGatewayStartupStderrLine } from './startup-stderr';
 import { runGatewayStartupSequence } from './startup-orchestrator';
+import {
+  buildMaxReconnectsExhaustedFailure,
+  classifyGatewayStartupFailure,
+  type GatewayStartupFailureClassification,
+} from './failure-taxonomy';
+import {
+  buildGatewayStartupFailureReport,
+  type GatewayStartupFailureReport,
+  type GatewayStartupMetric,
+} from './startup-report';
+import { hasInvalidConfigFailureSignal } from './startup-recovery';
+import { getOpenClawConfigDir } from '../utils/paths';
+import type { GatewayFailureInfo, GatewayReadinessTier } from '@shared/types/gateway';
 import {
   GatewayCapabilityMonitor,
   type GatewayCapabilityName,
@@ -79,6 +97,12 @@ export interface GatewayStatus {
   reconnectAttempts?: number;
   /** True once the gateway's internal subsystems (skills, plugins) are ready for RPC calls. */
   gatewayReady?: boolean;
+  /** Structured failure info; present on `error`/`failed`, cleared on success/stop. */
+  failure?: GatewayFailureInfo | null;
+  /** Epoch ms of the next scheduled reconnect attempt (banner countdown). */
+  nextRetryAt?: number;
+  /** Reconnect budget ceiling, for "attempt n/max" rendering. */
+  reconnectMaxAttempts?: number;
 }
 
 export type GatewayHealthState = 'healthy' | 'degraded' | 'unresponsive';
@@ -195,6 +219,11 @@ export class GatewayManager extends EventEmitter {
   private lastRestartAt = 0;
   /** Set by scheduleReconnect() before calling start() to signal auto-reconnect. */
   private isAutoReconnectStart = false;
+  /** Terminal-failure startup report (single slot; cleared on successful start). */
+  private lastStartupReport: GatewayStartupFailureReport | null = null;
+  private doctorRepairAttempted = false;
+  private portOccupiedStreak = 0;
+  private startupTimings: { t0?: number; tSpawned?: number; tReady?: number } = {};
   private gatewayReadyFallbackTimer: NodeJS.Timeout | null = null;
   private gatewayReadyFallbackAttempt = 0;
   private readonly capabilityMonitor = new GatewayCapabilityMonitor();
@@ -356,6 +385,7 @@ export class GatewayManager extends EventEmitter {
     const t0 = Date.now();
     let tSpawned = 0;
     let tReady = 0;
+    this.startupTimings = { t0 };
 
     try {
       await runGatewayStartupSequence({
@@ -366,6 +396,7 @@ export class GatewayManager extends EventEmitter {
           this.recentStartupStderrLines = [];
         },
         getStartupStderrLines: () => this.recentStartupStderrLines,
+        getProcessExitCode: () => this.processExitCode,
         assertLifecycle: (phase) => {
           this.lifecycleController.assert(startEpoch, phase);
         },
@@ -407,6 +438,7 @@ export class GatewayManager extends EventEmitter {
         startProcess: async () => {
           await this.startProcess();
           tSpawned = Date.now();
+          this.startupTimings.tSpawned = tSpawned;
         },
         waitForReady: async (port) => {
           await waitForGatewayReady({
@@ -414,9 +446,15 @@ export class GatewayManager extends EventEmitter {
             getProcessExitCode: () => this.processExitCode,
           });
           tReady = Date.now();
+          this.startupTimings.tReady = tReady;
         },
         onConnectedToManagedGateway: () => {
           this.startHealthCheck();
+          // Successful boot clears any prior terminal-failure artifact/state.
+          this.lastStartupReport = null;
+          this.portOccupiedStreak = 0;
+          this.doctorRepairAttempted = false;
+          this.setStatus({ failure: null, nextRetryAt: undefined });
           const tConnected = Date.now();
           logger.info('[metric] gateway.startup', {
             configSyncMs: tSpawned ? tSpawned - t0 : undefined,
@@ -425,7 +463,10 @@ export class GatewayManager extends EventEmitter {
             totalMs: tConnected - t0,
           });
         },
-        runDoctorRepair: async () => await runOpenClawDoctorRepair(),
+        runDoctorRepair: async () => {
+          this.doctorRepairAttempted = true;
+          return await runOpenClawDoctorRepair();
+        },
         onDoctorRepairSuccess: () => {
           this.setStatus({ state: 'starting', error: undefined, reconnectAttempts: 0 });
         },
@@ -442,10 +483,36 @@ export class GatewayManager extends EventEmitter {
         `Gateway start failed (port=${this.status.port}, reconnectAttempts=${this.reconnectAttempts}, spawn=${this.lastSpawnSummary ?? 'n/a'})`,
         error
       );
-      this.setStatus({ state: 'error', error: String(error) });
-      if (this.shouldReconnect) {
-        logger.warn('Gateway start failed; scheduling auto-reconnect recovery');
-        this.scheduleReconnect();
+      const errorText = error instanceof Error ? error.message : String(error);
+      if (/Port \d+ still occupied/i.test(errorText)) {
+        this.portOccupiedStreak += 1;
+      } else {
+        this.portOccupiedStreak = 0;
+      }
+      const classification = classifyGatewayStartupFailure({
+        error,
+        exitCode: error instanceof GatewayProcessExitedError ? error.exitCode : this.processExitCode,
+        stderrLines: this.recentStartupStderrLines,
+        configRepairAttempted: this.doctorRepairAttempted,
+        invalidConfigSignal: hasInvalidConfigFailureSignal(error, this.recentStartupStderrLines),
+        readyPollExhausted: error instanceof GatewayReadyTimeoutError,
+        portOccupiedStreak: this.portOccupiedStreak,
+        phase: error instanceof GatewayReadyTimeoutError
+          ? 'wait-ready'
+          : error instanceof GatewayProcessExitedError
+            ? 'spawn'
+            : 'connect',
+      });
+      if (classification.deterministic) {
+        // Deterministic boot failure (e.g. openclaw legacy state-dir migration
+        // refusal, exit 78): retrying cannot help — go terminal immediately.
+        this.enterTerminalFailure(error, classification);
+      } else {
+        this.setStatus({ state: 'error', error: String(error), failure: classification.info });
+        if (this.shouldReconnect) {
+          logger.warn('Gateway start failed; scheduling auto-reconnect recovery');
+          this.scheduleReconnect();
+        }
       }
       throw error;
     } finally {
@@ -521,7 +588,7 @@ export class GatewayManager extends EventEmitter {
     this.restartController.resetDeferredRestart();
     this.isAutoReconnectStart = false;
     this.diagnostics.consecutiveHeartbeatMisses = 0;
-    this.setStatus({ state: 'stopped', error: undefined, pid: undefined, connectedAt: undefined, uptime: undefined, gatewayReady: undefined });
+    this.setStatus({ state: 'stopped', error: undefined, pid: undefined, connectedAt: undefined, uptime: undefined, gatewayReady: undefined, failure: null, nextRetryAt: undefined });
   }
 
   /**
@@ -1310,6 +1377,73 @@ export class GatewayManager extends EventEmitter {
     this.initialReadyHeartbeatRecoveryTimer = null;
   }
 
+  /** The startup report for the most recent terminal failure, if any. */
+  public getLastStartupReport(): GatewayStartupFailureReport | null {
+    return this.lastStartupReport;
+  }
+
+  /**
+   * Enter the terminal `failed` state for a deterministic startup failure:
+   * stop auto-reconnect, publish the structured failure and build the redacted
+   * startup report. Only an explicit start()/restart() leaves this state.
+   */
+  private enterTerminalFailure(
+    error: unknown,
+    classification: GatewayStartupFailureClassification,
+  ): void {
+    const exitCode = error instanceof GatewayProcessExitedError ? error.exitCode : this.processExitCode;
+    this.shouldReconnect = false;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+
+    const failedTier = classification.info.tier;
+    const tiers: Partial<Record<GatewayReadinessTier, boolean>> = { spawn: failedTier === 'spawn' ? false : true };
+    if (failedTier === 'port') tiers.port = false;
+    else if (failedTier === 'handshake') { tiers.port = true; tiers.handshake = false; }
+    else if (failedTier === 'rpc') { tiers.port = true; tiers.handshake = true; tiers.rpc = false; }
+    else if (failedTier === 'config') tiers.config = false;
+
+    const t0 = this.startupTimings.t0;
+    const tSpawned = this.startupTimings.tSpawned;
+    const tReady = this.startupTimings.tReady;
+    const metric: GatewayStartupMetric = {
+      configSyncMs: t0 && tSpawned ? tSpawned - t0 : undefined,
+      spawnToReadyMs: tSpawned && tReady ? tReady - tSpawned : undefined,
+      totalMs: t0 ? Date.now() - t0 : undefined,
+    };
+
+    this.lastStartupReport = buildGatewayStartupFailureReport({
+      platform: process.platform,
+      appVersion: app.getVersion(),
+      openclawVersion: this.status.version ?? 'unknown',
+      stateDir: getOpenClawConfigDir(),
+      failure: classification.info,
+      exitCode,
+      stderrTail: this.recentStartupStderrLines,
+      startupMetric: metric,
+      readinessTiers: tiers,
+      lastSpawnSummary: this.lastSpawnSummary ?? undefined,
+    });
+
+    logger.error('[metric] gateway.startup', {
+      outcome: 'failed',
+      code: classification.info.code,
+      tier: classification.info.tier,
+      exitCode,
+    });
+
+    this.setStatus({
+      state: 'failed',
+      error: String(error),
+      failure: classification.info,
+      reconnectAttempts: this.reconnectAttempts,
+      reconnectMaxAttempts: this.reconnectConfig.maxAttempts,
+      nextRetryAt: undefined,
+    });
+  }
+
   /**
    * Schedule reconnection attempt with exponential backoff
    */
@@ -1334,10 +1468,29 @@ export class GatewayManager extends EventEmitter {
 
     if (decision.action === 'fail') {
       logger.error(`Gateway reconnect failed: max attempts reached (${decision.maxAttempts})`);
+      // Terminal: the reconnect budget is exhausted. Stop auto-recovery and
+      // surface a structured, actionable failure instead of a silent red dot.
+      const failure = buildMaxReconnectsExhaustedFailure(this.reconnectAttempts);
+      this.shouldReconnect = false;
+      this.lastStartupReport = buildGatewayStartupFailureReport({
+        platform: process.platform,
+        appVersion: app.getVersion(),
+        openclawVersion: this.status.version ?? 'unknown',
+        stateDir: getOpenClawConfigDir(),
+        failure,
+        exitCode: this.processExitCode,
+        stderrTail: this.recentStartupStderrLines,
+        startupMetric: {},
+        readinessTiers: { spawn: true, port: true, handshake: false },
+        lastSpawnSummary: this.lastSpawnSummary ?? undefined,
+      });
       this.setStatus({
-        state: 'error',
+        state: 'failed',
         error: 'Failed to reconnect after maximum attempts',
-        reconnectAttempts: this.reconnectAttempts
+        failure,
+        reconnectAttempts: this.reconnectAttempts,
+        reconnectMaxAttempts: decision.maxAttempts,
+        nextRetryAt: undefined,
       });
       return;
     }
@@ -1350,7 +1503,9 @@ export class GatewayManager extends EventEmitter {
 
     this.setStatus({
       state: 'reconnecting',
-      reconnectAttempts: this.reconnectAttempts
+      reconnectAttempts: this.reconnectAttempts,
+      nextRetryAt: Date.now() + effectiveDelay,
+      reconnectMaxAttempts: maxAttempts,
     });
     const scheduledEpoch = this.lifecycleController.getCurrentEpoch();
 

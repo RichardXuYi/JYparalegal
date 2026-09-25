@@ -289,6 +289,9 @@ export type AgentChannelPayload = { id: string; channelType: string };
 
 export type DiagnosticsGatewaySnapshotResult = JsonRecord;
 
+/** Redacted startup-failure report for the most recent terminal gateway failure, or null. */
+export type DiagnosticsStartupReportResult = JsonRecord | null;
+
 export type ProviderType =
   | 'anthropic'
   | 'openai'
@@ -961,6 +964,7 @@ export type HostApiContract = {
   };
   diagnostics: {
     gatewaySnapshot: () => DiagnosticsGatewaySnapshotResult;
+    startupReport: () => DiagnosticsStartupReportResult;
   };
   providers: {
     list: () => ProviderWithKeyInfo[];

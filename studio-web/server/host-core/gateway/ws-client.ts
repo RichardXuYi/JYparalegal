@@ -70,6 +70,32 @@ export async function probeGatewayReady(
   });
 }
 
+/**
+ * Typed error carrying the child exit code so callers (failure taxonomy) do not
+ * have to parse it out of a message string. Message text is unchanged for
+ * log/spec compatibility.
+ */
+export class GatewayProcessExitedError extends Error {
+  readonly exitCode: number | null;
+
+  constructor(exitCode: number | null) {
+    super(`Gateway process exited before becoming ready (code=${exitCode})`);
+    this.name = 'GatewayProcessExitedError';
+    this.exitCode = exitCode;
+  }
+}
+
+/** Ready-poll budget exhausted while the gateway process stayed alive. */
+export class GatewayReadyTimeoutError extends Error {
+  constructor(
+    readonly port: number,
+    readonly retries: number,
+  ) {
+    super(`Gateway failed to start after ${retries} retries (port ${port})`);
+    this.name = 'GatewayReadyTimeoutError';
+  }
+}
+
 export async function waitForGatewayReady(options: {
   port: number;
   getProcessExitCode: () => number | null;
@@ -83,7 +109,7 @@ export async function waitForGatewayReady(options: {
     const exitCode = options.getProcessExitCode();
     if (exitCode !== null) {
       logger.error(`Gateway process exited before ready (code=${exitCode})`);
-      throw new Error(`Gateway process exited before becoming ready (code=${exitCode})`);
+      throw new GatewayProcessExitedError(exitCode);
     }
 
     try {
@@ -104,7 +130,7 @@ export async function waitForGatewayReady(options: {
   }
 
   logger.error(`Gateway failed to become ready after ${retries} attempts on port ${options.port}`);
-  throw new Error(`Gateway failed to start after ${retries} retries (port ${options.port})`);
+  throw new GatewayReadyTimeoutError(options.port, retries);
 }
 
 const GATEWAY_PROTOCOL_VERSION = 4;

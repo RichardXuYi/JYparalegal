@@ -15,10 +15,44 @@ export type GatewayRuntimePayload = GatewayRuntimeJsonValue | undefined;
 export type GatewayRuntimeRecord = { [key: string]: GatewayRuntimeJsonValue | undefined };
 
 /**
+ * Structured classification of a gateway startup/lifecycle failure.
+ * Carried on {@link GatewayStatus.failure} so the renderer can show an
+ * actionable, localized reason instead of a generic error string.
+ */
+export type GatewayFailureCode =
+  | 'state-migration-failed'
+  | 'invalid-config'
+  | 'port-occupied'
+  | 'spawn-failed'
+  | 'startup-timeout'
+  | 'max-reconnects-exhausted'
+  | 'unknown';
+
+/** Which readiness tier failed (spawn → port → handshake → rpc), per the
+ *  gateway-startup-diagnostics spec. `config` covers config-validation refusals. */
+export type GatewayReadinessTier = 'spawn' | 'port' | 'handshake' | 'rpc' | 'config';
+
+export type GatewaySuggestedAction = 'retry' | 'viewLogs' | 'copyReport' | 'runDoctor';
+
+export interface GatewayFailureInfo {
+  code: GatewayFailureCode;
+  tier: GatewayReadinessTier;
+  exitCode?: number | null;
+  /** false ⇒ terminal: the manager will not auto-recover; only an explicit
+   *  start()/restart() leaves the `failed` state. */
+  retryable: boolean;
+  /** i18n key under the `common` namespace, e.g. `gateway.failure.stateMigration`. */
+  reasonKey: string;
+  reasonParams?: Record<string, string | number>;
+  suggestedActions: GatewaySuggestedAction[];
+  detectedAt: number;
+}
+
+/**
  * Gateway connection status
  */
 export interface GatewayStatus {
-  state: 'stopped' | 'starting' | 'running' | 'error' | 'reconnecting';
+  state: 'stopped' | 'starting' | 'running' | 'error' | 'reconnecting' | 'failed';
   port: number;
   pid?: number;
   uptime?: number;
@@ -28,6 +62,12 @@ export interface GatewayStatus {
   reconnectAttempts?: number;
   /** True once the gateway's internal subsystems (skills, plugins) are ready for RPC calls. */
   gatewayReady?: boolean;
+  /** Structured failure info; present on `error`/`failed`, cleared on success/stop. */
+  failure?: GatewayFailureInfo | null;
+  /** Epoch ms of the next scheduled reconnect attempt (banner countdown). */
+  nextRetryAt?: number;
+  /** Reconnect budget ceiling, for "attempt n/max" rendering. */
+  reconnectMaxAttempts?: number;
 }
 
 /**

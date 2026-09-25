@@ -50,6 +50,15 @@ function getLegacyOpenClawDir(): string {
   return join(homedir(), '.openclaw');
 }
 
+/**
+ * Dedicated, app-owned OpenClaw state dir used when logged out (no account
+ * scope). Kept separate from the legacy `~/.openclaw` so openclaw 9.6 never sees
+ * old-format legacy state there (see getScopedOpenClawDir).
+ */
+function getPrimaryOpenClawDir(): string {
+  return join(getStudioConfigDir(), 'openclaw', 'primary');
+}
+
 function readScopeState(): ScopeState {
   try {
     const raw = readFileSync(getScopeStatePath(), 'utf-8');
@@ -134,9 +143,17 @@ export function setActiveScopeUser(userId: number | null): boolean {
 /**
  * The OpenClaw state directory for the active scope.
  *
- * - logged out          → legacy `~/.openclaw`
- * - owner (or first login, which claims ownership) → legacy `~/.openclaw`
- * - any other account   → `~/.grandpoem-studio/openclaw/u<id>`
+ * Default (openclaw >= 9.6 compatible):
+ * - logged out           → `~/.grandpoem-studio/openclaw/primary`
+ * - any logged-in account → `~/.grandpoem-studio/openclaw/u<id>`
+ *
+ * The legacy "claim ~/.openclaw" model is OFF by default and only enabled with
+ * `JY_CLAIM_LEGACY_OPENCLAW=1`. Reason: openclaw 9.6 runs a legacy
+ * workspace-state migration whenever the state dir holds old-format state
+ * (`~/.openclaw/workspace`, `state/*.sqlite`); that migration's fsync returns
+ * EPERM on Windows, so the gateway refuses to report ready (exit 78) and the app
+ * reconnects forever. A fresh dedicated dir skips the legacy migration entirely
+ * and boots in ~10s (verified 2026-09-25 against a clean OPENCLAW_STATE_DIR).
  */
 export function getScopedOpenClawDir(): string {
   const override = getStateDirOverride();
@@ -145,19 +162,25 @@ export function getScopedOpenClawDir(): string {
   }
   ensureInitialized();
   const userId = activeUserId ?? null;
-  if (userId === null) {
-    return getLegacyOpenClawDir();
+
+  if (process.env.JY_CLAIM_LEGACY_OPENCLAW === '1') {
+    if (userId === null) {
+      return getLegacyOpenClawDir();
+    }
+    const state = readScopeState();
+    if (state.openclawOwnerUserId === null) {
+      // First account ever to log in claims the legacy directory (zero migration).
+      writeScopeState({ openclawOwnerUserId: userId });
+      return getLegacyOpenClawDir();
+    }
+    if (state.openclawOwnerUserId === userId) {
+      return getLegacyOpenClawDir();
+    }
   }
-  const state = readScopeState();
-  if (state.openclawOwnerUserId === null) {
-    // First account ever to log in claims the legacy directory (zero migration).
-    writeScopeState({ openclawOwnerUserId: userId });
-    return getLegacyOpenClawDir();
-  }
-  if (state.openclawOwnerUserId === userId) {
-    return getLegacyOpenClawDir();
-  }
-  const dir = join(getStudioConfigDir(), 'openclaw', `u${userId}`);
+
+  const dir = userId === null
+    ? getPrimaryOpenClawDir()
+    : join(getStudioConfigDir(), 'openclaw', `u${userId}`);
   if (!existsSync(dir)) {
     try {
       mkdirSync(dir, { recursive: true });

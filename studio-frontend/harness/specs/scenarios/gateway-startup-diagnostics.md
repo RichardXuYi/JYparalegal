@@ -215,6 +215,25 @@ Expected handling:
 - Explain to users that restart cost is dominated by active Gateway work, not by GrandPoem Studio UI rendering.
 - Avoid triggering full Gateway restart for feature toggles when a narrower config reload or plugin RPC is available.
 
+### Deterministic Boot Refusal (exit 78 / state migration)
+
+Symptoms:
+
+- Gateway spawns, prints `startup migrations did not complete cleanly; refusing to report the gateway ready` (typically a Windows `fsync` EPERM on a legacy workspace-state directory), and exits with code 78.
+- Before the terminal-state work this manifested as minutes of spinning: 3 start flows x 10 reconnect attempts, then a silent red dot (the renderer had no surface for `stopped`/`error`).
+
+Expected behavior:
+
+- `electron/gateway/failure-taxonomy.ts` classifies exit 78 / the migration-refusal signature as deterministic at tier `spawn`; the manager enters the terminal `failed` state within one start flow (see the `failed` invariants in `gateway-readiness-policy`).
+- The renderer shows the terminal failure dialog with the localized reason, readiness tier, stderr tail, and the actions retry / view logs / copy startup report / run doctor. No automatic cold retry.
+- `manager.enterTerminalFailure` emits `[metric] gateway.startup {outcome:'failed', code, tier}` and builds a redacted startup report, exposed via `hostApi.diagnostics.startupReport()` (`electron/gateway/startup-report.ts`: schemaVersion 1; redacts tokens / Bearer / apiKey / account+device ids; preserves state-dir path, versions, timings, tier map, and a ≤120-line stderr tail).
+
+Repro without touching real state (dev build only):
+
+```bash
+GP_GATEWAY_ENTRY_OVERRIDE="scripts/dev/fake-gateway-exit78.mjs" pnpm dev
+```
+
 ## Remediation Order
 
 1. Avoid renderer-side transport workarounds. Renderer code must continue to use `host-api` / `api-client`.
@@ -269,8 +288,7 @@ For fixes in this area, run:
 ```bash
 pnpm run typecheck
 pnpm run lint:check
-pnpm exec vitest run tests/unit/openclaw-auth.test.ts tests/unit/skills-symlink-cleanup.test.ts tests/unit/gateway-manager-heartbeat.test.ts tests/unit/gateway-ready-fallback.test.ts
-pnpm exec playwright test tests/e2e/openclaw-dreams.spec.ts
+pnpm test   # vitest unit suite incl. failure-taxonomy / startup-recovery / process-policy / startup-report / connection-status
 pnpm run build:vite
 ```
 

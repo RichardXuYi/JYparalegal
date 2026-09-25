@@ -21,7 +21,6 @@ import {
   Bot,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-// isGatewayRestarting moved to TopBar
 import { rendererExtensionRegistry } from '@/extensions/registry';
 import { useSettingsStore } from '@/stores/settings';
 import { useAuthStore } from '@/stores/auth';

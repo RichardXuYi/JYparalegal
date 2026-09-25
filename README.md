@@ -63,6 +63,8 @@
 
 聊天顶栏换模型走 `sessions.patch { key, model }`，只钉当前会话，Gateway 进程不重启，也不再盖全屏「正在切换模型」。`model: null` 清掉会话 pin，新开会话回到该智能体的默认模型。设置页改默认模型或默认 Provider 时，先落盘，Gateway 在线则 `config.apply` 热应用。删除 Provider 仍会重启 Gateway。非 Windows 上，宿主若仍要做进程内重启，信号是 `SIGUSR2`（`commands.restart`）；`SIGUSR1` 在 9.6 里属于 Node 调试器。
 
+Gateway 生命周期有终态 `failed`：确定性启动故障（如遗留状态目录迁移失败、exit 78）在一个启动流程内进入终态，不再空转 3×10 次重试；终态只响应显式重试，不自动恢复。连接态界面由单一判定函数 `deriveGatewaySurface` 分三层呈现——有界启动遮罩（≤6 秒后降级）、常驻状态横幅（重连计数 + 倒计时）、终态故障对话框（本地化原因、就绪层级、日志末尾、重试 / 查看日志 / 复制启动报告 / Doctor 修复）。桌面与网页两端字节镜像同一套逻辑。
+
 ## 仓库
 
 | 路径 | 说明 |
@@ -123,7 +125,7 @@ Web 要同时开宿主和 Vite。只改界面可以先等 Gateway；对话依赖
 
 ```bash
 cd backend && mvn -q -DskipTests package
-cd studio-frontend && pnpm run typecheck && pnpm run lint:check
+cd studio-frontend && pnpm run typecheck && pnpm run lint:check && pnpm test
 cd studio-web && pnpm run typecheck && pnpm run lint:check
 ```
 

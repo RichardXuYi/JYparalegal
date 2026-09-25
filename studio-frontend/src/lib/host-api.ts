@@ -219,6 +219,7 @@ export const hostApi = {
   },
   diagnostics: {
     gatewaySnapshot: () => invokeHost('diagnostics', 'gatewaySnapshot'),
+    startupReport: () => invokeHost('diagnostics', 'startupReport'),
   },
   providers: {
     list: () => invokeHost('providers', 'list'),

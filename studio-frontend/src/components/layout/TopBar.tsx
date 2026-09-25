@@ -3,29 +3,25 @@
  * brand + tenant switcher | drag region | role / gateway / notify / settings / avatar (+ Windows window controls).
  */
 import { useState, useEffect } from 'react';
-import { Bell, Building2, ChevronDown, Minus, Square, X, RectangleHorizontal, Settings as SettingsIcon, Loader2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { useGatewayStore } from '@/stores/gateway';
+import { Bell, Building2, Minus, Square, X, RectangleHorizontal, Settings as SettingsIcon } from 'lucide-react';
+import { GatewayStatusChip } from '@/components/common/GatewayStatusChip';
 import { useSettingsUiStore } from '@/stores/settings-ui';
+import { useAuthStore } from '@/stores/auth';
 import { hostApi } from '@/lib/host-api';
 import { useTranslation } from 'react-i18next';
 import logoSvg from '@/assets/logo.svg';
 
-const TENANTS = ['君言律师事务所', '个人空间'];
-
 export function TopBar() {
   const { t } = useTranslation('common');
   const platform = window.electron?.platform;
-  const gatewayStatus = useGatewayStore((s) => s.status);
-  const isGatewayRunning = gatewayStatus.state === 'running';
-  const isGatewayStarting = gatewayStatus.state === 'starting';
   const openSettings = useSettingsUiStore((s) => s.openSettings);
+  // 真实登录身份：头像/标题一律取自会话，不再硬编码姓名或角色。
+  const user = useAuthStore((s) => s.user);
+  const displayName = user?.username?.trim() ?? '';
+  const avatarInitial = displayName ? displayName[0].toUpperCase() : '?';
+  const avatarTitle = user
+    ? (user.role ? `${displayName} · ${user.role}` : displayName)
+    : t('topbar.guest');
 
   return (
     <div className="drag-region flex h-12 shrink-0 items-center gap-3 px-4">
@@ -37,29 +33,12 @@ export function TopBar() {
         <span className="truncate whitespace-nowrap text-sm font-semibold text-white">
           JYparalegal
         </span>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              className="shell-glass flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-tiny text-white/90 transition-colors hover:bg-white/20"
-            >
-              <Building2 className="h-3 w-3" strokeWidth={1.75} />
-              <span>{TENANTS[0]}</span>
-              <ChevronDown className="h-3 w-3" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            {TENANTS.map((name) => (
-              <DropdownMenuItem key={name}>
-                <Building2 className="h-3.5 w-3.5" strokeWidth={1.75} />
-                <span>{name}</span>
-              </DropdownMenuItem>
-            ))}
-            <DropdownMenuItem>
-              <span>＋ 创建新企业…</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {/* 租户/企业名此前为硬编码假数据（"君言律师事务所/个人空间"）。AuthUser 目前不携带
+            企业名，故显示中性标签；接入真实企业数据后再替换。 */}
+        <span className="shell-glass flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-tiny text-white/90">
+          <Building2 className="h-3 w-3" strokeWidth={1.75} />
+          <span>{t('topbar.workspace')}</span>
+        </span>
       </div>
 
       <div className="min-w-0 flex-1 self-stretch" />
@@ -68,27 +47,9 @@ export function TopBar() {
       <div className="no-drag flex shrink-0 items-center gap-2">
         <label className="shell-glass flex cursor-pointer select-none items-center gap-1.5 rounded-lg px-2.5 py-1 text-tiny text-white/90">
           <input type="checkbox" className="h-3 w-3 accent-white" />
-          员工视角
+          {t('topbar.employeeView')}
         </label>
-        <div className="shell-glass flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-tiny">
-          {isGatewayStarting ? (
-            <Loader2 className="h-2.5 w-2.5 animate-spin text-yellow-300" />
-          ) : (
-            <span
-              className={cn(
-                'h-2 w-2 rounded-full',
-                isGatewayRunning ? 'bg-green-400 shadow-[0_0_0_3px_rgba(74,222,128,0.25)]' : 'bg-red-400',
-              )}
-            />
-          )}
-          <span className="text-white/90">
-            {isGatewayStarting
-              ? t('gateway.connecting', '连接中')
-              : isGatewayRunning
-                ? t('gateway.connected', '已连接')
-                : t('gateway.disconnected', '未连接')}
-          </span>
-        </div>
+        <GatewayStatusChip glass />
         <button
           type="button"
           className="flex h-8 w-8 items-center justify-center rounded-lg text-white/80 transition-colors hover:bg-white/15 hover:text-white"
@@ -110,9 +71,10 @@ export function TopBar() {
         <button
           type="button"
           className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-xs font-bold text-indigo-700 shadow-[0_0_0_2px_rgba(255,255,255,0.35)]"
-          title="许一 · ADMIN"
+          title={avatarTitle}
+          aria-label={avatarTitle}
         >
-          许
+          {avatarInitial}
         </button>
         {platform === 'win32' && <WindowsWindowControls />}
       </div>

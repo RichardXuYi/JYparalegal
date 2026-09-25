@@ -16,7 +16,10 @@ function parseScalar(value) {
   return trimmed;
 }
 
-export function parseFrontmatter(markdown) {
+export function parseFrontmatter(input) {
+  // Spec files are committed with BOM/CRLF on some checkouts; normalize before
+  // matching so `---` fences and per-line parsing stay consistent.
+  const markdown = String(input).replace(/^\uFEFF/, '').replace(/\r\n/g, '\n');
   const match = markdown.match(/^---\n([\s\S]*?)\n---(?:\n|$)/);
   if (!match) {
     throw new Error('Spec must start with Markdown frontmatter');

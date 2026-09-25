@@ -7,6 +7,7 @@ import { hostApi } from '@/lib/host-api';
 import { hostEvents } from '@/lib/host-events';
 import type { GatewayNotification, GatewayHealth, GatewayStatus } from '../types/gateway';
 import type { ChatRuntimeEvent } from '../../shared/chat-runtime-events';
+import { useGatewayUiStore } from './gateway-ui';
 import { getCronSessionBaseKey, sessionKeysAreEquivalent } from './chat/cron-session-utils';
 
 let gatewayInitPromise: Promise<void> | null = null;
@@ -28,6 +29,8 @@ interface GatewayState {
   health: GatewayHealth | null;
   isInitialized: boolean;
   lastError: string | null;
+  /** Sticky for the session: true once the gateway has been observed running. */
+  hasSeenRunningThisSession: boolean;
   init: () => Promise<void>;
   start: () => Promise<void>;
   stop: () => Promise<void>;
@@ -318,6 +321,24 @@ function mapChannelStatus(status: string): 'connected' | 'connecting' | 'disconn
   }
 }
 
+/**
+ * Single funnel for every gateway-status transition: records whether the
+ * session has seen the gateway running (which pins connection UI to the
+ * non-blocking banner) and feeds the same status to the UI store that drives
+ * the overlay grace window and the terminal-failure dialog.
+ */
+function applyGatewayStatus(
+  set: (partial: Partial<GatewayState>) => void,
+  get: () => GatewayState,
+  status: GatewayStatus,
+): void {
+  set({
+    status,
+    hasSeenRunningThisSession: get().hasSeenRunningThisSession || status.state === 'running',
+  });
+  useGatewayUiStore.getState().syncGatewayStatus(status);
+}
+
 export const useGatewayStore = create<GatewayState>((set, get) => ({
   status: {
     state: 'stopped',
@@ -326,6 +347,7 @@ export const useGatewayStore = create<GatewayState>((set, get) => ({
   health: null,
   isInitialized: false,
   lastError: null,
+  hasSeenRunningThisSession: false,
 
   init: async () => {
     if (get().isInitialized) return;
@@ -342,12 +364,13 @@ export const useGatewayStore = create<GatewayState>((set, get) => ({
         // A resetForUserSwitch during the fetch bumped the generation —
         // this result belongs to the previous account and must be dropped.
         if (generation !== gatewayInitGeneration) return;
-        set({ status, isInitialized: true });
+        applyGatewayStatus(set, get, status);
+        set({ isInitialized: true });
 
         if (!gatewayEventUnsubscribers) {
           const unsubscribers: Array<() => void> = [];
           unsubscribers.push(hostEvents.onGatewayStatus((payload) => {
-            set({ status: payload });
+            applyGatewayStatus(set, get, payload);
 
             // Trigger cron repair when gateway becomes ready
             if (!cronRepairTriggeredThisSession && payload.state === 'running') {
@@ -420,7 +443,7 @@ export const useGatewayStore = create<GatewayState>((set, get) => ({
                   console.info(
                     `[gateway-store] reconciled stale state: ${current.state} → ${latest.state}`,
                   );
-                  set({ status: latest });
+                  applyGatewayStatus(set, get, latest);
                 }
               })
               .catch(() => { /* ignore */ });
@@ -436,7 +459,7 @@ export const useGatewayStore = create<GatewayState>((set, get) => ({
           if (generation !== gatewayInitGeneration) return;
           const current = get().status;
           if (refreshed.state !== current.state) {
-            set({ status: refreshed });
+            applyGatewayStatus(set, get, refreshed);
           }
         } catch {
           // Best-effort; the IPC listener will eventually reconcile.
@@ -457,26 +480,32 @@ export const useGatewayStore = create<GatewayState>((set, get) => ({
 
   start: async () => {
     try {
-      set({ status: { ...get().status, state: 'starting' }, lastError: null });
+      set({ lastError: null });
+      applyGatewayStatus(set, get, { ...get().status, state: 'starting' });
       const result = await hostApi.gateway.start();
       if (!result.success) {
-        set({
-          status: { ...get().status, state: 'error', error: result.error },
-          lastError: result.error || 'Failed to start Gateway',
+        applyGatewayStatus(set, get, {
+          ...get().status,
+          state: 'error',
+          error: result.error,
         });
+        set({ lastError: result.error || 'Failed to start Gateway' });
       }
     } catch (error) {
-      set({
-        status: { ...get().status, state: 'error', error: String(error) },
-        lastError: String(error),
+      applyGatewayStatus(set, get, {
+        ...get().status,
+        state: 'error',
+        error: String(error),
       });
+      set({ lastError: String(error) });
     }
   },
 
   stop: async () => {
     try {
       await hostApi.gateway.stop();
-      set({ status: { ...get().status, state: 'stopped' }, lastError: null });
+      set({ lastError: null });
+      applyGatewayStatus(set, get, { ...get().status, state: 'stopped' });
     } catch (error) {
       console.error('Failed to stop Gateway:', error);
       set({ lastError: String(error) });
@@ -485,19 +514,24 @@ export const useGatewayStore = create<GatewayState>((set, get) => ({
 
   restart: async () => {
     try {
-      set({ status: { ...get().status, state: 'starting' }, lastError: null });
+      set({ lastError: null });
+      applyGatewayStatus(set, get, { ...get().status, state: 'starting' });
       const result = await hostApi.gateway.restart();
       if (!result.success) {
-        set({
-          status: { ...get().status, state: 'error', error: result.error },
-          lastError: result.error || 'Failed to restart Gateway',
+        applyGatewayStatus(set, get, {
+          ...get().status,
+          state: 'error',
+          error: result.error,
         });
+        set({ lastError: result.error || 'Failed to restart Gateway' });
       }
     } catch (error) {
-      set({
-        status: { ...get().status, state: 'error', error: String(error) },
-        lastError: String(error),
+      applyGatewayStatus(set, get, {
+        ...get().status,
+        state: 'error',
+        error: String(error),
       });
+      set({ lastError: String(error) });
     }
   },
 
@@ -517,7 +551,7 @@ export const useGatewayStore = create<GatewayState>((set, get) => ({
     return await hostApi.gateway.rpc<T>(method, params, timeoutMs);
   },
 
-  setStatus: (status) => set({ status }),
+  setStatus: (status) => applyGatewayStatus(set, get, status),
   clearError: () => set({ lastError: null }),
 
   resetForUserSwitch: () => {
@@ -531,11 +565,13 @@ export const useGatewayStore = create<GatewayState>((set, get) => ({
     cronRepairTriggeredThisSession = false;
     lastLoadSessionsAt = 0;
     lastLoadHistoryAt = 0;
+    useGatewayUiStore.getState().reset();
     set({
       status: { state: 'stopped', port: 18789 },
       health: null,
       isInitialized: false,
       lastError: null,
+      hasSeenRunningThisSession: false,
     });
   },
 }));

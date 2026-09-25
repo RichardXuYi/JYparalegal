@@ -2,15 +2,14 @@
  * TopBar — glass band sitting directly on the connected shell gradient.
  * brand + tenant switcher | (level tabs are rendered below by PlatformTabs) | role / gateway / notify / avatar / settings.
  */
-import { Bell, Building2, ChevronDown, Loader2, Settings as SettingsIcon } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Bell, Building2, ChevronDown, Settings as SettingsIcon } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useGatewayStore } from '@/stores/gateway';
+import { GatewayStatusChip } from '@/components/common/GatewayStatusChip';
 import { useSettingsUiStore } from '@/stores/settings-ui';
 import { useTranslation } from 'react-i18next';
 import logoSvg from '@/assets/logo.svg';
@@ -19,9 +18,6 @@ const TENANTS = ['君言律师事务所', '个人空间'];
 
 export function TopBar() {
   const { t } = useTranslation('common');
-  const gatewayStatus = useGatewayStore((s) => s.status);
-  const isGatewayRunning = gatewayStatus.state === 'running';
-  const isGatewayStarting = gatewayStatus.state === 'starting';
   const openSettings = useSettingsUiStore((s) => s.openSettings);
 
   return (
@@ -67,25 +63,7 @@ export function TopBar() {
           <input type="checkbox" className="h-3 w-3 accent-white" />
           员工视角
         </label>
-        <div className="shell-glass flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-tiny">
-          {isGatewayStarting ? (
-            <Loader2 className="h-2.5 w-2.5 animate-spin text-yellow-300" />
-          ) : (
-            <span
-              className={cn(
-                'h-2 w-2 rounded-full',
-                isGatewayRunning ? 'bg-green-400 shadow-[0_0_0_3px_rgba(74,222,128,0.25)]' : 'bg-red-400',
-              )}
-            />
-          )}
-          <span className="text-white/90">
-            {isGatewayStarting
-              ? t('gateway.connecting', '连接中')
-              : isGatewayRunning
-                ? t('gateway.connected', '已连接')
-                : t('gateway.disconnected', '未连接')}
-          </span>
-        </div>
+        <GatewayStatusChip glass />
         <button
           type="button"
           className="flex h-8 w-8 items-center justify-center rounded-lg text-white/80 transition-colors hover:bg-white/15 hover:text-white"

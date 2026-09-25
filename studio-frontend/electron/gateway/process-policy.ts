@@ -81,7 +81,15 @@ export function getReconnectScheduleDecision(
   };
 }
 
-export type GatewayLifecycleState = 'stopped' | 'starting' | 'running' | 'error' | 'reconnecting';
+export type GatewayLifecycleState =
+  | 'stopped'
+  | 'starting'
+  | 'running'
+  | 'error'
+  | 'reconnecting'
+  /** Terminal: a deterministic/unrecoverable failure. No auto-recovery; only an
+   *  explicit start()/restart() (user action) leaves this state. */
+  | 'failed';
 
 export interface RestartDeferralContext {
   state: GatewayLifecycleState;
@@ -115,6 +123,10 @@ export type DeferredRestartAction = 'none' | 'wait' | 'drop' | 'execute';
 export function getDeferredRestartAction(context: DeferredRestartActionContext): DeferredRestartAction {
   if (!context.hasPendingRestart) return 'none';
   if (shouldDeferRestart(context)) return 'wait';
+  // A terminal failure must not swallow an explicit restart request: an explicit
+  // retry is the only escape hatch out of `failed` (shouldReconnect is false there,
+  // which would otherwise drop the request).
+  if (context.state === 'failed') return 'execute';
   if (!context.shouldReconnect) return 'drop';
   return 'execute';
 }

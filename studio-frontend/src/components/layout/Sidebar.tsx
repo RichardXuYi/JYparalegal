@@ -21,7 +21,6 @@ import {
   Search,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-// isGatewayRestarting moved to TopBar
 import { rendererExtensionRegistry } from '@/extensions/registry';
 import { useSettingsStore } from '@/stores/settings';
 import { useChatStore, type ChatSession } from '@/stores/chat';
@@ -301,7 +300,7 @@ function SidebarFooter({ collapsed }: { collapsed: boolean }) {
   }
 
   return (
-    <div className="shell-card mt-2 shrink-0 rounded-xl p-2">
+    <div className="shell-card mt-auto shrink-0 rounded-xl p-2">
       <div className="px-2.5 pb-1 pt-1 text-[11px] font-medium tracking-wide text-white/55">
         {t('sidebar.capabilities')}
       </div>
