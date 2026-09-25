@@ -115,6 +115,19 @@ public class EsignSigningService {
             }
             Map<String, Object> psn = new LinkedHashMap<>();
             psn.put("psnAccount", account);
+            // e签宝规范：个人姓名/证件号必须放在 psnSignerInfo.psnInfo 对象内（账号在 psnSignerInfo 顶层）。
+            // 传 psnAccount 时 psnInfo.psnName 必传，否则报“需传入<account>账号对应姓名”。
+            Map<String, Object> psnInfo = new LinkedHashMap<>();
+            String psnName = trimToNull(s.get("name"));
+            if (psnName == null) psnName = trimToNull(s.get("psnName"));
+            if (psnName != null) psnInfo.put("psnName", psnName);
+            String idNum = trimToNull(s.get("idNumber"));
+            if (idNum == null) idNum = trimToNull(s.get("psnIDCardNum"));
+            if (idNum != null) {
+                psnInfo.put("psnIDCardNum", idNum);
+                psnInfo.put("psnIDCardType", "CRED_PSN_CH_IDCARD");
+            }
+            if (!psnInfo.isEmpty()) psn.put("psnInfo", psnInfo);
             signer.put("psnSignerInfo", psn);
             signer.put("signerType", 0);
         }

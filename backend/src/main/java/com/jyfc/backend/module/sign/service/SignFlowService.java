@@ -483,6 +483,8 @@ public class SignFlowService {
                 m.put("account", p.getExternalPhone());
                 m.put("phone", p.getExternalPhone());
                 m.put("email", p.getExternalEmail());
+                // e签宝建流程要求个人签署方提供姓名（账号在 e签宝侧未注册时必需）
+                m.put("name", p.getExternalName());
             }
             m.put("signOrder", p.getSignOrder() == null ? 1 : p.getSignOrder());
             out.add(m);

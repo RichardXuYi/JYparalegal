@@ -1,9 +1,0 @@
-{
-  "app": { "about": "À propos de {{appName}}", "preferences": "Préférences...", "services": "Services", "hide": "Masquer {{appName}}", "hideOthers": "Masquer les autres", "unhide": "Tout afficher", "quit": "Quitter {{appName}}" },
-  "file": { "label": "Fichier", "newChat": "Nouvelle discussion", "close": "Fermer" },
-  "edit": { "label": "Édition", "undo": "Annuler", "redo": "Rétablir", "cut": "Couper", "copy": "Copier", "paste": "Coller", "pasteAndMatchStyle": "Coller et adapter le style", "delete": "Supprimer", "selectAll": "Tout sélectionner" },
-  "view": { "label": "Affichage", "reload": "Recharger", "forceReload": "Forcer le rechargement", "toggleDevTools": "Outils de développement", "resetZoom": "Taille réelle", "zoomIn": "Zoom avant", "zoomOut": "Zoom arrière", "toggleFullscreen": "Plein écran" },
-  "navigate": { "label": "Navigation", "dashboard": "Tableau de bord", "chat": "Discussion", "channels": "Canaux", "skills": "Compétences", "cronTasks": "Tâches planifiées", "settings": "Paramètres" },
-  "window": { "label": "Fenêtre", "minimize": "Réduire", "zoom": "Zoom", "front": "Tout au premier plan", "close": "Fermer" },
-  "help": { "label": "Aide", "documentation": "Documentation", "reportIssue": "Signaler un problème", "openClawDocumentation": "Documentation OpenClaw" }
-}
