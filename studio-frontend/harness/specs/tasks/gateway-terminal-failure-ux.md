@@ -7,10 +7,10 @@ intent: >-
   Give the gateway lifecycle a terminal `failed` state with a structured,
   exit-code-aware failure taxonomy so deterministic boot failures (e.g. openclaw
   legacy workspace-state migration EPERM on Windows, exit 78) stop burning the
-  3x10 retry budget, and surface a designed, actionable UI (bounded startup
-  overlay, non-blocking reconnect banner, terminal failure dialog with
-  retry/logs/startup-report/doctor) instead of an endless spinner or a silent
-  red dot.
+  3x10 retry budget, and surface a designed, actionable UI (full-screen brand
+  loading screen during boot, non-blocking reconnect banner, terminal failure
+  dialog with retry/logs/startup-report/doctor) instead of an endless spinner,
+  a modal dimming a rendered page, or a silent red dot.
 touchedAreas:
   - harness/specs/tasks/gateway-terminal-failure-ux.md
   - shared/types/gateway.ts
@@ -54,12 +54,35 @@ touchedAreas:
   - studio-frontend/AGENTS.md
   - studio-web/server/host-core/gateway/* (byte-identical mirror)
   - studio-web/src/** (byte-identical mirror of shared renderer files)
+  # 以下为仓库根相对路径：validate 的 changedFiles 以仓库根给出，且 glob 为锚定匹配，
+  # 包内相对写法（如 src/App.tsx）永远匹配不上。连接态 UI 的完整覆盖面：
+  - studio-frontend/src/App.tsx
+  - studio-web/src/App.tsx
+  - studio-frontend/src/lib/connection-status.ts
+  - studio-web/src/lib/connection-status.ts
+  - studio-frontend/src/stores/gateway-ui.ts
+  - studio-web/src/stores/gateway-ui.ts
+  - studio-frontend/src/components/common/GatewayConnectOverlay.tsx
+  - studio-web/src/components/common/GatewayConnectOverlay.tsx
+  - studio-frontend/src/components/common/GatewayStatusBanner.tsx
+  - studio-web/src/components/common/GatewayStatusBanner.tsx
+  - studio-frontend/src/components/channels/ChannelConfigModal.tsx
+  - studio-web/src/components/channels/ChannelConfigModal.tsx
+  - studio-frontend/shared/i18n/locales/*/common.json
+  - studio-web/shared/i18n/locales/*/common.json
+  - studio-frontend/tests/unit/connection-status.test.ts
+  - studio-frontend/harness/specs/rules/gateway-readiness-policy.md
+  - studio-frontend/harness/specs/tasks/gateway-terminal-failure-ux.md
+  - studio-frontend/README.md
 expectedUserBehavior:
   - A deterministic boot failure (exit 78 / migration refusal) reaches a terminal
     failure dialog within one start flow, showing the reason, exit code and
     readiness tier, with Retry / View logs / Copy startup report / Run Doctor.
-  - No endless blocking spinner: the startup overlay is bounded and demotes to a
-    non-blocking banner; a terminal failure never silently shows only a red dot.
+  - No blocking surface over a rendered page: while the gateway has never run,
+    the full-screen `InitializingScreen` stays up (capped at
+    `BOOT_SCREEN_CAP_MS`) and the shell is revealed only once loading settles;
+    afterwards dips show a non-blocking banner, and a terminal failure never
+    silently shows only a red dot.
   - Transient flaps still auto-reconnect with a visible attempt counter and
     countdown, and recover without user action.
   - After a terminal failure the client does not auto-retry; recovery is an

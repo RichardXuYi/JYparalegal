@@ -23,18 +23,10 @@ function formatCountdown(target: number | undefined, now: number | null): string
 export function GatewayStatusBanner() {
   const { t } = useTranslation('common');
   const status = useGatewayStore((s) => s.status);
-  const hasSeenRunning = useGatewayStore((s) => s.hasSeenRunningThisSession);
   const startGateway = useGatewayStore((s) => s.start);
-  const overlayDismissed = useGatewayUiStore((s) => s.overlayDismissed);
-  const overlayGraceExpired = useGatewayUiStore((s) => s.overlayGraceExpired);
   const openFailureDialog = useGatewayUiStore((s) => s.openFailureDialog);
 
-  const surface = deriveGatewaySurface({
-    status,
-    hasSeenRunningThisSession: hasSeenRunning,
-    userDismissedOverlay: overlayDismissed,
-    overlayGraceExpired,
-  });
+  const surface = deriveGatewaySurface({ status });
 
   const countdownTarget = surface?.kind === 'banner' ? surface.nextRetryAt : undefined;
   // `now` lives in state (updated by the ticker) so render stays pure. When no

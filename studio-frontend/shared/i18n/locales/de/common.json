@@ -116,13 +116,8 @@
     }
   },
   "connection": {
-    "connectingTitle": "Verbindung wird hergestellt…",
-    "connectingDesc": "Verbindung zum Gateway wird hergestellt. Bitte warten.",
-    "reconnectingTitle": "Erneute Verbindung…",
-    "reconnectingDesc": "Es wird versucht, die Verbindung zum Gateway wiederherzustellen. Bitte warten.",
     "switchingModelTitle": "Modell wird gewechselt…",
-    "switchingModelDesc": "Wechsel zu {{model}}. Bitte warten.",
-    "runInBackground": "Im Hintergrund fortfahren"
+    "switchingModelDesc": "Wechsel zu {{model}}. Bitte warten."
   },
   "init": {
     "tagline": "AI-Vertragsarbeitsplatz für Chinas Juristinnen und Juristen",

@@ -117,13 +117,8 @@
     }
   },
   "connection": {
-    "connectingTitle": "正在连接…",
-    "connectingDesc": "正在建立与 Gateway 的连接，请稍候。",
-    "reconnectingTitle": "正在重新连接…",
-    "reconnectingDesc": "正在尝试重新连接 Gateway，请稍候。",
     "switchingModelTitle": "正在切换模型…",
-    "switchingModelDesc": "正在切换到 {{model}}，请稍候。",
-    "runInBackground": "在后台继续"
+    "switchingModelDesc": "正在切换到 {{model}}，请稍候。"
   },
   "init": {
     "tagline": "给中国法律人用的 AI 合同工作台",

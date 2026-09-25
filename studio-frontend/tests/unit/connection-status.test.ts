@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { deriveGatewaySurface } from '../../src/lib/connection-status';
+import { BOOT_SCREEN_CAP_MS, deriveGatewaySurface, shouldHoldBootScreen } from '../../src/lib/connection-status';
 import type { GatewayFailureInfo, GatewayStatus } from '@/types/gateway';
 
 const failure: GatewayFailureInfo = {
@@ -13,15 +13,22 @@ const failure: GatewayFailureInfo = {
   detectedAt: 1_700_000_000_000,
 };
 
-function surface(
-  status: Partial<GatewayStatus> & { state: GatewayStatus['state'] },
-  params: { seen?: boolean; dismissed?: boolean; expired?: boolean } = {},
+function status(partial: Partial<GatewayStatus> & { state: GatewayStatus['state'] }): GatewayStatus {
+  return { port: 18789, ...partial } as GatewayStatus;
+}
+
+function surface(partial: Partial<GatewayStatus> & { state: GatewayStatus['state'] }) {
+  return deriveGatewaySurface({ status: status(partial) });
+}
+
+function hold(
+  partial: Partial<GatewayStatus> & { state: GatewayStatus['state'] },
+  params: { seen?: boolean; cap?: boolean } = {},
 ) {
-  return deriveGatewaySurface({
-    status: { port: 18789, ...status } as GatewayStatus,
+  return shouldHoldBootScreen({
+    status: status(partial),
     hasSeenRunningThisSession: params.seen ?? false,
-    userDismissedOverlay: params.dismissed ?? false,
-    overlayGraceExpired: params.expired ?? false,
+    capElapsed: params.cap ?? false,
   });
 }
 
@@ -45,35 +52,48 @@ describe('deriveGatewaySurface', () => {
     expect(surface({ state: 'running', gatewayReady: true })).toBeNull();
   });
 
-  it('degraded readiness (running but not ready) is a banner, never an overlay', () => {
-    expect(surface({ state: 'running', gatewayReady: false }, { seen: true }).kind).toBe('banner');
-    expect(surface({ state: 'running', gatewayReady: false }, { seen: false }).kind).toBe('banner');
+  it('degraded readiness (running but not ready) is a banner', () => {
+    expect(surface({ state: 'running', gatewayReady: false }).kind).toBe('banner');
   });
 
-  it('overlays only before the session saw a running gateway', () => {
-    expect(surface({ state: 'starting' }).kind).toBe('overlay');
-    expect(surface({ state: 'reconnecting' }).kind).toBe('overlay');
-    expect(surface({ state: 'starting' }, { seen: true }).kind).toBe('banner');
-    expect(surface({ state: 'reconnecting' }, { seen: true }).kind).toBe('banner');
-  });
-
-  it('demotes the overlay to a banner once dismissed or past the grace window', () => {
-    expect(surface({ state: 'starting' }, { dismissed: true }).kind).toBe('banner');
-    expect(surface({ state: 'starting' }, { expired: true }).kind).toBe('banner');
+  it('starting/reconnecting are non-blocking banners (the boot screen is the only loading surface)', () => {
+    expect(surface({ state: 'starting' }).kind).toBe('banner');
+    expect(surface({ state: 'reconnecting' }).kind).toBe('banner');
   });
 
   it('carries reconnect progress fields on the banner for countdown rendering', () => {
-    const result = surface(
-      {
-        state: 'reconnecting',
-        reconnectAttempts: 3,
-        reconnectMaxAttempts: 10,
-        nextRetryAt: 1_700_000_005_000,
-      },
-      { seen: true },
-    );
+    const result = surface({
+      state: 'reconnecting',
+      reconnectAttempts: 3,
+      reconnectMaxAttempts: 10,
+      nextRetryAt: 1_700_000_005_000,
+    });
     expect(result).toMatchObject({
       kind: 'banner', attempt: 3, max: 10, nextRetryAt: 1_700_000_005_000,
     });
+  });
+});
+
+describe('shouldHoldBootScreen', () => {
+  it('holds the loading screen while the gateway has never run and is still coming up', () => {
+    expect(hold({ state: 'starting' })).toBe(true);
+    expect(hold({ state: 'reconnecting' })).toBe(true);
+  });
+
+  it('releases once this session has seen the gateway running (later dips are runtime, not boot)', () => {
+    expect(hold({ state: 'starting' }, { seen: true })).toBe(false);
+    expect(hold({ state: 'reconnecting' }, { seen: true })).toBe(false);
+  });
+
+  it('releases for terminal or idle states so the failure dialog/banner can speak', () => {
+    expect(hold({ state: 'failed', failure })).toBe(false);
+    expect(hold({ state: 'error' })).toBe(false);
+    expect(hold({ state: 'stopped' })).toBe(false);
+    expect(hold({ state: 'running' })).toBe(false);
+  });
+
+  it('releases unconditionally past the cap so a silent gateway cannot pin the loading screen', () => {
+    expect(hold({ state: 'starting' }, { cap: true })).toBe(false);
+    expect(BOOT_SCREEN_CAP_MS).toBeGreaterThan(0);
   });
 });

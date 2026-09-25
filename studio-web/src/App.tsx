@@ -5,7 +5,7 @@
  * detection (see use-device-shell); both shells share stores and routes.
  */
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import { Component, Suspense, lazy, useEffect, useRef } from 'react';
+import { Component, Suspense, lazy, useEffect, useRef, useState } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
 import { Toaster } from 'sonner';
 import i18n from './i18n';
@@ -18,11 +18,11 @@ import { useProviderStore } from './stores/providers';
 import { rendererExtensionRegistry } from './extensions/registry';
 import { loadExternalRendererExtensions } from './extensions/_ext-bridge.generated';
 
-import { GatewayConnectOverlay } from './components/common/GatewayConnectOverlay';
 import { GatewayFailureDialog } from './components/common/GatewayFailureDialog';
 import { InitializingScreen } from './components/common/InitializingScreen';
 import { useNewChatAction } from './components/layout/use-new-chat-action';
 import { hostEvents } from './lib/host-events';
+import { BOOT_SCREEN_CAP_MS, shouldHoldBootScreen } from './lib/connection-status';
 import { useDeviceShell } from '@/hooks/use-device-shell';
 
 // Route-level code splitting: both shells and all pages load on demand so
@@ -119,6 +119,8 @@ function App() {
   const autoSyncTriggeredRef = useRef(false);
   const initGateway = useGatewayStore((state) => state.init);
   const gatewayInitialized = useGatewayStore((state) => state.isInitialized);
+  const gatewayStatus = useGatewayStore((state) => state.status);
+  const gatewaySeenRunning = useGatewayStore((state) => state.hasSeenRunningThisSession);
   const initProviders = useProviderStore((state) => state.init);
   const providersInitCompleted = useProviderStore((state) => state.initCompleted);
   const handleNewChat = useNewChatAction();
@@ -133,6 +135,22 @@ function App() {
     && settingsInitCompleted
     && gatewayInitialized
     && providersInitCompleted;
+
+  // 加载动画的硬上限：从"各 store 初始化完成"起算。网关若永不回报状态，
+  // 到点也放行主界面（以非阻塞横幅呈现连接态），绝不无限停在加载页。
+  const [bootCapElapsed, setBootCapElapsed] = useState(false);
+  useEffect(() => {
+    if (!allInitDone) return undefined;
+    const timer = setTimeout(() => setBootCapElapsed(true), BOOT_SCREEN_CAP_MS);
+    return () => clearTimeout(timer);
+  }, [allInitDone]);
+
+  // 网关就绪（或终态/超时）之前，主界面不放出来：画好的页面再盖模态，观感等于卡死。
+  const holdBootScreen = shouldHoldBootScreen({
+    status: gatewayStatus,
+    hasSeenRunningThisSession: gatewaySeenRunning,
+    capElapsed: bootCapElapsed,
+  });
 
   useEffect(() => {
     if (authUserId === null) return;
@@ -298,8 +316,9 @@ function App() {
     );
   }
 
-  // Authenticated but initialization still in progress: show loading overlay.
-  if (!allInitDone) {
+  // Authenticated but still loading (incl. gateway startup): keep the brand
+  // loading animation up instead of revealing a shell we'd have to dim again.
+  if (!allInitDone || holdBootScreen) {
     return (
       <ErrorBoundary>
         <InitializingScreen visible={true} />
@@ -337,8 +356,7 @@ function App() {
           </Routes>
         </Suspense>
 
-        {/* Bounded startup overlay + non-blocking banner + terminal failure dialog */}
-        <GatewayConnectOverlay />
+        {/* Non-blocking banner + terminal failure dialog */}
         <GatewayFailureDialog />
 
         {/* Global toast notifications (mobile: bottom is taken by tab bar / input) */}

@@ -116,13 +116,8 @@
     }
   },
   "connection": {
-    "connectingTitle": "Connexion en cours…",
-    "connectingDesc": "Établissement de la connexion à la passerelle. Veuillez patienter.",
-    "reconnectingTitle": "Reconnexion en cours…",
-    "reconnectingDesc": "Tentative de reconnexion à la passerelle. Veuillez patienter.",
     "switchingModelTitle": "Changement de modèle…",
-    "switchingModelDesc": "Passage à {{model}}. Veuillez patienter.",
-    "runInBackground": "Continuer en arrière-plan"
+    "switchingModelDesc": "Passage à {{model}}. Veuillez patienter."
   },
   "init": {
     "tagline": "Banque de travail contractuelle IA pour les juristes chinois",

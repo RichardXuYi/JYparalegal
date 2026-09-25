@@ -117,13 +117,8 @@
     }
   },
   "connection": {
-    "connectingTitle": "Connecting…",
-    "connectingDesc": "Establishing a connection to the Gateway. Please wait.",
-    "reconnectingTitle": "Reconnecting…",
-    "reconnectingDesc": "Trying to reconnect to the Gateway. Please wait.",
     "switchingModelTitle": "Switching model…",
-    "switchingModelDesc": "Switching to {{model}}. Please wait.",
-    "runInBackground": "Continue in background"
+    "switchingModelDesc": "Switching to {{model}}. Please wait."
   },
   "init": {
     "tagline": "AI contract workbench for legal professionals in China",

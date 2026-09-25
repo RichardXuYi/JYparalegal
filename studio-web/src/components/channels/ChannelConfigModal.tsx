@@ -115,7 +115,7 @@ export function ChannelConfigModal({
   const accountIdForConfigLoad = shouldLoadExistingConfig ? resolvedAccountId : undefined;
 
   // Adjust state during render when props/derived keys change (React-recommended
-  // pattern, same as GatewayConnectOverlay) instead of setState-in-effect.
+  // pattern) instead of setState-in-effect.
   const [prevInitialSelectedType, setPrevInitialSelectedType] = useState(initialSelectedType);
   if (initialSelectedType !== prevInitialSelectedType) {
     setPrevInitialSelectedType(initialSelectedType);
