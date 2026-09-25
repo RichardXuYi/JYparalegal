@@ -60,8 +60,8 @@ export function More() {
   return (
     <div className="h-full overflow-y-auto overscroll-contain">
       {/* User card */}
-      <div className="mx-4 mt-4 flex items-center gap-3 rounded-2xl bg-gradient-to-br from-indigo-500/10 to-violet-500/10 dark:from-rose-500/10 dark:to-orange-500/10 p-4">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 dark:from-rose-500 dark:to-orange-500 text-lg font-bold text-white">
+      <div className="mx-4 mt-4 flex items-center gap-3 rounded-2xl bg-gradient-to-br from-indigo-500/10 to-violet-500/10 p-4">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-lg font-bold text-white">
           {(user?.username ?? '?')[0]?.toUpperCase()}
         </div>
         <div className="flex min-w-0 flex-1 flex-col">

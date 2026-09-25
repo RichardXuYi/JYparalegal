@@ -33,15 +33,15 @@ export function InitializingScreen({ visible }: InitializingScreenProps) {
       }}
     >
       {/* Background gradient - matching Login page */}
-      <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50 dark:from-[hsl(240,27%,5%)] dark:via-[hsl(240,27%,8%)] dark:to-[hsl(240,27%,5%)]" />
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50 dark:from-[hsl(15,60%,8%)] dark:via-[hsl(20,70%,12%)] dark:to-[hsl(25,65%,8%)]" />
 
       {/* Decorative blurs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div
-          className="absolute -top-40 -right-40 w-96 h-96 bg-gradient-to-br from-blue-400/20 to-purple-400/20 rounded-full blur-3xl animate-pulse"
+          className="absolute -top-40 -right-40 w-96 h-96 bg-gradient-to-br from-orange-400/20 to-red-400/20 rounded-full blur-3xl animate-pulse"
         />
         <div
-          className="absolute -bottom-40 -left-40 w-96 h-96 bg-gradient-to-tr from-purple-400/20 to-blue-400/20 rounded-full blur-3xl animate-pulse"
+          className="absolute -bottom-40 -left-40 w-96 h-96 bg-gradient-to-tr from-red-400/20 to-orange-400/20 rounded-full blur-3xl animate-pulse"
           style={{ animationDelay: '1.5s' }}
         />
       </div>
@@ -51,13 +51,13 @@ export function InitializingScreen({ visible }: InitializingScreenProps) {
         {/* Brand logo */}
         <div className="flex items-center gap-4">
           <div className="relative">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-600 via-blue-500 to-purple-600 flex items-center justify-center shadow-2xl shadow-blue-500/30 relative z-10">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-600 via-blue-500 to-purple-600 flex items-center justify-center shadow-2xl shadow-blue-500/30 relative z-10 dark:from-orange-600 dark:via-red-500 dark:to-red-600 dark:shadow-red-500/30">
               <span className="text-white font-bold text-3xl tracking-tight">JY</span>
             </div>
-            <div className="absolute -inset-1.5 bg-gradient-to-br from-blue-600/30 to-purple-600/30 rounded-2xl blur-lg animate-pulse" />
+            <div className="absolute -inset-1.5 bg-gradient-to-br from-blue-600/30 to-purple-600/30 rounded-2xl blur-lg animate-pulse dark:from-orange-600/30 dark:to-red-600/30" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent dark:from-blue-400 dark:to-purple-400">
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent dark:from-orange-500 dark:to-red-500">
               JYparalegal
             </h1>
             <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
@@ -71,7 +71,7 @@ export function InitializingScreen({ visible }: InitializingScreenProps) {
           {[0, 1, 2].map((i) => (
             <div
               key={i}
-              className="w-2.5 h-2.5 rounded-full bg-gradient-to-br from-blue-500 to-purple-500"
+              className="w-2.5 h-2.5 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 dark:from-orange-500 dark:to-red-500"
               style={{
                 animation: 'init-dot-pulse 1.4s ease-in-out infinite',
                 animationDelay: `${i * 0.16}s`,

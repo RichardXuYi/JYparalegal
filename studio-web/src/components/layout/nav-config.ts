@@ -4,7 +4,6 @@ import {
   FileDiff,
   FileText,
   LayoutDashboard,
-  Mic,
   Scale,
   ScrollText,
   Shield,
@@ -110,14 +109,7 @@ export const LEGAL_MODULES: LegalModule[] = [
     cta: { label: '邀请成员', to: '/company' },
     groups: [{ title: '企业管理', entries: [{ key: 'company', label: '成员与部门' }] }],
   },
-  {
-    route: '/voice',
-    label: '语音转录',
-    icon: Mic,
-    cta: { label: '即将开发', to: '/voice' },
-    overflow: true,
-    groups: [{ title: '语音转录', entries: [{ key: 'voice', label: '转录会话（即将开发）' }] }],
-  },
+
   {
     route: '/compare',
     label: '文档对比',

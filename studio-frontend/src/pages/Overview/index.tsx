@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Scale, GraduationCap, FileText, Mic, FileUp, Sparkles } from 'lucide-react';
+import { Scale, GraduationCap, FileText, FileUp, Sparkles } from 'lucide-react';
 import { billingRuleLabel, fmtDateTime, planLabel, signStatusLabel } from '@/lib/legal-enums';
 import { LegalPageHeader } from '@/components/legal/LegalPageHeader';
 import { DropZone } from '@/components/legal/DropZone';
@@ -215,11 +215,7 @@ export default function Overview() {
                 <div className="mt-1 font-medium">智能比对</div>
                 <div className="mt-0.5 text-tiny text-muted-foreground">两版合同差异核对</div>
               </button>
-              <button className="rounded-lg border border-border p-3 text-left text-meta hover:border-primary" onClick={() => nav('/voice')}>
-                <Mic className="h-5 w-5 text-primary" />
-                <div className="mt-1 font-medium">语音通话</div>
-                <div className="mt-0.5 text-tiny text-muted-foreground">实时语音与转写留痕 · 即将开发</div>
-              </button>
+
             </div>
           </div>
 

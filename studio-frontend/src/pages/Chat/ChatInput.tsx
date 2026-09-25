@@ -1228,7 +1228,7 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false }:
               className={cn(
                 'ml-auto shrink-0 h-11 w-11 sm:h-8 sm:w-8 rounded-xl transition-all',
                 (sending || canSend)
-                  ? 'bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-sm hover:opacity-90 dark:from-red-500 dark:to-orange-500'
+                  ? 'bg-gradient-to-br from-indigo-500 to-violet-600 dark:from-orange-500 dark:to-red-600 text-white shadow-sm hover:opacity-90'
                   : 'text-muted-foreground/50 hover:bg-transparent bg-transparent'
               )}
               variant={sending || canSend ? 'default' : 'ghost'}

@@ -89,24 +89,24 @@ export function Register() {
   const inputCls = 'pl-12 h-12 bg-slate-50 border-slate-200 text-slate-800 focus-visible:ring-blue-500/30';
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50 flex items-center justify-center p-4">
+    <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50 dark:from-[hsl(15,60%,8%)] dark:via-[hsl(20,70%,12%)] dark:to-[hsl(25,65%,8%)] flex items-center justify-center p-4">
       <div className="absolute inset-x-0 top-0 z-20">
         <TitleBar />
       </div>
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-96 h-96 bg-gradient-to-br from-blue-400/25 to-purple-400/25 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-gradient-to-tr from-purple-400/25 to-blue-400/25 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1.5s' }} />
+        <div className="absolute -top-40 -right-40 w-96 h-96 bg-gradient-to-br from-blue-400/25 to-purple-400/25 dark:from-orange-400/25 dark:to-red-400/25 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-gradient-to-tr from-purple-400/25 to-blue-400/25 dark:from-red-400/25 dark:to-orange-400/25 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1.5s' }} />
       </div>
 
       <div className="relative w-full max-w-md">
-        <Card className="shadow-2xl border-0 bg-white/90 backdrop-blur-md relative overflow-hidden text-slate-800">
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-600 via-purple-500 to-purple-600" />
+        <Card className="shadow-2xl border-0 bg-white/90 backdrop-blur-md relative overflow-hidden text-slate-800 dark:bg-slate-900/90 dark:text-slate-100">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-600 via-purple-500 to-purple-600 dark:from-orange-600 dark:via-red-500 dark:to-red-600" />
           <CardHeader className="space-y-3 pb-5 pt-8">
             <div className="flex items-center gap-3 mb-1">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center shadow-lg">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center shadow-lg dark:from-orange-600 dark:to-red-600">
                 <span className="text-white font-bold text-2xl">JY</span>
               </div>
-              <h1 className="text-xl font-bold text-slate-800">JYparalegal</h1>
+              <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100">JYparalegal</h1>
             </div>
             <CardTitle className="text-2xl font-bold text-center text-slate-800">创建账户</CardTitle>
             <CardDescription className="text-base text-center text-slate-500">
@@ -207,7 +207,7 @@ export function Register() {
               </div>
             ) : null}
 
-            <Button className="w-full h-12 bg-gradient-to-r from-blue-600 via-blue-500 to-purple-600 hover:opacity-90 text-white font-semibold shadow-lg shadow-blue-500/30"
+            <Button className="w-full h-12 bg-gradient-to-r from-blue-600 via-blue-500 to-purple-600 hover:opacity-90 text-white font-semibold shadow-lg shadow-blue-500/30 dark:from-orange-600 dark:via-red-500 dark:to-red-600 dark:shadow-red-500/30"
               size="lg" onClick={() => void handleSubmit()} disabled={submitting}>
               {submitting ? (
                 <span className="flex items-center gap-2.5">

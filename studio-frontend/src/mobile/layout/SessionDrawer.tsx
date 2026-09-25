@@ -249,7 +249,7 @@ export function SessionDrawer({ open, onOpenChange }: SessionDrawerProps) {
                               className={cn(
                                 'w-full text-left rounded-2xl px-2.5 py-2 transition-all pr-[4.5rem]',
                                 isCurrent
-                                  ? 'bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-lg shadow-indigo-200 dark:from-rose-500 dark:to-orange-500 dark:shadow-rose-900/30 font-medium'
+                                  ? 'bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-lg shadow-indigo-200 font-medium'
                                   : 'active:bg-black/5 dark:active:bg-white/5 text-foreground/75',
                               )}
                             >

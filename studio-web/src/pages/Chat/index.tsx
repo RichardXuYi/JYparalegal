@@ -1355,7 +1355,7 @@ function WelcomeScreen() {
   return (
     <div className="flex h-full flex-col items-center justify-center px-6 text-center">
       {/* Illustration mark */}
-      <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-indigo-500 to-violet-600 shadow-lg shadow-indigo-200 dark:from-rose-500 dark:to-orange-500 dark:shadow-rose-900/30">
+      <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-indigo-500 to-violet-600 shadow-lg shadow-indigo-200">
         <Sparkles className="h-7 w-7 text-white" strokeWidth={1.75} />
       </div>
 

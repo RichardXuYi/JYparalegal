@@ -41,7 +41,7 @@ const TaskSetup = lazy(() => import('./pages/CreateTask/TaskSetup'));
 const TaskCompose = lazy(() => import('./pages/CreateTask/TaskCompose'));
 const TaskDetail = lazy(() => import('./pages/TaskDetail'));
 const MockCourt = lazy(() => import('./pages/MockCourt'));
-const Voice = lazy(() => import('./pages/Voice'));
+
 const Templates = lazy(() => import('./pages/Templates'));
 const Evidence = lazy(() => import('./pages/Evidence'));
 const CompanyManage = lazy(() => import('./pages/CompanyManage'));
@@ -327,7 +327,7 @@ function App() {
               <Route path="/signing/:id/compose" element={<TaskCompose />} />
               <Route path="/signing/:id" element={<TaskDetail />} />
               <Route path="/moot" element={<MockCourt />} />
-              <Route path="/voice" element={<Voice />} />
+
               <Route path="/templates" element={<Templates />} />
               <Route path="/evidence" element={<Evidence />} />
               <Route path="/company" element={<CompanyManage />} />

@@ -70,7 +70,7 @@ export function TopBar() {
         </button>
         <button
           type="button"
-          className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-xs font-bold text-indigo-700 shadow-[0_0_0_2px_rgba(255,255,255,0.35)]"
+          className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-xs font-bold text-indigo-700 dark:text-red-600 shadow-[0_0_0_2px_rgba(255,255,255,0.35)]"
           title={avatarTitle}
           aria-label={avatarTitle}
         >

@@ -1347,7 +1347,7 @@ function WelcomeScreen() {
 
   return (
     <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-      <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-indigo-500 to-violet-600 shadow-lg shadow-indigo-200 dark:from-rose-500 dark:to-orange-500 dark:shadow-rose-900/30">
+      <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-indigo-500 to-violet-600 shadow-lg shadow-indigo-200 dark:from-orange-500 dark:to-red-600 dark:shadow-red-500/20">
         <Sparkles className="h-7 w-7 text-white" strokeWidth={1.75} />
       </div>
       <h1 className="mb-2 text-3xl font-bold tracking-tight text-foreground md:text-4xl">

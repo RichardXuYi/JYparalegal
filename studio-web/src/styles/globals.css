@@ -195,7 +195,7 @@
     --usage-cache: 48 96% 53%;
   }
 
-  /* Dark mode - warm tech style with Orange primary (complete color swap!) */
+  /* Dark mode - indigo-violet accent (consistent with light) */
   .dark {
     --background: 240 27% 5%;
     --foreground: 248 100% 96%;
@@ -203,7 +203,7 @@
     --card-foreground: 248 100% 96%;
     --popover: 240 18% 9%;
     --popover-foreground: 248 100% 96%;
-    --primary: 25 95% 53%;
+    --primary: 243 75% 59%;
     --primary-foreground: 0 0% 100%;
     --secondary: 240 18% 13%;
     --secondary-foreground: 250 17% 80%;
@@ -215,7 +215,7 @@
     --destructive-foreground: 0 0% 100%;
     --border: 240 6% 16%;
     --input: 240 6% 14%;
-    --ring: 25 95% 53%;
+    --ring: 243 75% 59%;
 
     /* Surface tokens (dark) - redirect to existing shadcn tokens */
     --surface-modal: 240 18% 9%;

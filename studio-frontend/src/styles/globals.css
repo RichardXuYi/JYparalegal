@@ -203,19 +203,19 @@
     --card-foreground: 0 0% 100%;
     --popover: 0 0% 6%;
     --popover-foreground: 0 0% 100%;
-    --primary: 16 95% 54%;
+    --primary: 15 75% 55%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 12 24% 12%;
+    --secondary: 240 20% 12%;
     --secondary-foreground: 0 0% 100%;
     --muted: 0 0% 12%;
     --muted-foreground: 0 0% 74%;
-    --accent: 16 40% 14%;
+    --accent: 15 30% 14%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
     --border: 0 0% 18%;
     --input: 0 0% 10%;
-    --ring: 16 95% 54%;
+    --ring: 15 75% 55%;
 
     /* Surface tokens (dark) */
     --surface-modal: 0 0% 6%;
@@ -550,7 +550,7 @@
 }
 
 .dark .shell-gradient {
-  background: linear-gradient(145deg, #1e1b4b 0%, #3b0764 48%, #4c1d95 100%);
+  background: linear-gradient(145deg, #7f1d1d 0%, #dc2626 30%, #f97316 65%, #fb923c 100%);
 }
 
 /* Glassy control surfaces for controls that sit on the gradient. */
@@ -580,7 +580,7 @@
 
 .dark .shell-cta {
   background: #fff;
-  color: #4c1d95;
+  color: #c2410c;
 }
 
 /* Bottom glass info card in the sidebar (quota / user). */
@@ -593,6 +593,10 @@
 /* Shadow for the white stage card floating on the gradient. */
 .shadow-shell {
   box-shadow: 0 10px 40px -12px rgba(30, 27, 75, 0.45);
+}
+
+.dark .shadow-shell {
+  box-shadow: 0 10px 40px -12px rgba(124, 45, 18, 0.55);
 }
 
 /* Gradient text */

@@ -714,7 +714,7 @@ function UserMessageBubble({
   text: string;
 }) {
   return (
-    <div className="relative rounded-2xl rounded-tr-sm px-4 py-3 bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-sm dark:from-rose-500 dark:to-orange-500">
+    <div className="relative rounded-2xl rounded-tr-sm px-4 py-3 bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-sm">
       <p className="whitespace-pre-wrap break-words text-sm">{text}</p>
     </div>
   );
