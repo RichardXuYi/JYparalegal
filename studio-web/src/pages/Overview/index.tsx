@@ -5,6 +5,7 @@ import { Scale, GraduationCap, FileText, Mic, FileUp, LayoutTemplate, Sparkles }
 import { billingRuleLabel, planLabel, signStatusLabel } from '@/lib/legal-enums';
 import { LegalPageHeader } from '@/components/legal/LegalPageHeader';
 import { DropZone } from '@/components/legal/DropZone';
+import { MAX_UPLOAD_BYTES, fileToBase64 } from '@/lib/file-base64';
 
 type SignTask = { id: number; taskNo: string; title: string; status: string; createdAt: string };
 type Account = { plan: string; signQuota: number; signUsed: number; signRemaining: number; aiQuotaTokens: number; aiUsedTokens: number; billingRule: string };
@@ -38,8 +39,17 @@ export default function Overview() {
   }, []);
 
   const uploadFile = async (file: File) => {
-    const buf = await file.arrayBuffer();
-    const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+    if (file.size > MAX_UPLOAD_BYTES) {
+      toast.error(`文件超过 50MB，无法上传：${file.name}`);
+      return;
+    }
+    let b64: string;
+    try {
+      b64 = await fileToBase64(file);
+    } catch (e) {
+      toast.error(`读取文件失败：${e instanceof Error ? e.message : file.name}`);
+      return;
+    }
     const res = await fetch('/platform/sign/tasks/from-file', {
       method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title: file.name.replace(/\.[^.]+$/, ''), fileName: file.name, contentBase64: b64 }),

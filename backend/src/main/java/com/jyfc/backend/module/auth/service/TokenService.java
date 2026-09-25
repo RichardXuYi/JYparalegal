@@ -102,6 +102,19 @@ public class TokenService {
     }
 
     /**
+     * 吊销某用户全部仍然有效的 refresh token：改密后各端无法再刷新，只能重新登录。
+     *
+     * @return 被吊销的令牌数
+     */
+    @Transactional
+    public int revokeAllForUser(Long userId) {
+        if (userId == null) {
+            return 0;
+        }
+        return refreshTokenRepository.revokeAllByUserId(userId);
+    }
+
+    /**
      * 查询某用户所有活跃设备（未吊销的 refresh token 记录）。
      */
     @Transactional(readOnly = true)

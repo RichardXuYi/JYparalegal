@@ -73,7 +73,10 @@ public class CpTokenVerifier {
                     .build();
             return Optional.of(verifier.verify(token));
         } catch (Exception e) {
-            // 签名不符/过期/iss-aud 不符 —— 视为无效，不抛（放行给后续认证路径）
+            // 签名不符/过期/iss-aud 不符 —— 视为无效，不抛（放行给后续认证路径）。
+            // 必须留痕：这里的完全静默曾让 CP 用 HS256 签发、本类按 RS256 验签的不匹配
+            // 潜伏数月——票一直验不过，表现为"CP 联运好像没生效"而不是报错。
+            log.warn("CP passport 验签未通过，回退到其它认证方式: {}", e.getMessage());
             return Optional.empty();
         }
     }

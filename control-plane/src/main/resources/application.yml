@@ -22,11 +22,23 @@ cp:
 
   # JWT 签发配置
   jwt:
-    # 不再内置已知默认密钥：否则任何读到仓库的人都能伪造服务账号 passport，
-    # 绕过 /cp/v1/signing/** 的鉴权。必须由环境变量注入 >=32 字节随机密钥。
-    secret: ${CP_JWT_SECRET:}
+    # passport 用 RS256 签发：私钥永不出 CP，DP 只拿公钥（/cp/.well-known/jwks.json）验签。
+    # 留空 private-key 时首次启动在 cp.data.dir 生成并持久化 jwt-private.pem/jwt-public.pem；
+    # 多实例必须显式注入同一份 PEM，否则各实例密钥不同、跨实例验签失败。
     issuer: ${CP_JWT_ISSUER:https://cp.jyparalegal.local}
+    # 必须与 DP 的 jy.cp.instance-id 拼出的 dp:<instanceId> 一致（DP 校验 aud）。
+    audience: ${CP_JWT_AUDIENCE:dp:dp-dev-01}
+    # 服务账号票所代表的租户 id
+    passport-tenant-id: ${CP_PASSPORT_TENANT_ID:1}
     expires-in: 900
+    rsa:
+      private-key: ${CP_JWT_RSA_PRIVATE_KEY:}
+      private-key-path: ${CP_JWT_RSA_PRIVATE_KEY_PATH:}
+      public-key-path: ${CP_JWT_RSA_PUBLIC_KEY_PATH:}
+
+  # 运行时状态目录（当前存放自动生成的签名密钥）。多实例/容器需挂持久卷。
+  data:
+    dir: ${CP_DATA_DIR:}
 
   # DP 回调转发配置
   dp:

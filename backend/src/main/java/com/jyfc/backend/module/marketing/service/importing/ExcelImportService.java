@@ -4,13 +4,10 @@ import com.jyfc.backend.module.marketing.entity.ImportJob;
 import com.jyfc.backend.module.marketing.repository.ImportJobRepository;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
@@ -23,21 +20,21 @@ import java.util.*;
 @Service
 public class ExcelImportService {
     private final ImportJobRepository importJobRepository;
-    private final Map<String, ExcelImportHandler> handlers = new HashMap<>();
+    private final ExcelImportHandlerRegistry handlerRegistry;
+    private final ImportJobRunner importJobRunner;
     private final Path baseDir;
 
-    public ExcelImportService(ImportJobRepository importJobRepository, ObjectProvider<ExcelImportHandler> handlerProvider) {
+    public ExcelImportService(ImportJobRepository importJobRepository,
+                              ExcelImportHandlerRegistry handlerRegistry,
+                              ImportJobRunner importJobRunner) {
         this.importJobRepository = importJobRepository;
-        handlerProvider.forEach(h -> handlers.put(h.getModule(), h));
+        this.handlerRegistry = handlerRegistry;
+        this.importJobRunner = importJobRunner;
         this.baseDir = Paths.get(System.getProperty("user.dir"), "uploads", "imports");
     }
 
     public ExcelImportHandler getHandler(String module) {
-        ExcelImportHandler handler = handlers.get(module);
-        if (handler == null) {
-            throw new IllegalArgumentException("Unsupported module: " + module);
-        }
-        return handler;
+        return handlerRegistry.get(module);
     }
 
     public Workbook buildTemplate(String module) {
@@ -82,51 +79,14 @@ public class ExcelImportService {
         }
     }
 
+    /**
+     * 提交异步导入。真正的执行在 {@link ImportJobRunner}（跨 bean 调用，事务代理才会生效）。
+     * <p>此前这里是 {@code @Async} 方法自调用本类的 {@code @Transactional} 方法，
+     * 两层代理同时失效：既没有异步事务，也没有导入事务。</p>
+     */
     @Async("importTaskExecutor")
     public void startImportAsync(Long jobId) {
-        runImport(jobId);
-    }
-
-    @Transactional
-    public void runImport(Long jobId) {
-        if (jobId == null) return;
-        Optional<ImportJob> jobOpt = importJobRepository.findById(jobId);
-        if (jobOpt.isEmpty()) {
-            return;
-        }
-        ImportJob job = jobOpt.get();
-        if (!Objects.equals(job.getStatus(), "UPLOADED")) {
-            return;
-        }
-        job.setStatus("RUNNING");
-        job.setStartedAt(LocalDateTime.now());
-        importJobRepository.save(job);
-        File file = new File(job.getFilePath());
-        if (!file.exists()) {
-            job.setStatus("FAILED");
-            job.setErrorSummary("源文件不存在");
-            job.setFinishedAt(LocalDateTime.now());
-            importJobRepository.save(job);
-            return;
-        }
-        try (InputStream in = new FileInputStream(file);
-             Workbook workbook = WorkbookFactory.create(in)) {
-            ExcelImportHandler handler = getHandler(job.getModule());
-            ExcelImportResult result = handler.importWorkbook(workbook, job.getOperatorId());
-            job.setStatus("SUCCESS");
-            job.setTotalCount(result.getTotalCount());
-            job.setSuccessCount(result.getSuccessCount());
-            job.setFailureCount(result.getFailureCount());
-            String summary = String.join(" | ", result.getErrors().size() > 20 ? result.getErrors().subList(0, 20) : result.getErrors());
-            job.setErrorSummary(summary);
-            job.setFinishedAt(LocalDateTime.now());
-            importJobRepository.save(job);
-        } catch (Exception e) {
-            job.setStatus("FAILED");
-            job.setErrorSummary(e.getMessage());
-            job.setFinishedAt(LocalDateTime.now());
-            importJobRepository.save(job);
-        }
+        importJobRunner.run(jobId);
     }
 
     private void validateFile(MultipartFile file) {

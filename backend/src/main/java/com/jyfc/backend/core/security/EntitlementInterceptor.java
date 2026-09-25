@@ -16,9 +16,11 @@ import org.springframework.web.servlet.HandlerInterceptor;
  * 套餐门禁（阶段2）：对法律域接口按当前租户的 plan 拦截。
  *
  * <p>FREE 套餐（未购买）访问被 gate 的路径时返回 HTTP 402 + code 402，前端据此弹「请购买」。
- * PRO（含 quotaOf 对无记录租户的默认放行）通过。未认证 / 根租户交由安全层与 requireTenant 处理。</p>
+ * PRO 及以上通过；<b>无配额行的租户由 {@code quotaOf} 补为 FREE/0</b>（不再默认放行）。
+ * 未认证 / 根租户交由安全层与控制器 requireTenant 处理。</p>
  *
- * <p>路径匹配在 {@code WebConfig} 注册（含 /api/sign/** 等，豁免 esign 回调）。</p>
+ * <p>拦截器只看租户 plan、与请求体形状无关，因此新增付费入口只需在 {@code WebConfig}
+ * 加路径（含 /api/sign/**、/internal/tools/**、/api/knowledge/** 等，豁免 esign 回调）。</p>
  */
 @Component
 public class EntitlementInterceptor implements HandlerInterceptor {

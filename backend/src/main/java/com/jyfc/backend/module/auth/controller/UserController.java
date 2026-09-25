@@ -1,6 +1,7 @@
 package com.jyfc.backend.module.auth.controller;
 
 import com.jyfc.backend.module.auth.entity.UserEntity;
+import com.jyfc.backend.module.auth.service.TokenService;
 import com.jyfc.backend.module.auth.service.UserService;
 import com.jyfc.backend.core.security.SecurityConstants;
 import com.jyfc.backend.core.security.ValidationUtils;
@@ -8,12 +9,18 @@ import com.jyfc.backend.module.dashboard.repository.ConsultationRepository;
 import com.jyfc.backend.module.trade.repository.OrderRepository;
 import com.jyfc.backend.module.dashboard.repository.FavoriteRepository;
 import com.jyfc.backend.module.news.repository.NewsLikeRepository;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -32,19 +39,26 @@ public class UserController {
     private static final Logger log = LoggerFactory.getLogger(UserController.class);
     
     private final UserService userService;
+    private final TokenService tokenService;
     private final ConsultationRepository consultationRepository;
     private final OrderRepository orderRepository;
     private final FavoriteRepository favoriteRepository;
     private final NewsLikeRepository newsLikeRepository;
+
+    /** refresh token cookie 的 secure 属性，与 AuthController 保持一致。 */
+    @Value("${app.cookie.secure:true}")
+    private boolean cookieSecure;
     
     @Autowired
     public UserController(
             UserService userService,
+            TokenService tokenService,
             ConsultationRepository consultationRepository,
             OrderRepository orderRepository,
             FavoriteRepository favoriteRepository,
             NewsLikeRepository newsLikeRepository) {
         this.userService = userService;
+        this.tokenService = tokenService;
         this.consultationRepository = consultationRepository;
         this.orderRepository = orderRepository;
         this.favoriteRepository = favoriteRepository;
@@ -216,6 +230,8 @@ public class UserController {
     @PreAuthorize("hasAuthority('ROLE_USER')")
     public ResponseEntity<Map<String, Object>> changePassword(
             Authentication authentication,
+            HttpServletRequest request,
+            HttpServletResponse response,
             @RequestBody Map<String, String> body) {
         
         if (authentication == null || authentication.getName() == null) {
@@ -251,10 +267,28 @@ public class UserController {
         
         // 更新密码
         userService.updatePassword(user, newPassword);
-        
-        log.info("Password changed successfully for user: {}", username);
-        
-        return ResponseEntity.ok(Map.of("message", "密码修改成功,请重新登录"));
+
+        // BE-11：改密必须让既有登录态失效，否则旧凭证在令牌有效期内继续可用。
+        // 1) 吊销全部 refresh token —— 各端下次刷新即失败，只能重新登录；
+        // 2) 断开当前会话；3) 清 refresh_token cookie。
+        int revoked = tokenService.revokeAllForUser(user.getId());
+        SecurityContextHolder.clearContext();
+        HttpSession session = request.getSession(false);
+        if (session != null) {
+            session.invalidate();
+        }
+        response.addHeader("Set-Cookie", ResponseCookie.from("refresh_token", "")
+                .httpOnly(true)
+                .secure(cookieSecure)
+                .sameSite("Lax")
+                .path("/api/auth")
+                .maxAge(0)
+                .build()
+                .toString());
+
+        log.info("Password changed successfully for user: {} (revoked {} refresh token(s))", username, revoked);
+
+        return ResponseEntity.ok(Map.of("message", "密码修改成功，已注销全部登录设备，请重新登录"));
     }
     
     // ==================== 用户注册 ====================

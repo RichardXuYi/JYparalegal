@@ -54,7 +54,21 @@ EOF
 
 systemd 示例只列出必须替换的变量。`User=root` 可以改成专用账号。
 
-控制平面：工作目录 `/opt/jyparalegal/control-plane`，启动 `java -Xmx256m -jar control-plane-1.0.0.jar`。环境变量包括 `ESIGN_APP_ID`、`ESIGN_APP_SECRET`、`CP_SERVICE_USERNAME`、`CP_SERVICE_PASSWORD`、`CP_JWT_SECRET`、`DP_BASE_URL=http://127.0.0.1:8181`、`CP_ESIGN_CALLBACK_TOKEN`。
+控制平面：工作目录 `/opt/jyparalegal/control-plane`，启动 `java -Xmx256m -jar control-plane-1.0.0.jar`。环境变量包括 `ESIGN_APP_ID`、`ESIGN_APP_SECRET`、`CP_SERVICE_USERNAME`、`CP_SERVICE_PASSWORD`、`DP_BASE_URL=http://127.0.0.1:8181`、`CP_ESIGN_CALLBACK_TOKEN`。
+
+passport 用 RS256 签发，私钥不出 CP，公钥经 `http://127.0.0.1:8281/cp/.well-known/jwks.json` 供后端离线验签（不再有 `CP_JWT_SECRET`）。密钥来源二选一：
+
+- 单实例：设 `CP_DATA_DIR=/opt/jyparalegal/control-plane/keys`（需可写且**持久化**，容器重建不换目录）。首次启动自动生成 `jwt-private.pem` / `jwt-public.pem` 并复用。
+- 多实例或已有密钥：`CP_JWT_RSA_PRIVATE_KEY`（PEM 或裸 base64 PKCS#8），或 `CP_JWT_RSA_PRIVATE_KEY_PATH` + `CP_JWT_RSA_PUBLIC_KEY_PATH`。各实例必须注入同一份，否则跨实例验签失败。
+
+**两侧必须成对配置，配错不会报错、只会让验签静默失败并回退**（CP 非 dev profile 启动时会校验 audience 前缀，见 `CpSecretGuard`）：
+
+| 用途 | 控制平面 | 后端 |
+|------|----------|------|
+| 签发者 | `CP_JWT_ISSUER` | `CP_ISSUER` |
+| 受众 / 实例 | `CP_JWT_AUDIENCE=dp:<值>` | `CP_INSTANCE_ID=<同一值>` |
+
+例：`CP_JWT_AUDIENCE=dp:dp-prod-01` 对应 `CP_INSTANCE_ID=dp-prod-01`。留空则两侧都用 `dp:dp-dev-01`。
 
 后端：工作目录 `/opt/jyparalegal/backend`，在 MySQL 与 Redis 之后启动，`java -Xmx768m -jar backend-1.5.0.jar`。环境变量包括 `DB_URL`、`DB_USER`、`DB_PASSWORD`、`REDIS_HOST`、`REDIS_PORT`、`CP_MODE=required`、`CP_BASE_URL=http://127.0.0.1:8281`、与控制平面一致的服务账号，以及 `JWT_SECRET`、`ESIGN_CALLBACK_TOKEN`。
 

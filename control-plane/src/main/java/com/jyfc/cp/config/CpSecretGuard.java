@@ -16,26 +16,23 @@ import java.util.List;
  * 都等于把"签章必经你方云"的强制点敞开。非 {@code dev} profile 下，密钥缺失、过短
  * 或等于历史弱默认值时 fail-fast，防止：
  * <ul>
- *   <li>用已知默认 {@code cp-dev-jwt-secret...} 伪造 passport 绕过签署端点鉴权；</li>
- *   <li>用已知 {@code cp-secret} / {@code dev-callback-token} 冒充 DP 或伪造回调转发。</li>
+ *   <li>用已知 {@code cp-secret} / {@code dev-callback-token} 冒充 DP 或伪造回调转发；</li>
+ *   <li>audience 未与 DP 的 {@code jy.cp.instance-id} 对齐——这不会报错，只会让 DP
+ *       验签永远失败并静默回退（历史上 HS256/RS256 不匹配就是这么潜伏的），故启动即查。</li>
  * </ul>
- * 本地开发用 {@code --spring.profiles.active=dev} 跳过（会打印告警）。
+ * passport 签名私钥的可用性由 {@link CpRsaKeyProvider} 在构造期保证（非 dev 下无法
+ * 落盘即抛）。本地开发用 {@code --spring.profiles.active=dev} 跳过强度校验（会打印告警）。
  */
 @Component
 public class CpSecretGuard implements ApplicationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(CpSecretGuard.class);
 
-    private static final int MIN_JWT_SECRET_BYTES = 32;
     private static final List<String> WEAK_VALUES = List.of(
             "cp-secret",
-            "dev-callback-token",
-            "cp-dev-jwt-secret-must-be-at-least-32-chars!!");
+            "dev-callback-token");
 
     private final Environment environment;
-
-    @Value("${cp.jwt.secret:}")
-    private String jwtSecret;
 
     @Value("${cp.auth.service-password:}")
     private String servicePassword;
@@ -49,6 +46,9 @@ public class CpSecretGuard implements ApplicationRunner {
     @Value("${cp.esign.app-secret:}")
     private String esignAppSecret;
 
+    @Value("${cp.jwt.audience:}")
+    private String audience;
+
     public CpSecretGuard(Environment environment) {
         this.environment = environment;
     }
@@ -61,11 +61,14 @@ public class CpSecretGuard implements ApplicationRunner {
             return;
         }
 
-        requireStrong(jwtSecret, "CP_JWT_SECRET", MIN_JWT_SECRET_BYTES);
         requirePresent(servicePassword, "CP_SERVICE_PASSWORD");
         requirePresent(callbackToken, "CP_ESIGN_CALLBACK_TOKEN");
         requirePresent(esignAppId, "ESIGN_APP_ID");
         requirePresent(esignAppSecret, "ESIGN_APP_SECRET");
+        if (isBlank(audience) || !audience.trim().startsWith("dp:")) {
+            throw new IllegalStateException("CP 启动失败：CP_JWT_AUDIENCE 应为 dp:<DP 的 jy.cp.instance-id>，"
+                    + "当前为 \"" + audience + "\"。留空或不匹配不会报错，只会让 DP 验签静默失败。");
+        }
 
         log.info("CP 密钥校验通过（非 dev profile）");
     }
@@ -78,14 +81,6 @@ public class CpSecretGuard implements ApplicationRunner {
         if (WEAK_VALUES.contains(value.trim())) {
             throw new IllegalStateException(
                     "CP 启动失败：" + envName + " 使用了历史弱默认值，必须改为强随机值。");
-        }
-    }
-
-    private void requireStrong(String value, String envName, int minBytes) {
-        requirePresent(value, envName);
-        if (value.trim().getBytes(StandardCharsets.UTF_8).length < minBytes) {
-            throw new IllegalStateException(
-                    "CP 启动失败：" + envName + " 至少需要 " + minBytes + " 字节。");
         }
     }
 

@@ -6,6 +6,7 @@ import com.jyfc.cp.esign.EsignSignatureUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
@@ -49,9 +50,13 @@ public class EsignCallbackController {
      * <p>
      * e签宝推送 POST /api/esign/callback?playIdentity=xxx
      * Header: X-Tsign-Open-Ca-Timestamp, X-Tsign-Open-Signature
+     * <p>
+     * <b>响应语义</b>：转发 DP 失败必须以非 2xx 回给 e签宝，否则对方按成功处理、
+     * 停止重试，该签署事件永久丢失。验签失败/时间戳过期仍回 200 + code 403——
+     * 伪造与重放流量重试也不会有不同结果，不该形成重试风暴。
      */
     @PostMapping("/callback")
-    public Map<String, Object> callback(
+    public ResponseEntity<Map<String, Object>> callback(
             @RequestParam(value = "playIdentity", required = false) String playIdentity,
             @RequestHeader(value = "X-Tsign-Open-Ca-Timestamp", required = false) String timestamp,
             @RequestHeader(value = "X-Tsign-Open-Signature", required = false) String signature,
@@ -64,7 +69,7 @@ public class EsignCallbackController {
         // {"action":"SIGN_FLOW_UPDATE","flowId":"..."} 即可伪造"已签署"法律状态。
         if (timestamp == null || timestamp.isBlank() || signature == null || signature.isBlank()) {
             log.warn("e签宝回调缺少签名头，拒绝处理");
-            return Map.of("code", 403, "msg", "missing signature");
+            return ResponseEntity.ok(Map.of("code", 403, "msg", "missing signature"));
         }
 
         // 时间戳新鲜度校验，防重放（±5 分钟）。verifyCallback 已把 timestamp 绑进
@@ -76,18 +81,18 @@ public class EsignCallbackController {
             tsMillis = parsed < 100_000_000_000L ? parsed * 1000L : parsed;
         } catch (NumberFormatException e) {
             log.warn("e签宝回调时间戳非法: {}", timestamp);
-            return Map.of("code", 403, "msg", "invalid timestamp");
+            return ResponseEntity.ok(Map.of("code", 403, "msg", "invalid timestamp"));
         }
         if (Math.abs(System.currentTimeMillis() - tsMillis) > CALLBACK_TIMESTAMP_TOLERANCE_MS) {
             log.warn("e签宝回调时间戳超出容忍窗口: ts={}", timestamp);
-            return Map.of("code", 403, "msg", "timestamp expired");
+            return ResponseEntity.ok(Map.of("code", 403, "msg", "timestamp expired"));
         }
 
         String query = playIdentity != null ? "playIdentity=" + playIdentity : "";
         boolean valid = EsignSignatureUtil.verifyCallback(timestamp, query, rawBody, appSecret, signature);
         if (!valid) {
             log.warn("e签宝回调验签失败！");
-            return Map.of("code", 403, "msg", "signature invalid");
+            return ResponseEntity.ok(Map.of("code", 403, "msg", "signature invalid"));
         }
 
         // 解析回调体，映射为 DP 期望的事件格式
@@ -96,21 +101,44 @@ public class EsignCallbackController {
             String action = mapAction(body.path("action").asText(""), body);
             String flowId = body.path("flowId").asText(null);
             String accountId = body.path("accountId").asText(null);
-            String eventKey = body.path("timestamp").asText(String.valueOf(System.currentTimeMillis()));
 
             if (flowId == null || action == null || "IGNORE".equals(action)) {
                 log.info("e签宝回调不推进状态，忽略: action={} flowId={}", action, flowId);
-                return Map.of("code", 0, "msg", "ignored");
+                return ResponseEntity.ok(Map.of("code", 0, "msg", "ignored"));
             }
 
-            // 转发到 DP
-            forwardToDp(eventKey, flowId, action, accountId, body);
+            // 幂等键必须由事件自身的稳定身份构成。此前取 body 的 timestamp、缺失时退化为
+            // System.currentTimeMillis()，同一事件重投会拿到不同 key，DP 侧去重形同虚设。
+            String eventKey = buildEventKey(flowId, action, body);
 
-            return Map.of("code", 0, "msg", "success");
+            // 转发到 DP：失败必须让 e签宝重试，不能吞掉后回成功
+            if (!forwardToDp(eventKey, flowId, action, accountId, body)) {
+                return ResponseEntity.status(502).body(
+                        Map.of("code", 50002, "msg", "dp forward failed, please retry"));
+            }
+
+            return ResponseEntity.ok(Map.of("code", 0, "msg", "success"));
         } catch (Exception e) {
             log.error("处理 e签宝回调异常", e);
-            return Map.of("code", 500, "msg", e.getMessage());
+            return ResponseEntity.ok(Map.of("code", 500, "msg", e.getMessage()));
         }
+    }
+
+    /**
+     * 由 flowId + 映射后 action + accountId + signResult 组成幂等键。
+     * <p>
+     * 不用 flowId 单键：一个流程会有多事件（多签人各一条 SIGNER_SIGNED、随后
+     * FLOW_COMPLETE）；不用 timestamp / signTime：正是它们让重投产生新键。
+     * 长度远小于 DP 侧 event_key 列宽（VARCHAR(191)）。
+     */
+    private String buildEventKey(String flowId, String action, JsonNode body) {
+        StringBuilder sb = new StringBuilder(flowId)
+                .append('|').append(action)
+                .append('|').append(body.path("accountId").asText(""));
+        if (body.hasNonNull("signResult")) {
+            sb.append("|sr").append(body.path("signResult").asInt());
+        }
+        return sb.toString();
     }
 
     /**
@@ -135,12 +163,18 @@ public class EsignCallbackController {
 
     /**
      * 转发事件到 DP 的 /api/sign/callbacks/esign。
+     *
+     * @return 是否已被 DP 确认受理。只有 HTTP 2xx <b>且</b> 响应体 {@code code==0} 才算成功
+     *         （DP 的 GlobalExceptionHandler 会把业务异常映射为 4xx/5xx，但"200 + 业务错误码"
+     *         仍需看 body 才不漏）。返回 false 时调用方必须让 e签宝重试。
      */
-    private void forwardToDp(String eventKey, String flowId, String action,
-                             String account, JsonNode originalBody) {
+    private boolean forwardToDp(String eventKey, String flowId, String action,
+                                String account, JsonNode originalBody) {
         if (dpCallbackToken == null || dpCallbackToken.isBlank()) {
-            log.warn("DP 回调令牌未配置，跳过转发");
-            return;
+            // CpSecretGuard 在非 dev profile 下已强制该令牌存在且非弱值，生产走不到这里；
+            // dev 下宁可让 e签宝重试并暴露配错，也不静默丢弃事件。
+            log.error("DP 回调令牌未配置，无法转发事件: flowId={} action={}", flowId, action);
+            return false;
         }
 
         try {
@@ -161,9 +195,22 @@ public class EsignCallbackController {
                     .build();
 
             HttpResponse<String> resp = http.send(request, HttpResponse.BodyHandlers.ofString());
-            log.info("转发回调到 DP: flowId={} action={} status={}", flowId, action, resp.statusCode());
+            if (resp.statusCode() < 200 || resp.statusCode() >= 300) {
+                log.error("转发回调到 DP 返回非 2xx: flowId={} action={} status={}",
+                        flowId, action, resp.statusCode());
+                return false;
+            }
+            int bizCode = mapper.readTree(resp.body()).path("code").asInt(-1);
+            if (bizCode != 0) {
+                log.error("转发回调到 DP 业务失败: flowId={} action={} code={}",
+                        flowId, action, bizCode);
+                return false;
+            }
+            log.info("转发回调到 DP 成功: flowId={} action={} eventKey={}", flowId, action, eventKey);
+            return true;
         } catch (Exception e) {
             log.error("转发回调到 DP 失败: flowId={}", flowId, e);
+            return false;
         }
     }
 }

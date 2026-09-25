@@ -69,25 +69,38 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 SecurityContextHolder.getContext().setAuthentication(auth);
             } else if (cpProperties.isEnabled()) {
                 cpTokenVerifier.verify(token).ifPresent(decoded -> {
-                    String username = decoded.getClaim(CpClaims.CLAIM_USERNAME).asString();
-                    if (username == null || username.isBlank()) {
-                        username = decoded.getSubject();
-                    }
-                    Long tenantId = decoded.getClaim(CpClaims.CLAIM_TENANT_ID).asLong();
-                    UsernamePasswordAuthenticationToken auth = UsernamePasswordAuthenticationToken.authenticated(
-                            username, null, List.of(new SimpleGrantedAuthority("ROLE_USER")));
-                    auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                    SecurityContextHolder.getContext().setAuthentication(auth);
-                    // tenant 以 CP claim 为权威（D12/D16），供 TenantContextFilter 使用
-                    if (tenantId != null) {
-                        request.setAttribute(CpClaims.REQ_ATTR_TENANT_ID, tenantId);
-                    }
-                    request.setAttribute(CpClaims.REQ_ATTR_CP_USER, username);
+                    authenticateCpPassport(decoded, request);
                 });
             }
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    /**
+     * 用已验签的 CP passport 建立认证。
+     * <p>CP 的服务账号票（{@code token_use=service}）<b>不</b>构成用户身份：它是给
+     * DP 调 CP 用的，若在此接受，持有 CP 服务凭证的一方将获得 DP 全部需认证端点、
+     * 且租户被票面 claim 钉死。auth 反转落地后 CP 会签发 {@code token_use=user}。</p>
+     */
+    private void authenticateCpPassport(DecodedJWT decoded, HttpServletRequest request) {
+        if (CpClaims.TOKEN_USE_SERVICE.equals(decoded.getClaim(CpClaims.CLAIM_TOKEN_USE).asString())) {
+            return;
+        }
+        String username = decoded.getClaim(CpClaims.CLAIM_USERNAME).asString();
+        if (username == null || username.isBlank()) {
+            username = decoded.getSubject();
+        }
+        Long tenantId = decoded.getClaim(CpClaims.CLAIM_TENANT_ID).asLong();
+        UsernamePasswordAuthenticationToken auth = UsernamePasswordAuthenticationToken.authenticated(
+                username, null, List.of(new SimpleGrantedAuthority("ROLE_USER")));
+        auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+        SecurityContextHolder.getContext().setAuthentication(auth);
+        // tenant 以 CP claim 为权威（D12/D16），供 TenantContextFilter 使用
+        if (tenantId != null) {
+            request.setAttribute(CpClaims.REQ_ATTR_TENANT_ID, tenantId);
+        }
+        request.setAttribute(CpClaims.REQ_ATTR_CP_USER, username);
     }
 
     private String resolveToken(HttpServletRequest request) {
