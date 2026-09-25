@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component jdk="1.8.0_144" jdk_type="JavaSDK">
+	<exclude-output/>
+	<contentEntry url="file://$MODULE_DIR$"/>
+	<levels>
+		<level name="paas-sdk-3.0.7" value="project"/>
+		<level name="log4j-1.2.17" value="project"/>
+		<level name="slf4j-log4j12-1.7.5" value="project"/>
+		<level name="slf4j-api-1.7.5" value="project"/>
+		<level name="gson-2.2.4" value="project"/>
+		<level name="json-lib-2.4-jdk15" value="project"/>
+		<level name="commons-collections-3.2.2" value="project"/>
+		<level name="commons-codec-1.2" value="project"/>
+		<level name="commons-io-2.5" value="project"/>
+		<level name="commons-lang-2.5" value="project"/>
+		<level name="commons-logging-1.2" value="project"/>
+		<level name="core-2.2" value="project"/>
+		<level name="httpcore-4.4.3" value="project"/>
+		<level name="httpmime-4.5.1" value="project"/>
+		<level name="httpclient-4.5.1" value="project"/>
+		<level name="ezmorph-1.0.6" value="project"/>
+		<level name="commons-beanutils-1.9.2" value="project"/>
+	</levels>
+</component>

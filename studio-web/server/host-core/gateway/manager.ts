@@ -705,18 +705,19 @@ export class GatewayManager extends EventEmitter {
     }
 
     if (process.platform === 'win32') {
-      // Windows does not support SIGUSR1 for in-process reload.
-      // Fall back to a full restart.  The connectedForMs < 8000 guard above
-      // already skips unnecessary restarts for recently-started processes.
+      // OpenClaw 2026.9.6 restarts on Windows via gateway.restart.request.
+      // This fallback stays for non-model reloads (channels, agent deletion).
+      // Model and default-provider changes must not call reload().
       logger.warn('[gateway-refresh] mode=reload result=fallback_restart cause=windows');
       await this.restart();
       return;
     }
 
     try {
-      process.kill(this.process.pid, 'SIGUSR1');
-      logger.info(`Sent SIGUSR1 to Gateway for config reload (pid=${this.process.pid})`);
-      // Some gateway builds do not handle SIGUSR1 as an in-process reload.
+      // 2026.9.6: SIGUSR2 is the in-process restart. SIGUSR1 is the Node inspector.
+      process.kill(this.process.pid, 'SIGUSR2');
+      logger.info(`Sent SIGUSR2 to Gateway for config reload (pid=${this.process.pid})`);
+      // Some gateway builds do not handle SIGUSR2 as an in-process restart.
       // If process state doesn't recover quickly, fall back to restart.
       await new Promise((resolve) => setTimeout(resolve, 1500));
       if (this.status.state !== 'running' || !this.process?.pid) {

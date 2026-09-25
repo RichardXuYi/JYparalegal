@@ -4,6 +4,7 @@ import com.jyfc.backend.module.auth.entity.CompanyEntity;
 import com.jyfc.backend.module.auth.entity.UserEntity;
 import com.jyfc.backend.module.auth.repository.CompanyRepository;
 import com.jyfc.backend.module.auth.repository.UserRepository;
+import com.jyfc.backend.module.tenant.service.TenantProvisioningService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
@@ -27,15 +28,18 @@ public class CompanyDataBootstrapper implements ApplicationRunner {
     private final UserRepository userRepository;
     private final CompanyRepository companyRepository;
     private final PasswordEncoder passwordEncoder;
+    private final TenantProvisioningService tenantProvisioningService;
 
     public CompanyDataBootstrapper(Environment environment,
                                    UserRepository userRepository,
                                    CompanyRepository companyRepository,
-                                   PasswordEncoder passwordEncoder) {
+                                   PasswordEncoder passwordEncoder,
+                                   TenantProvisioningService tenantProvisioningService) {
         this.environment = environment;
         this.userRepository = userRepository;
         this.companyRepository = companyRepository;
         this.passwordEncoder = passwordEncoder;
+        this.tenantProvisioningService = tenantProvisioningService;
     }
 
     @Override
@@ -79,6 +83,8 @@ public class CompanyDataBootstrapper implements ApplicationRunner {
             log.warn("Company ID is null, skipping enterprise user association");
             return;
         }
+        // 供给企业租户：建 tenant + 回填 company.tenant_id + 绑定 owner（幂等）
+        tenantProvisioningService.provisionCompany(company);
         ensureEnterpriseUser(owner, companyId);
 
         // 4. 查找或创建员工
@@ -112,5 +118,7 @@ public class CompanyDataBootstrapper implements ApplicationRunner {
             userRepository.save(user);
             log.info("更新用户 {} 为企业用户, companyId={}", user.getUsername(), companyId);
         }
+        // 绑定到企业租户（幂等；tenant 缺失时由 provisionCompany 已补建）
+        tenantProvisioningService.bindUserToCompany(user, companyId);
     }
 }

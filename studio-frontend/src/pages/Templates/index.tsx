@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { FileText } from 'lucide-react';
+import { LegalPageHeader } from '@/components/legal/LegalPageHeader';
 
 type Tpl = { id: number; title: string; category: string | null; body: string | null; variables: string | null; status: string };
 
@@ -72,10 +72,12 @@ export default function Templates() {
 
   return (
     <div className="h-full overflow-y-auto p-5">
-      <div className="mb-4 flex items-center gap-3">
-        <h1 className="flex items-center gap-2 text-lg font-semibold"><FileText className="h-5 w-5 text-primary" />合同模板库</h1>
-        <button className="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground" onClick={() => setShowCreate(!showCreate)}>＋ 新建模板</button>
-      </div>
+      <LegalPageHeader
+        title="合同模板库"
+        actions={
+          <button className="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground" onClick={() => setShowCreate(!showCreate)}>＋ 新建模板</button>
+        }
+      />
 
       {showCreate && (
         <div className="mb-4 grid gap-3 rounded-lg border border-border bg-card p-4 text-sm">

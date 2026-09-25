@@ -2,6 +2,7 @@ package com.jyfc.backend.module.auth.service;
 
 import com.jyfc.backend.module.auth.entity.CompanyEntity;
 import com.jyfc.backend.module.auth.repository.CompanyRepository;
+import com.jyfc.backend.module.tenant.service.TenantProvisioningService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -16,9 +17,11 @@ public class CompanyService {
     private static final Logger log = LoggerFactory.getLogger(CompanyService.class);
 
     private final CompanyRepository companyRepository;
+    private final TenantProvisioningService tenantProvisioningService;
 
-    public CompanyService(CompanyRepository companyRepository) {
+    public CompanyService(CompanyRepository companyRepository, TenantProvisioningService tenantProvisioningService) {
         this.companyRepository = companyRepository;
+        this.tenantProvisioningService = tenantProvisioningService;
     }
 
     /**
@@ -38,7 +41,10 @@ public class CompanyService {
 
         company.setOwnerUserId(ownerUserId);
         company.setStatus(1); // 正常状态
-        return companyRepository.save(company);
+        CompanyEntity saved = companyRepository.save(company);
+        // 运行时租户供给：为新企业建 ENTERPRISE 租户并绑定 owner（幂等）
+        tenantProvisioningService.provisionCompany(saved);
+        return saved;
     }
 
     /**

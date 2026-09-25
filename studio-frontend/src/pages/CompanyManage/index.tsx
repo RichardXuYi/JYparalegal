@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Building2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { LegalPageHeader } from '@/components/legal/LegalPageHeader';
 
-type Company = { id: number; name: string; tenantId?: number; unifiedCode?: string | null };
+type Company = { id: number; name: string; tenantId?: number; unifiedCode?: string | null; esignOrgId?: string | null };
 type Member = { id: number; username: string; phone?: string | null; roleName?: string | null };
 type Dept = { id: number; name: string };
 
-/** 企业管理：本公司/成员/部门（租户内，/platform/companies）。 */
+/** 企业管理：本公司/成员/部门 + 企业章机构号绑定（租户内，/platform/companies）。 */
 export default function CompanyManage() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [listState, setListState] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -13,8 +14,14 @@ export default function CompanyManage() {
   // 派生而非存储：数据与「它是为哪个 sel 取的」一起存，选择变化/清空时自然回到空列表，
   // 无需在 effect 里同步 setState（会触发级联渲染），也顺带避免旧响应覆盖新选择的竞态。
   const [loaded, setLoaded] = useState<{ sel: number; members: Member[]; depts: Dept[] } | null>(null);
+  // 机构号输入框：与「它是为哪个 sel 编辑的」一起存，选择变化时派生值自然回到当前企业的机构号。
+  const [orgEdit, setOrgEdit] = useState<{ sel: number; value: string } | null>(null);
+  const [saving, setSaving] = useState(false);
   const members = loaded && loaded.sel === sel ? loaded.members : [];
   const depts = loaded && loaded.sel === sel ? loaded.depts : [];
+  const selCompany = companies.find((c) => c.id === sel);
+  const orgInput = orgEdit && orgEdit.sel === sel ? orgEdit.value : (selCompany?.esignOrgId ?? '');
+  const setOrgInput = (v: string) => { if (sel != null) setOrgEdit({ sel, value: v }); };
 
   const load = useCallback(() => {
     void fetch('/platform/companies', { credentials: 'include' }).then((r) => r.json())
@@ -45,9 +52,26 @@ export default function CompanyManage() {
     return () => { cancelled = true; };
   }, [sel]);
 
+  const bindOrg = async () => {
+    if (sel == null) return;
+    setSaving(true);
+    try {
+      const e = await fetch(`/platform/companies/${sel}/esign-org-id`, {
+        method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ esignOrgId: orgInput.trim() }),
+      }).then((r) => r.json());
+      if (e?.code === 0) { toast.success('企业机构号已更新'); load(); }
+      else toast.error(e?.msg ?? '更新失败');
+    } catch {
+      toast.error('网络错误,更新失败');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="h-full overflow-y-auto p-5">
-      <h1 className="mb-4 flex items-center gap-2 text-lg font-semibold"><Building2 className="h-5 w-5 text-primary" />企业管理</h1>
+      <LegalPageHeader title="企业管理" />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[280px_1fr]">
         <div className="rounded-lg border border-border bg-card p-3">
           <h4 className="mb-2 px-1 text-xs font-semibold text-muted-foreground">企业</h4>
@@ -95,6 +119,36 @@ export default function CompanyManage() {
             <div className="flex flex-wrap gap-2">
               {depts.map((d) => <span key={d.id} className="rounded-md bg-muted px-3 py-1.5 text-xs">{d.name}</span>)}
             </div>
+          </div>
+          <div className="rounded-lg border border-border bg-card p-4">
+            <h4 className="mb-3 text-sm font-semibold">企业章（e签宝机构号）</h4>
+            {sel == null ? (
+              <div className="p-6 text-center text-sm text-muted-foreground">从左侧选择企业</div>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-meta text-muted-foreground">
+                  绑定该企业在 e签宝 的机构号（orgId）后，本企业参与方的签署将用企业章完成；留空则退回个人签署（手机号/邮箱）。
+                </p>
+                <div className="flex items-center gap-2">
+                  <input
+                    className="h-8 flex-1 rounded-md border border-border bg-card px-2.5 font-mono text-xs"
+                    placeholder="e签宝机构号（orgId）"
+                    value={orgInput}
+                    onChange={(e) => setOrgInput(e.target.value)}
+                  />
+                  <button
+                    className="h-8 rounded-md bg-primary px-4 text-sm text-primary-foreground disabled:opacity-50"
+                    disabled={saving}
+                    onClick={() => void bindOrg()}
+                  >
+                    {saving ? '保存中…' : '绑定'}
+                  </button>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  当前：{selCompany?.esignOrgId ? <span className="font-mono">{selCompany.esignOrgId}</span> : '未绑定（个人签署）'}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

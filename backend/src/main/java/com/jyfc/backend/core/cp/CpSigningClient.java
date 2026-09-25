@@ -44,10 +44,15 @@ public class CpSigningClient {
      * 请求 CP 执行一次签署（送签 chokepoint）。
      *
      * @param forwardToken 终端用户持有的 CP passport（优先转发，使 CP 按正确租户计费）；可为 null → 用服务账号
-     * @return CP 返回的 data（grantId/providerTaskId/signUrl/quota/plan）
+     * @param fileName     合同文件名（CP 上传 e签宝用）
+     * @param fileContentBase64 合同文件 base64（CP 上传 e签宝用）；为 null → 退化空流程
+     * @param signers      签署人描述 [{signerType, account, orgId, signOrder}]；为 null/空 → 流程无签署人
+     * @return CP 返回的 data（grantId/providerTaskId/signUrl/quota/plan/fileId）
      * @throws BusinessException CP 拒绝（如配额用尽 SIGN_QUOTA_EXCEEDED）或 CP 不可达
      */
-    public Map<String, Object> execute(String taskRef, String title, String docSha256, String forwardToken) {
+    public Map<String, Object> execute(String taskRef, String title, String docSha256,
+                                       String fileName, String fileContentBase64,
+                                       java.util.List<Map<String, Object>> signers, String forwardToken) {
         if (!props.isEnabled()) {
             throw new IllegalStateException("CP 未启用（jy.cp.mode≠required）：local/off 模式不应调用 CP chokepoint");
         }
@@ -55,6 +60,9 @@ public class CpSigningClient {
         body.put("taskRef", taskRef);
         body.put("title", title);
         body.put("docSha256", docSha256);
+        if (fileName != null) body.put("fileName", fileName);
+        if (fileContentBase64 != null) body.put("fileContentBase64", fileContentBase64);
+        if (signers != null && !signers.isEmpty()) body.put("signers", signers);
 
         String token = (forwardToken != null && !forwardToken.isBlank()) ? forwardToken : serviceToken();
         JsonNode env = post("/cp/v1/signing/execute", body, token);
@@ -109,6 +117,21 @@ public class CpSigningClient {
         body.put("flowId", flowId);
         body.put("reason", reason);
         call("/cp/v1/signing/rescind", body, forwardToken);
+    }
+
+    /** 获取蚂蚁链存证信息（经 CP → e签宝 /v3/antchain-file-info）。 */
+    public Map<String, Object> antchainInfo(String flowId, String forwardToken) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("flowId", flowId);
+        return call("/cp/v1/signing/antchain-info", body, forwardToken);
+    }
+
+    /** 核验蚂蚁链存证（经 CP → e签宝 /v3/antchain-file-info/verify）。 */
+    public Map<String, Object> antchainVerify(String fileHash, String antTxHash, String forwardToken) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("fileHash", fileHash);
+        body.put("antTxHash", antTxHash);
+        return call("/cp/v1/signing/antchain-verify", body, forwardToken);
     }
 
     private Map<String, Object> call(String path, Map<String, Object> body, String forwardToken) {

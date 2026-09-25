@@ -14,11 +14,18 @@ import {
   Check,
   X,
   ChevronRight,
+  Search,
+  Settings,
+  Sparkles,
+  Clock,
+  Bot,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 // isGatewayRestarting moved to TopBar
 import { rendererExtensionRegistry } from '@/extensions/registry';
 import { useSettingsStore } from '@/stores/settings';
+import { useAuthStore } from '@/stores/auth';
+import { useSettingsUiStore } from '@/stores/settings-ui';
 import { useChatStore, type ChatSession } from '@/stores/chat';
 import { useGatewayStore } from '@/stores/gateway';
 import { useAgentsStore } from '@/stores/agents';
@@ -55,10 +62,10 @@ function NavItem({ to, icon, label, badge, collapsed, onClick, testId }: NavItem
       className={({ isActive }) =>
         cn(
           'sidebar-nav-text flex items-center gap-2 rounded-xl px-2.5 py-2 transition-all',
-          'hover:bg-black/5 dark:hover:bg-white/5 text-foreground/80',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+          'hover:bg-white/10 text-white/80',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60',
           isActive
-            ? 'bg-gradient-to-r from-indigo-500/10 to-violet-500/10 text-indigo-700 font-medium dark:from-rose-500/10 dark:to-orange-500/10 dark:text-orange-400'
+            ? 'shell-glass-strong text-white font-medium'
             : '',
           collapsed && 'justify-center px-0'
         )
@@ -84,6 +91,17 @@ function NavItem({ to, icon, label, badge, collapsed, onClick, testId }: NavItem
 }
 
 const INITIAL_NOW_MS = Date.now();
+
+function relTime(ms: number, now: number): string {
+  const min = Math.floor(Math.max(0, now - ms) / 60000);
+  if (min < 1) return '刚刚';
+  if (min < 60) return `${min}分钟前`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}小时前`;
+  const day = Math.floor(hr / 24);
+  if (day < 30) return `${day}天前`;
+  return `${Math.floor(day / 30)}个月前`;
+}
 const DEFAULT_EXPANDED_SESSION_BUCKETS: Record<SessionBucketKey, boolean> = {
   today: true,
   withinWeek: true,
@@ -95,6 +113,7 @@ interface SessionItemProps {
   session: ChatSession;
   agentName: string;
   sessionLabel: string;
+  activityLabel: string;
   isActive: boolean;
   isEditing: boolean;
   editingLabel: string;
@@ -111,6 +130,7 @@ function SessionItem({
   session,
   agentName,
   sessionLabel,
+  activityLabel,
   isActive,
   isEditing,
   editingLabel,
@@ -164,8 +184,8 @@ function SessionItem({
             className={cn(
               'w-full text-left rounded-2xl px-2.5 py-2 text-meta transition-all pr-16',
               isActive
-                ? 'bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-lg shadow-indigo-200 dark:from-rose-500 dark:to-orange-500 dark:shadow-rose-900/30 font-medium'
-                : 'hover:bg-black/5 dark:hover:bg-white/5 text-foreground/75 hover:shadow-sm',
+                ? 'shell-glass-strong text-white font-medium'
+                : 'hover:bg-white/10 text-white/80',
             )}
           >
             <div className="flex min-w-0 items-center gap-2.5">
@@ -181,7 +201,7 @@ function SessionItem({
               <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className={cn(
                   'truncate text-xs font-semibold',
-                  isActive ? 'text-white' : 'text-foreground/85'
+                  isActive ? 'text-white' : 'text-white/90'
                 )}>
                   {sessionLabel || agentName}
                 </span>
@@ -190,7 +210,7 @@ function SessionItem({
                     'shrink-0 rounded-full px-1.5 py-px text-[10px] font-medium',
                     isActive
                       ? 'bg-white/20 text-white/90'
-                      : 'bg-black/[0.04] text-foreground/60 dark:bg-white/[0.08]'
+                      : 'bg-white/10 text-white/65'
                   )}>
                     {agentName}
                   </span>
@@ -202,12 +222,18 @@ function SessionItem({
                         'shrink-0 truncate rounded-full px-1.5 py-px text-[10px] font-medium',
                         isActive
                           ? 'bg-white/20 text-white/90'
-                          : 'bg-blue-500/10 text-blue-700 dark:bg-blue-400/10 dark:text-blue-400'
+                          : 'bg-white/10 text-white/70'
                       )}
                     >
                       {channelName}
                     </span>
                   )}
+                  <span className={cn(
+                    'ml-auto shrink-0 text-[10px]',
+                    isActive ? 'text-white/70' : 'text-white/45'
+                  )}>
+                    {activityLabel}
+                  </span>
                 </div>
               </div>
             </div>
@@ -223,7 +249,7 @@ function SessionItem({
                 e.stopPropagation();
                 onStartRename();
               }}
-              className="flex items-center justify-center rounded p-0.5 text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/10"
+              className="flex items-center justify-center rounded p-0.5 text-white/60 hover:text-white hover:bg-white/15"
             >
               <Pencil className="h-3.5 w-3.5" />
             </button>
@@ -234,13 +260,63 @@ function SessionItem({
                 e.stopPropagation();
                 onRequestDelete();
               }}
-              className="flex items-center justify-center rounded p-0.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+              className="flex items-center justify-center rounded p-0.5 text-white/60 hover:text-red-300 hover:bg-white/15"
             >
               <Trash2 className="h-3.5 w-3.5" />
             </button>
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+function SidebarFooter() {
+  const { t } = useTranslation(['common']);
+  const user = useAuthStore((s) => s.user);
+  const openSettings = useSettingsUiStore((s) => s.openSettings);
+  const name = user?.username?.trim() || t('sidebar.settings');
+  const initial = name.slice(0, 1).toUpperCase();
+  const entries = [
+    { section: 'skills' as const, icon: Sparkles, label: t('sidebar.skills') },
+    { section: 'cron' as const, icon: Clock, label: t('sidebar.cronTasks') },
+    { section: 'agents' as const, icon: Bot, label: t('sidebar.agents') },
+  ];
+
+  return (
+    <div className="shell-card mt-2 shrink-0 rounded-xl p-2">
+      <div className="px-2.5 pb-1 pt-1 text-[11px] font-medium tracking-wide text-white/55">
+        {t('sidebar.capabilities')}
+      </div>
+      {entries.map((item) => {
+        const Icon = item.icon;
+        return (
+          <button
+            key={item.section}
+            type="button"
+            onClick={() => openSettings(item.section)}
+            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+          >
+            <Icon className="h-4 w-4 shrink-0" strokeWidth={1.75} />
+            <span className="truncate">{item.label}</span>
+          </button>
+        );
+      })}
+      <div className="mt-1 flex items-center gap-2 rounded-lg px-2 py-1.5">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-xs font-semibold text-indigo-700">
+          {initial}
+        </span>
+        <span className="min-w-0 flex-1 truncate text-sm text-white">{name}</span>
+        <button
+          type="button"
+          title={t('sidebar.settings')}
+          aria-label={t('sidebar.settings')}
+          onClick={() => openSettings()}
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-white/70 hover:bg-white/15 hover:text-white"
+        >
+          <Settings className="h-4 w-4" />
+        </button>
+      </div>
     </div>
   );
 }
@@ -252,6 +328,7 @@ export function Sidebar() {
   const sidebarWidth = useSettingsStore((state) => state.sidebarWidth);
   const setSidebarWidth = useSettingsStore((state) => state.setSidebarWidth);
   const [isResizing, setIsResizing] = useState(false);
+  const [query, setQuery] = useState('');
   const stopResizeRef = useRef<(() => void) | null>(null);
 
   const sessions = useChatStore((s) => s.sessions);
@@ -436,7 +513,14 @@ export function Sidebar() {
     (typeof sessionBuckets)[number]
   >;
 
-  for (const session of sessions) {
+  const q = query.trim().toLowerCase();
+  const visibleSessions = q
+    ? sessions.filter((s) =>
+        (sessionLabels[s.key] || s.label || s.displayName || '').toLowerCase().includes(q),
+      )
+    : sessions;
+
+  for (const session of visibleSessions) {
     const bucketKey = getSessionBucket(getSessionActivityMs(session, sessionLastActivity), nowMs);
     sessionBucketMap[bucketKey].sessions.push(session);
   }
@@ -451,6 +535,7 @@ export function Sidebar() {
         session={session}
         agentName={agentName}
         sessionLabel={sessionLabel}
+        activityLabel={relTime(getSessionActivityMs(session, sessionLastActivity), nowMs)}
         isActive={isOnChat && currentSessionKey === session.key}
         isEditing={editingSessionKey === session.key}
         editingLabel={editingLabel}
@@ -494,7 +579,7 @@ export function Sidebar() {
     <aside
       data-testid="sidebar"
       className={cn(
-        'relative flex min-h-0 shrink-0 flex-col overflow-hidden',
+        'relative flex min-h-0 shrink-0 flex-col overflow-hidden px-2.5 pb-3 pt-1',
         isResizing ? 'transition-none' : 'transition-[width] duration-300',
       )}
       style={{ width: sidebarCollapsed ? SIDEBAR_COLLAPSED_WIDTH : sidebarWidth }}
@@ -520,8 +605,8 @@ export function Sidebar() {
           variant="ghost"
           size="icon"
           className={cn(
-            'no-drag h-8 w-8 shrink-0 rounded-lg text-foreground/80',
-            'hover:bg-black/5 hover:text-foreground/80 dark:hover:bg-white/5',
+            'no-drag h-8 w-8 shrink-0 rounded-lg text-white/70',
+            'hover:bg-white/15 hover:text-white',
           )}
           onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
         >
@@ -540,8 +625,7 @@ export function Sidebar() {
           data-testid="sidebar-new-chat"
           onClick={handleNewChat}
           className={cn(
-            'sidebar-nav-text flex items-center gap-2 rounded-lg px-2.5 py-2 transition-colors',
-            'hover:bg-black/5 dark:hover:bg-white/5 text-foreground/80',
+            'sidebar-nav-text shell-cta flex items-center gap-2 rounded-lg px-2.5 py-2 font-semibold transition-colors',
             sidebarCollapsed && 'justify-center px-0',
           )}
         >
@@ -560,6 +644,19 @@ export function Sidebar() {
         ))}
       </nav>
 
+      {/* Glass search over sessions */}
+      {!sidebarCollapsed && (
+        <div className="shell-glass mx-2 mt-2 flex shrink-0 items-center gap-2 rounded-lg px-2.5 py-1.5">
+          <Search className="h-3.5 w-3.5 shrink-0 text-white/60" strokeWidth={1.75} />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="搜索会话…"
+            className="min-w-0 flex-1 bg-transparent text-meta text-white placeholder:text-white/50 focus:outline-none"
+          />
+        </div>
+      )}
+
       {/* Session list —below Settings, only when expanded */}
       {!sidebarCollapsed && sessions.length > 0 && (
         <div className="mt-4 flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-2 pb-2 space-y-1">
@@ -574,8 +671,8 @@ export function Sidebar() {
                   onClick={() => toggleSessionBucket(bucket.key)}
                   className={cn(
                     'flex w-full items-center gap-1 rounded-md px-2.5 py-1 text-left text-[11px] font-bold uppercase tracking-widest',
-                    'text-muted-foreground/60 transition-colors',
-                    'hover:bg-black/5 hover:text-muted-foreground dark:hover:bg-white/5',
+                    'text-white/55 transition-colors',
+                    'hover:bg-white/10 hover:text-white/80',
                   )}
                 >
                   <ChevronRight
@@ -592,6 +689,9 @@ export function Sidebar() {
           })}
         </div>
       )}
+
+      {/* Bottom glass user + capabilities footer */}
+      {!sidebarCollapsed && <SidebarFooter />}
 
       {!sidebarCollapsed && (
         <div

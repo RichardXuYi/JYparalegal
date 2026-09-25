@@ -77,10 +77,8 @@ export function createAgentsApi(ctx: AgentsApiContext): CompleteHostServiceRegis
       } catch (syncError) {
         console.warn('[agents] Failed to sync runtime after updating agent model:', syncError);
       }
-      // Agent model changes must be picked up by the running Gateway before
-      // the next send; otherwise the UI can show the new selection while the
-      // active runtime still answers with the previous model.
-      scheduleGatewayReload(ctx, 'update-agent-model');
+      // OpenClaw 2026.9.6 hot-applies agents.entries model changes. Do not
+      // restart the Gateway; a process restart is what popped the reconnect overlay.
       return { success: true, ...snapshot };
     },
     delete: async (payload) => {

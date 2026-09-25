@@ -4,6 +4,7 @@ import com.jyfc.backend.module.auth.entity.AdminEntity;
 import com.jyfc.backend.module.auth.entity.UserEntity;
 import com.jyfc.backend.module.auth.repository.AdminRepository;
 import com.jyfc.backend.module.auth.repository.UserRepository;
+import com.jyfc.backend.module.tenant.service.TenantProvisioningService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
@@ -23,12 +24,14 @@ public class UserBootstrapper implements ApplicationRunner {
     private final UserRepository userRepository;
     private final AdminRepository adminRepository;
     private final PasswordEncoder passwordEncoder;
+    private final TenantProvisioningService tenantProvisioningService;
 
-    public UserBootstrapper(Environment environment, UserRepository userRepository, AdminRepository adminRepository, PasswordEncoder passwordEncoder) {
+    public UserBootstrapper(Environment environment, UserRepository userRepository, AdminRepository adminRepository, PasswordEncoder passwordEncoder, TenantProvisioningService tenantProvisioningService) {
         this.environment = environment;
         this.userRepository = userRepository;
         this.adminRepository = adminRepository;
         this.passwordEncoder = passwordEncoder;
+        this.tenantProvisioningService = tenantProvisioningService;
     }
 
     @Override
@@ -69,6 +72,7 @@ public class UserBootstrapper implements ApplicationRunner {
         if (userOpt.isPresent()) {
             UserEntity existing = userOpt.get();
             ensureDefaults(existing);
+            tenantProvisioningService.provisionPersonalUser(existing);
             // 只有当显式配置了 FORCE=true 时才覆盖现有数据
             if ("true".equalsIgnoreCase(force)) {
                 log.info("User '{}' exists; FORCE reset enabled - updating password (DEV ONLY)", username);
@@ -93,7 +97,8 @@ public class UserBootstrapper implements ApplicationRunner {
         user.setStatus(1); // Active
         user.setEmailVerified(true); // Assume bootstrapped users are verified
         ensureDefaults(user);
-        userRepository.save(user);
+        UserEntity saved = userRepository.save(user);
+        tenantProvisioningService.provisionPersonalUser(saved);
     }
 
     private void ensureDefaults(UserEntity user) {

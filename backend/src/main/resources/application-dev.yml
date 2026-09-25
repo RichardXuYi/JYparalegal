@@ -30,6 +30,13 @@ USER_BOOTSTRAP_PASSWORD: "123456"
 USER_BOOTSTRAP_EMAIL: xuyi@example.com
 USER_BOOTSTRAP_FORCE: true
 
+# 企业数据初始化：把 xuyi 变成企业 owner + 建公司 grandpoem + 员工 diandian，
+# 并供给 ENTERPRISE 租户（否则签署等法律域因 requireTenant / 无授权公司而不可用）
+COMPANY_BOOTSTRAP_ENABLED: true
+COMPANY_BOOTSTRAP_NAME: grandpoem
+COMPANY_BOOTSTRAP_EMPLOYEE: diandian
+COMPANY_BOOTSTRAP_EMPLOYEE_PASSWORD: "123456"
+
 logging:
   level:
     com.jyfc.backend.module.auth: DEBUG
@@ -78,8 +85,15 @@ app:
 #     api-key: ${LLM_API_KEY:}     # 生产由 LLM_API_KEY 密钥注入（DashScope/OpenAI 兼容）
 #     model: qwen3-max
 
-# --- CP 强制点模式（D16）：dev 单机用 DP 本地配额兜底（honor-system）；
-#     要联调 CP chokepoint 时覆盖 CP_MODE=required ---
+# --- CP 强制点模式（D16）---
+# required = 走 CP chokepoint → e签宝；local = 仅本地配额兜底；off = 关闭
 jy:
   cp:
-    mode: ${CP_MODE:local}
+    mode: ${CP_MODE:required}
+    base-url: ${CP_BASE_URL:http://localhost:8281}
+    service-username: ${CP_SERVICE_USERNAME:cp-service}
+    service-password: ${CP_SERVICE_PASSWORD:cp-secret}
+
+# --- 签章回调令牌（须与 CP 的 cp.dp.callback-token 一致）---
+  sign:
+    callback-token: ${ESIGN_CALLBACK_TOKEN:dev-callback-token}

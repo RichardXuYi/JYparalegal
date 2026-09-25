@@ -15,7 +15,6 @@ import { useChannelsStore } from '@/stores/channels';
 import { useArtifactPanel } from '@/stores/artifact-panel';
 import { useProviderStore } from '@/stores/providers';
 import { useSettingsStore } from '@/stores/settings';
-import { useConnectionStatusStore } from '@/stores/connection-status';
 import { DELETED_SESSIONS_STORAGE_KEY } from '@/stores/chat/deleted-sessions';
 
 /** localStorage keys holding per-account data that must not leak across users. */
@@ -47,8 +46,6 @@ export function resetAllUserStores(): void {
   useArtifactPanel.getState().resetForUserSwitch();
   useProviderStore.getState().resetForUserSwitch();
   useSettingsStore.getState().resetForUserSwitch();
-  // A model switch in flight belongs to the previous account's context.
-  useConnectionStatusStore.getState().endModelSwitch();
 
   try {
     for (const key of PER_USER_LOCALSTORAGE_KEYS) {

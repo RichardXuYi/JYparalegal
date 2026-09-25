@@ -4,7 +4,7 @@
  * entry point.  Rendered in the Header when on the Chat page.
  */
 import { useMemo, useState } from 'react';
-import { RefreshCw, Bot, FolderTree, ListTree } from 'lucide-react';
+import { RefreshCw, FolderTree, ListTree, FileDiff } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -18,12 +18,14 @@ import { WORKSPACE_BROWSER_ENABLED } from '@/components/file-preview/workspace-b
 type ChatToolbarProps = {
   questionDirectoryOpen?: boolean;
   questionDirectoryCount?: number;
+  changeCount?: number;
   onToggleQuestionDirectory?: () => void;
 };
 
 export function ChatToolbar({
   questionDirectoryOpen = false,
   questionDirectoryCount = 0,
+  changeCount = 0,
   onToggleQuestionDirectory,
 }: ChatToolbarProps = {}) {
   const refresh = useChatStore((s) => s.refresh);
@@ -32,6 +34,7 @@ export function ChatToolbar({
   const currentAgentId = useChatStore((s) => s.currentAgentId);
   const agents = useAgentsStore((s) => s.agents);
   const openBrowser = useArtifactPanel((s) => s.openBrowser);
+  const openChanges = useArtifactPanel((s) => s.openChanges);
   const panelOpen = useArtifactPanel((s) => s.open);
   const panelTab = useArtifactPanel((s) => s.tab);
   const closePanel = useArtifactPanel((s) => s.close);
@@ -40,9 +43,8 @@ export function ChatToolbar({
     () => (agents ?? []).find((agent) => agent.id === currentAgentId) ?? null,
     [agents, currentAgentId],
   );
-  const currentAgentName = currentAgent?.name ?? currentAgentId;
-
   const browserActive = WORKSPACE_BROWSER_ENABLED && panelOpen && panelTab === 'browser';
+  const changesActive = panelOpen && panelTab === 'changes';
   const questionDirectoryAvailable = questionDirectoryCount > 1 && !!onToggleQuestionDirectory;
   const refreshBusy = loading || refreshing;
 
@@ -65,10 +67,30 @@ export function ChatToolbar({
 
   return (
     <div className="flex items-center gap-2">
-      <div className="hidden sm:flex items-center gap-1.5 rounded-full border border-black/10 bg-white/70 px-3 py-1.5 text-xs font-medium text-foreground/80 dark:border-white/10 dark:bg-white/5">
-        <Bot className="h-3.5 w-3.5 text-primary" />
-        <span>{t('toolbar.currentAgent', { agent: currentAgentName })}</span>
-      </div>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              'relative h-8 w-8 hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10',
+              changesActive && 'bg-foreground/10 text-foreground',
+            )}
+            onClick={() => (changesActive ? closePanel() : openChanges())}
+            aria-label={t('generatedFiles.title', { count: changeCount })}
+          >
+            <FileDiff className="h-4 w-4" />
+            {changeCount > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-indigo-600 px-1 text-[10px] leading-none text-white dark:bg-orange-500">
+                {changeCount > 9 ? '9+' : changeCount}
+              </span>
+            )}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>{t('generatedFiles.title', { count: changeCount })}</p>
+        </TooltipContent>
+      </Tooltip>
       {WORKSPACE_BROWSER_ENABLED && (
         <Tooltip>
           <TooltipTrigger asChild>

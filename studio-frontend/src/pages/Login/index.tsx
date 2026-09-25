@@ -9,6 +9,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertCircle, Building2, Lock, LogIn, Shield, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { TitleBar } from '@/components/layout/TitleBar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -50,6 +51,10 @@ export function Login() {
 
   return (
     <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50 flex items-center justify-center p-4">
+      {/* Windows 无边框窗口：登录页同样需要拖拽区与最小化/最大化/关闭控件 */}
+      <div className="absolute inset-x-0 top-0 z-20">
+        <TitleBar />
+      </div>
       {/* 背景装饰 */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-96 h-96 bg-gradient-to-br from-blue-400/25 to-purple-400/25 rounded-full blur-3xl animate-pulse" />
@@ -203,6 +208,13 @@ export function Login() {
                   </span>
                 )}
               </Button>
+
+              <div className="text-center text-sm text-slate-500 pt-1">
+                还没有账户？
+                <button type="button" className="ml-1 font-medium text-blue-600 hover:underline" onClick={() => navigate('/register')}>
+                  注册账户
+                </button>
+              </div>
             </CardContent>
           </Card>
 

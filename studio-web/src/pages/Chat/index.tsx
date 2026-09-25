@@ -1318,34 +1318,95 @@ function QuestionDirectory({ items }: { items: QuestionDirectoryItem[] }) {
 
 // ── Welcome Screen ──────────────────────────────────────────────
 
+// Module-level so the render stays pure (React Compiler purity rule).
+const WELCOME_NOW_MS = Date.now();
+
 function WelcomeScreen() {
   const { t } = useTranslation('chat');
-  const quickActions = [
-    { key: 'askQuestions', label: t('welcome.askQuestions') },
-    { key: 'creativeTasks', label: t('welcome.creativeTasks') },
-    { key: 'brainstorming', label: t('welcome.brainstorming') },
-    { key: 'analyzeData', label: t('welcome.analyzeData') },
+  const sessions = useChatStore((s) => s.sessions);
+  const sessionLastActivity = useChatStore((s) => s.sessionLastActivity);
+  const [mode, setMode] = useState(0);
+
+  const modes = [
+    { label: '智能问答', actions: ['askQuestions', 'analyzeData'] },
+    { label: '文书起草', actions: ['creativeTasks', 'brainstorming'] },
+    { label: '合同审查', actions: ['analyzeData', 'askQuestions'] },
   ];
+  const actionLabel: Record<string, string> = {
+    askQuestions: t('welcome.askQuestions'),
+    creativeTasks: t('welcome.creativeTasks'),
+    brainstorming: t('welcome.brainstorming'),
+    analyzeData: t('welcome.analyzeData'),
+  };
+
+  // Real activity: session counts per week over the last 6 weeks.
+  const now = WELCOME_NOW_MS;
+  const weeks = Array.from({ length: 6 }, (_, i) => {
+    const start = now - (i + 1) * 7 * 86400000;
+    const end = now - i * 7 * 86400000;
+    const count = sessions.filter((s) => {
+      const ms = sessionLastActivity[s.key] ?? s.updatedAt ?? 0;
+      return ms > start && ms <= end;
+    }).length;
+    return count;
+  });
+  const maxWeek = Math.max(1, ...weeks);
 
   return (
-    <div className="flex flex-col items-center justify-center text-center h-[60vh]">
-      <h1 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent dark:from-rose-400 dark:to-orange-400 tracking-tight">
+    <div className="flex h-full flex-col items-center justify-center px-6 text-center">
+      {/* Illustration mark */}
+      <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-indigo-500 to-violet-600 shadow-lg shadow-indigo-200 dark:from-rose-500 dark:to-orange-500 dark:shadow-rose-900/30">
+        <Sparkles className="h-7 w-7 text-white" strokeWidth={1.75} />
+      </div>
+
+      <h1 className="mb-2 text-3xl font-bold tracking-tight text-foreground md:text-4xl">
         {t('welcome.subtitle')}
       </h1>
-      <p className="text-sm text-muted-foreground mb-8">
-        {t('welcome.description')}
-      </p>
+      <p className="mb-7 max-w-md text-sm text-muted-foreground">{t('welcome.description')}</p>
 
-      <div className="flex flex-wrap items-center justify-center gap-2.5 max-w-lg w-full">
-        {quickActions.map(({ key, label }) => (
-          <button 
-            key={key}
-            className="px-4 py-2 rounded-full bg-card text-sm text-foreground/70 hover:text-indigo-600 hover:bg-indigo-50 transition-all dark:hover:text-orange-300 shadow-sm"
+      {/* Mode pills */}
+      <div className="mb-4 flex items-center gap-2">
+        {modes.map((m, i) => (
+          <button
+            key={m.label}
+            type="button"
+            onClick={() => setMode(i)}
+            className={cn(
+              'rounded-full px-4 py-1.5 text-sm transition-colors',
+              i === mode
+                ? 'bg-primary font-semibold text-primary-foreground shadow-sm'
+                : 'bg-muted text-foreground/70 hover:bg-muted/70 hover:text-foreground',
+            )}
           >
-            {label}
+            {m.label}
           </button>
         ))}
       </div>
+
+      {/* Scenario chips for the active mode */}
+      <div className="mb-8 flex max-w-lg flex-wrap items-center justify-center gap-2">
+        {modes[mode].actions.map((key) => (
+          <button
+            key={key}
+            type="button"
+            className="rounded-full border border-border bg-card px-3.5 py-1.5 text-meta text-foreground/70 shadow-sm transition-colors hover:border-primary/40 hover:text-primary"
+          >
+            {actionLabel[key]}
+          </button>
+        ))}
+      </div>
+
+      {/* Activity mini-bars (real session data) */}
+      <div className="flex items-end gap-1.5" title="近 6 周会话活跃">
+        {weeks.map((c, i) => (
+          <div
+            key={i}
+            className="w-2.5 rounded-sm bg-primary/25"
+            style={{ height: `${8 + (c / maxWeek) * 24}px` }}
+          />
+        ))}
+      </div>
+      <p className="mt-2 text-tiny text-muted-foreground/70">近 6 周会话活跃</p>
     </div>
   );
 }

@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils';
 interface SettingsGroupProps {
   title?: ReactNode;
   description?: ReactNode;
-  icon?: ComponentType<{ className?: string }>;
+  icon?: ComponentType<{ className?: string; strokeWidth?: number }>;
   children: ReactNode;
   className?: string;
   /**
@@ -31,19 +31,15 @@ export function SettingsGroup({
   className,
   padded = false,
   testId,
-  gradientClass,
 }: SettingsGroupProps) {
   return (
     <section data-testid={testId} className={cn('space-y-3 sm:space-y-4', className)}>
-      <div className="overflow-hidden rounded-2xl glass-card">
+      <div className="overflow-hidden rounded-2xl border border-border/70 bg-card shadow-sm">
         {(title || description) && (
           <div className="flex items-center gap-3 px-4 pt-4 pb-3 sm:px-6 sm:pt-5 sm:pb-4 border-b border-border/60">
             {Icon && (
-              <div className={cn(
-                'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl shadow-sm',
-                gradientClass || 'gradient-general'
-              )}>
-                <Icon className="h-[18px] w-[18px] text-white" />
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <Icon className="h-[18px] w-[18px]" strokeWidth={1.75} />
               </div>
             )}
             <div className="min-w-0">

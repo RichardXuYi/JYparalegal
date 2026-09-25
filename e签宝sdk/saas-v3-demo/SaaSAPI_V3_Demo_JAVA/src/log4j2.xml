@@ -1,0 +1,49 @@
+<configuration monitorInterval="5" packages="log4j2.plugins">
+    <!--日志级别以及优先级排序: OFF > FATAL > ERROR > WARN > INFO > DEBUG > TRACE > ALL -->
+
+    <!--变量配置-->
+    <Properties>
+        <!-- 格式化输出：%date表示日期，%thread表示线程名，%-5level：级别从左显示5个字符宽度 %msg：日志消息，%n是换行符 %L:行号-->
+        <!-- %logger{参数}或者%c{参数} 表示 %c{1.} 省略前面包名保留类名 -->
+        <property name="LOG_PATTERN"
+                  value="%date{yyyy-MM-dd HH:mm:ss.SSS} ${FILE_NAME} - [%thread] %-5level %c:%L - %msg%n"/>
+        <!-- 定义日志存储的路径 -->
+        <property name="FILE_PATH" value="./logs"/>
+
+    </Properties>
+
+    <appenders>
+        <!--输出日志到控制台的配置-->
+        <console name="Console" target="SYSTEM_OUT">
+            <!--输出日志的格式-->
+            <PatternLayout pattern="${LOG_PATTERN}"/>
+            <!--控制台只输出level及其以上级别的信息（onMatch），其他的直接拒绝（onMismatch）-->
+            <ThresholdFilter level="info" onMatch="ACCEPT" onMismatch="DENY"/>
+        </console>
+
+        <!--文件会打印出所有信息，这个log每次运行程序会自动清空，由append属性决定，适合临时测试用-->
+        <RollingFile name="Filelog" fileName="${FILE_PATH}/eSign.log" append="true"
+                     filePattern="${FILE_PATH}/eSign-%d{yyyy-MM-dd}_%i.log">
+            <PatternLayout pattern="${LOG_PATTERN}"/>
+            <Policies>
+                <!--interval属性用来指定多久滚动一次，默认是1 -->
+                <TimeBasedTriggeringPolicy interval="1"/>
+                <SizeBasedTriggeringPolicy size="100MB"/>
+            </Policies>
+        </RollingFile>
+    </appenders>
+
+    <!--Logger节点用来单独指定日志的形式，比如要为指定包下的class指定不同的日志级别等。-->
+    <!--然后定义loggers，只有定义了logger并引入的appender，appender才会生效-->
+    <loggers>
+        <root level="info">
+            <Appender-ref ref="Filelog"/>
+            <appender-ref ref="Console"/>
+        </root>
+        <logger name="com.alibaba.nacos.client.naming" level="WARN" additivity="false">
+            <Appender-ref ref="Filelog"/>
+            <appender-ref ref="Console"/>
+        </logger>
+    </loggers>
+
+</configuration>

@@ -16,7 +16,7 @@ interface SettingsPageHeaderProps {
   /** Forwarded to the <h1> for E2E stability. */
   titleTestId?: string;
   /** Icon component for the header. */
-  icon?: ComponentType<{ className?: string }>;
+  icon?: ComponentType<{ className?: string; strokeWidth?: number }>;
   /** Gradient class for the icon background (e.g., 'gradient-models'). */
   gradientClass?: string;
 }
@@ -28,22 +28,18 @@ export function SettingsPageHeader({
   className,
   titleTestId,
   icon: Icon,
-  gradientClass,
 }: SettingsPageHeaderProps) {
   return (
     <div className={cn('mb-4 sm:mb-8 flex items-start gap-3 sm:gap-6', className)}>
       {Icon && (
-        <div className={cn(
-          'flex h-10 w-10 sm:h-16 sm:w-16 shrink-0 items-center justify-center rounded-2xl shadow-xl',
-          gradientClass || 'gradient-general'
-        )}>
-          <Icon className="h-5 w-5 sm:h-8 sm:w-8 text-white" />
+        <div className="flex h-10 w-10 sm:h-14 sm:w-14 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+          <Icon className="h-5 w-5 sm:h-7 sm:w-7" strokeWidth={1.75} />
         </div>
       )}
       <div className="flex-1 min-w-0">
         <h1
           data-testid={titleTestId}
-          className="text-xl sm:text-3xl font-bold tracking-tight gradient-text"
+          className="text-xl sm:text-3xl font-bold tracking-tight text-foreground"
         >
           {title}
         </h1>

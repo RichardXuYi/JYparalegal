@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { fmtDateTime, signStatusChipClass, signStatusLabel } from '@/lib/legal-enums';
+import { LegalPageHeader } from '@/components/legal/LegalPageHeader';
+import { StatusFilterChips } from '@/components/legal/StatusFilterChips';
+import { Pagination } from '@/components/legal/Pagination';
 
 type SignTask = {
   id: number; taskNo: string; title: string; status: string;
@@ -13,17 +16,6 @@ const STATUS_CHIPS = [
 ];
 
 const PAGE_SIZE = 50;
-
-/** 分页页码窗口:首尾页 + 当前页±1,中间用省略号。当前页始终可见。 */
-function pageWindow(current: number, total: number): (number | '…')[] {
-  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
-  const out: (number | '…')[] = [1];
-  if (current > 3) out.push('…');
-  for (let i = Math.max(2, current - 1); i <= Math.min(total - 1, current + 1); i++) out.push(i);
-  if (current < total - 2) out.push('…');
-  out.push(total);
-  return out;
-}
 
 /**
  * 导出 CSV —— 提到模块级：内含 DOM 副作用，
@@ -144,30 +136,25 @@ export default function Signing() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="flex items-center gap-3 px-5 pt-4 pb-2">
-        <h1 className="text-lg font-semibold">签署</h1>
+      <div className="px-5 pt-4">
+        <LegalPageHeader
+          title="签署"
+          actions={
+            <>
+              <button className="rounded-md border border-border px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted" onClick={exportCsv}>导出当前筛选</button>
+              <button className="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground" onClick={() => nav('/signing/new')}>＋ 创建任务</button>
+            </>
+          }
+        />
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 pb-4">
         <div className="rounded-lg border border-border bg-card">
           {/* Status filter chips */}
-          <div className="flex flex-wrap gap-2 border-b border-border px-4 py-2.5">
-            {STATUS_CHIPS.map((c) => (
-              <button key={c} onClick={() => { setChip(c); setPage(1); }}
-                className={`rounded-full px-3 py-1 text-xs border transition-colors ${
-                  chip === c
-                    ? 'bg-primary/15 text-primary border-primary/40 font-semibold'
-                    : 'bg-muted text-muted-foreground border-transparent hover:bg-muted/80'
-                }`}>
-                {c}
-              </button>
-            ))}
-          </div>
+          <StatusFilterChips chips={STATUS_CHIPS} active={chip} onSelect={(c) => { setChip(c); setPage(1); }} />
 
           {/* Toolbar */}
           <div className="flex flex-wrap items-center gap-2 px-4 py-3">
-            <button className="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground" onClick={() => nav('/signing/new')}>＋ 创建任务</button>
-            <button className="rounded-md border border-border px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted" onClick={exportCsv}>导出当前筛选</button>
             <div className="ml-auto flex items-center gap-2">
               <div className="relative">
                 <input className="h-8 w-[200px] rounded-md border border-border bg-card px-2.5 pr-7 text-sm placeholder:text-muted-foreground"
@@ -259,19 +246,7 @@ export default function Signing() {
           </div>
 
           {/* Pagination */}
-          <div className="flex flex-wrap items-center justify-end gap-3 px-4 py-3 text-xs text-muted-foreground">
-            <span>共 {filtered.length} 条 · 第 {page} / {totalPages} 页 · {PAGE_SIZE} 条/页</span>
-            <div className="flex items-center gap-1">
-              <button className="rounded px-2 py-1 hover:bg-muted disabled:opacity-40" disabled={page <= 1} onClick={() => setPage(page - 1)} aria-label="上一页">‹</button>
-              {pageWindow(page, totalPages).map((p, i) => (
-                p === '…'
-                  ? <span key={`gap-${i}`} className="px-1">…</span>
-                  : <button key={p} onClick={() => setPage(p)} aria-current={p === page ? 'page' : undefined}
-                      className={`rounded px-2 py-1 ${p === page ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}>{p}</button>
-              ))}
-              <button className="rounded px-2 py-1 hover:bg-muted disabled:opacity-40" disabled={page >= totalPages} onClick={() => setPage(page + 1)} aria-label="下一页">›</button>
-            </div>
-          </div>
+          <Pagination page={page} totalPages={totalPages} total={filtered.length} pageSize={PAGE_SIZE} onPage={setPage} />
         </div>
       </div>
     </div>

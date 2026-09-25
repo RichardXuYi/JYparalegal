@@ -149,6 +149,8 @@ export interface ChatState {
 
   /** Persist a session-level thinking level override via gateway sessions.patch. */
   setThinkingLevel: (level: string | null) => Promise<void>;
+  /** Persist a session-level model override via gateway sessions.patch. Null clears the pin. */
+  setSessionModel: (model: string | null) => Promise<void>;
 
   // Actions
   loadSessions: (force?: boolean, reportError?: boolean) => Promise<void>;

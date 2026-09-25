@@ -43,8 +43,6 @@ interface SettingsState {
   sidebarWidth: number;
   devModeUnlocked: boolean;
 
-  // Setup
-  setupComplete: boolean;
   /** Renderer finished the boot settings read. */
   initCompleted: boolean;
 
@@ -69,7 +67,6 @@ interface SettingsState {
   setSidebarCollapsed: (value: boolean) => void;
   setSidebarWidth: (value: number) => void;
   setDevModeUnlocked: (value: boolean) => void;
-  markSetupComplete: () => void;
   resetSettings: () => Promise<void>;
   /** Drop per-account settings (theme/language) when the account changes. */
   resetForUserSwitch: () => void;
@@ -123,7 +120,6 @@ const defaultSettings = {
   sidebarCollapsed: false,
   sidebarWidth: 280,
   devModeUnlocked: false,
-  setupComplete: false,
   initCompleted: false,
 };
 
@@ -219,7 +215,6 @@ export const useSettingsStore = create<SettingsState>()(
         set({ devModeUnlocked });
         void hostApi.settings.set('devModeUnlocked', devModeUnlocked).catch((e) => toast.error(`Failed to save developer mode: ${toUserMessage(e)}`));
       },
-      markSetupComplete: () => set({ setupComplete: true }),
       resetSettings: async () => {
         try {
           await hostApi.settings.reset();

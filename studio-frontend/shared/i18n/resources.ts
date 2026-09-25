@@ -10,7 +10,6 @@ import enAgents from './locales/en/agents.json';
 import enSkills from './locales/en/skills.json';
 import enCron from './locales/en/cron.json';
 import enDreams from './locales/en/dreams.json';
-import enSetup from './locales/en/setup.json';
 import enMenu from './locales/en/menu.json';
 
 // ZH
@@ -23,7 +22,6 @@ import zhAgents from './locales/zh/agents.json';
 import zhSkills from './locales/zh/skills.json';
 import zhCron from './locales/zh/cron.json';
 import zhDreams from './locales/zh/dreams.json';
-import zhSetup from './locales/zh/setup.json';
 import zhMenu from './locales/zh/menu.json';
 
 // DE
@@ -36,7 +34,6 @@ import deAgents from './locales/de/agents.json';
 import deSkills from './locales/de/skills.json';
 import deCron from './locales/de/cron.json';
 import deDreams from './locales/de/dreams.json';
-import deSetup from './locales/de/setup.json';
 import deMenu from './locales/de/menu.json';
 
 // FR
@@ -49,7 +46,6 @@ import frAgents from './locales/fr/agents.json';
 import frSkills from './locales/fr/skills.json';
 import frCron from './locales/fr/cron.json';
 import frDreams from './locales/fr/dreams.json';
-import frSetup from './locales/fr/setup.json';
 import frMenu from './locales/fr/menu.json';
 
 export const I18N_NAMESPACES = [
@@ -62,7 +58,6 @@ export const I18N_NAMESPACES = [
   'skills',
   'cron',
   'dreams',
-  'setup',
   'menu',
 ] as const;
 
@@ -77,7 +72,6 @@ export const I18N_RESOURCES = {
     skills: enSkills,
     cron: enCron,
     dreams: enDreams,
-    setup: enSetup,
     menu: enMenu,
   },
   zh: {
@@ -90,7 +84,6 @@ export const I18N_RESOURCES = {
     skills: zhSkills,
     cron: zhCron,
     dreams: zhDreams,
-    setup: zhSetup,
     menu: zhMenu,
   },
   de: {
@@ -103,7 +96,6 @@ export const I18N_RESOURCES = {
     skills: deSkills,
     cron: deCron,
     dreams: deDreams,
-    setup: deSetup,
     menu: deMenu,
   },
   fr: {
@@ -116,7 +108,6 @@ export const I18N_RESOURCES = {
     skills: frSkills,
     cron: frCron,
     dreams: frDreams,
-    setup: frSetup,
     menu: frMenu,
   },
 } as const;

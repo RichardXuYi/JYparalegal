@@ -43,6 +43,10 @@ public class CompanyEntity {
     @Column(name = "business_license", length = 255)
     private String businessLicense;
 
+    /** e签宝机构号（机构实名后回填）；用于企业章签署。 */
+    @Column(name = "esign_org_id", length = 64)
+    private String esignOrgId;
+
     @Column
     private Integer status = 1;
 
@@ -76,6 +80,8 @@ public class CompanyEntity {
     public void setLogo(String logo) { this.logo = logo; }
     public String getBusinessLicense() { return businessLicense; }
     public void setBusinessLicense(String businessLicense) { this.businessLicense = businessLicense; }
+    public String getEsignOrgId() { return esignOrgId; }
+    public void setEsignOrgId(String esignOrgId) { this.esignOrgId = esignOrgId; }
     public Integer getStatus() { return status; }
     public void setStatus(Integer status) { this.status = status; }
     public Long getOwnerUserId() { return ownerUserId; }

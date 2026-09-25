@@ -954,7 +954,7 @@ function backfillCustomProviderModelContextWindows(config: Record<string, unknow
 async function writeOpenClawJson(config: Record<string, unknown>): Promise<void> {
   normalizeAgentsDefaultsCompactionMode(config);
 
-  // Ensure SIGUSR1 graceful reload is authorized by OpenClaw config.
+  // commands.restart authorizes SIGUSR2 in-process restart on OpenClaw 2026.9.6.
   const commands = (
     config.commands && typeof config.commands === 'object'
       ? { ...(config.commands as Record<string, unknown>) }
@@ -1201,14 +1201,23 @@ export async function pruneStaleRuntimeAgentModelRefs(config: Record<string, unk
     }
   }
 
-  if (Array.isArray(agents.list)) {
+  const rosterEntries: Array<{ id: string; entry: Record<string, unknown> }> = [];
+  if (isPlainRecord(agents.entries)) {
+    for (const [id, entry] of Object.entries(agents.entries)) {
+      if (isPlainRecord(entry)) rosterEntries.push({ id, entry });
+    }
+  } else if (Array.isArray(agents.list)) {
     for (const entry of agents.list) {
-      if (!isPlainRecord(entry) || !isPlainRecord(entry.model)) continue;
+      if (!isPlainRecord(entry)) continue;
       const agentId = typeof entry.id === 'string' ? entry.id : 'unknown';
-      if (pruneStaleRuntimeModelConfig(entry.model, activeProviders, `agent "${agentId}" model override`)) {
-        deleteModelConfigIfEmpty(entry);
-        modified = true;
-      }
+      rosterEntries.push({ id: agentId, entry });
+    }
+  }
+  for (const { id, entry } of rosterEntries) {
+    if (!isPlainRecord(entry.model)) continue;
+    if (pruneStaleRuntimeModelConfig(entry.model, activeProviders, `agent "${id}" model override`)) {
+      deleteModelConfigIfEmpty(entry);
+      modified = true;
     }
   }
 
@@ -3209,7 +3218,7 @@ export async function sanitizeOpenClawConfig(): Promise<void> {
     }
 
     // 鈹€鈹€ commands section 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
-    // Required for SIGUSR1 in-process reload authorization.
+    // commands.restart authorizes SIGUSR2 in-process restart on OpenClaw 2026.9.6.
     const commands = (
       config.commands && typeof config.commands === 'object'
         ? { ...(config.commands as Record<string, unknown>) }

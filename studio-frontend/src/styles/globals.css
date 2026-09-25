@@ -162,8 +162,8 @@
 @layer base {
   :root {
     /* === shadcn semantic tokens (light) === */
-    /* Cold gray-white business style - matching GrandPoem studio-web-frontend */
-    --background: 210 40% 98%;
+    /* Light: white surfaces, blue-purple accent */
+    --background: 0 0% 100%;
     --foreground: 222 47% 11%;
     --card: 0 0% 100%;
     --card-foreground: 222 47% 11%;
@@ -174,12 +174,12 @@
     --secondary: 250 95% 96%;
     --secondary-foreground: 243 55% 48%;
     --muted: 210 40% 96%;
-    --muted-foreground: 215 14% 47%;
+    --muted-foreground: 215 14% 40%;
     --accent: 227 100% 97%;
     --accent-foreground: 243 55% 48%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 214 32% 91%;
+    --border: 226 40% 90%;
     --input: 210 40% 96%;
     --ring: 243 75% 59%;
     --radius: 0.75rem;
@@ -187,7 +187,7 @@
     /* Surface tokens (light) */
     --surface-modal: 0 0% 100%;
     --surface-input: 210 40% 96%;
-    --surface-sidebar: 210 40% 98%;
+    --surface-sidebar: 226 100% 98%;
 
     /* Usage accents (light) */
     --usage-input: 217 91% 60%;
@@ -195,32 +195,32 @@
     --usage-cache: 48 96% 53%;
   }
 
-  /* Dark mode - warm tech style with Orange primary (complete color swap!) */
+  /* Dark: black ground, white type, red-orange accent */
   .dark {
-    --background: 240 27% 5%;
-    --foreground: 248 100% 96%;
-    --card: 240 18% 9%;
-    --card-foreground: 248 100% 96%;
-    --popover: 240 18% 9%;
-    --popover-foreground: 248 100% 96%;
-    --primary: 25 95% 53%;
+    --background: 0 0% 0%;
+    --foreground: 0 0% 100%;
+    --card: 0 0% 6%;
+    --card-foreground: 0 0% 100%;
+    --popover: 0 0% 6%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 16 95% 54%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 240 18% 13%;
-    --secondary-foreground: 250 17% 80%;
-    --muted: 240 18% 13%;
-    --muted-foreground: 246 8% 46%;
-    --accent: 240 18% 13%;
-    --accent-foreground: 248 100% 96%;
+    --secondary: 12 24% 12%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 0 0% 12%;
+    --muted-foreground: 0 0% 74%;
+    --accent: 16 40% 14%;
+    --accent-foreground: 0 0% 100%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 240 6% 16%;
-    --input: 240 6% 14%;
-    --ring: 25 95% 53%;
+    --border: 0 0% 18%;
+    --input: 0 0% 10%;
+    --ring: 16 95% 54%;
 
-    /* Surface tokens (dark) - redirect to existing shadcn tokens */
-    --surface-modal: 240 18% 9%;
-    --surface-input: 240 18% 13%;
-    --surface-sidebar: 240 27% 5%;
+    /* Surface tokens (dark) */
+    --surface-modal: 0 0% 6%;
+    --surface-input: 0 0% 10%;
+    --surface-sidebar: 0 0% 0%;
 
     /* Usage accents (dark) - lifted shades for vivid bars */
     --usage-input: 217 91% 65%;
@@ -535,6 +535,64 @@
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.09);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 30px -14px rgba(0, 0, 0, 0.55);
+}
+
+/*
+ * ===== Connected app shell (layout-v2 / WorkBuddy-Qoder architecture) =====
+ * The whole window is one saturated blue-purple gradient. The topbar and the
+ * left sidebar sit DIRECTLY on that gradient as transparent/glass regions
+ * (white / glassy text); only the stage is a white rounded card. Because the
+ * topbar + sidebar are part of the same continuous gradient surface there are
+ * NO white seam lines between panels.
+ */
+.shell-gradient {
+  background: linear-gradient(145deg, #4f46e5 0%, #6d28d9 48%, #9333ea 100%);
+}
+
+.dark .shell-gradient {
+  background: linear-gradient(145deg, #1e1b4b 0%, #3b0764 48%, #4c1d95 100%);
+}
+
+/* Glassy control surfaces for controls that sit on the gradient. */
+.shell-glass {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.shell-glass:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.shell-glass-strong {
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+/* White CTA button on the gradient (sidebar primary action). */
+.shell-cta {
+  background: #fff;
+  color: #4f46e5;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.16);
+}
+
+.shell-cta:hover {
+  background: #f2f1ff;
+}
+
+.dark .shell-cta {
+  background: #fff;
+  color: #4c1d95;
+}
+
+/* Bottom glass info card in the sidebar (quota / user). */
+.shell-card {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(8px);
+}
+
+/* Shadow for the white stage card floating on the gradient. */
+.shadow-shell {
+  box-shadow: 0 10px 40px -12px rgba(30, 27, 75, 0.45);
 }
 
 /* Gradient text */

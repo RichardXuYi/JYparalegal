@@ -1,4 +1,7 @@
-﻿import type { GatewayManager } from '../../gateway/manager';
+﻿import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import type { GatewayManager } from '../../gateway/manager';
+import { getOpenClawConfigDir } from '../../utils/paths';
 import { getProviderAccount, listProviderAccounts } from './provider-store';
 import { getProviderSecret } from '../secrets/secret-store';
 import type { ProviderConfig } from '../../utils/secure-storage';
@@ -238,7 +241,51 @@ function scheduleGatewayRefresh(
     gatewayManager.debouncedRestart(options?.delayMs);
     return;
   }
-  gatewayManager.debouncedReload(options?.delayMs);
+  scheduleHotConfigApply(gatewayManager, message);
+}
+
+let hotConfigApplyTimer: ReturnType<typeof setTimeout> | null = null;
+
+function readConfigHash(result: unknown): string | null {
+  if (!result || typeof result !== 'object') return null;
+  const record = result as Record<string, unknown>;
+  if (typeof record.hash === 'string' && record.hash) return record.hash;
+  const payload = record.payload;
+  if (payload && typeof payload === 'object') {
+    const hash = (payload as Record<string, unknown>).hash;
+    if (typeof hash === 'string' && hash) return hash;
+  }
+  return null;
+}
+
+/**
+ * Ask a running OpenClaw 2026.9.6 Gateway to apply the on-disk config.
+ * agents/models changes hot-apply; this does not restart the process.
+ * Offline gateways keep the file write and pick it up on next start.
+ */
+function scheduleHotConfigApply(gatewayManager: GatewayManager, message: string): void {
+  logger.info(`${message} (hot apply)`);
+  if (gatewayManager.getStatus().state !== 'running') return;
+  if (hotConfigApplyTimer) clearTimeout(hotConfigApplyTimer);
+  hotConfigApplyTimer = setTimeout(() => {
+    hotConfigApplyTimer = null;
+    void publishRunningConfig(gatewayManager).catch((error) => {
+      logger.warn('[provider-runtime] Hot config apply failed:', error);
+    });
+  }, 400);
+}
+
+async function publishRunningConfig(gatewayManager: GatewayManager): Promise<void> {
+  if (gatewayManager.getStatus().state !== 'running') return;
+  const raw = await readFile(join(getOpenClawConfigDir(), 'openclaw.json'), 'utf8');
+  const snapshot = await gatewayManager.rpc<unknown>('config.get', {});
+  const baseHash = readConfigHash(snapshot);
+  if (!baseHash) {
+    logger.warn('[provider-runtime] config.get returned no hash; leaving the file write for the Gateway watcher');
+    return;
+  }
+  const applied = await gatewayManager.rpc<unknown>('config.apply', { raw, baseHash });
+  logger.info('[provider-runtime] config.apply accepted', { hash: readConfigHash(applied) });
 }
 
 export async function syncProviderApiKeyToRuntime(

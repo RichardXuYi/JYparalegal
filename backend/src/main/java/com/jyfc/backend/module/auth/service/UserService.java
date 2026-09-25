@@ -2,6 +2,7 @@ package com.jyfc.backend.module.auth.service;
 
 import com.jyfc.backend.module.auth.entity.UserEntity;
 import com.jyfc.backend.module.auth.repository.UserRepository;
+import com.jyfc.backend.module.tenant.service.TenantProvisioningService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -18,10 +19,13 @@ public class UserService {
     
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final TenantProvisioningService tenantProvisioningService;
     
-    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder,
+                       TenantProvisioningService tenantProvisioningService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.tenantProvisioningService = tenantProvisioningService;
     }
     
     /**
@@ -109,7 +113,10 @@ public class UserService {
         
         UserEntity savedUser = userRepository.save(user);
         log.debug("Created user with ID: {}", savedUser.getId());
-        
+
+        // 运行时租户供给：新用户默认绑定个人租户，否则法律域 requireTenant 会一律拒绝
+        tenantProvisioningService.provisionPersonalUser(savedUser);
+
         return savedUser;
     }
     

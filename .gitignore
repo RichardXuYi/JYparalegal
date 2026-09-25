@@ -42,3 +42,12 @@ coverage/
 *.tsbuildinfo
 .cache/
 .temp/
+
+# 文档参考截图（产品对照、竞品与签约流程，不纳入版本库）
+案例图/
+法大大截图/
+docs/**/*.png
+docs/**/*.jpg
+docs/**/*.jpeg
+docs/**/*.webp
+docs/**/*.gif

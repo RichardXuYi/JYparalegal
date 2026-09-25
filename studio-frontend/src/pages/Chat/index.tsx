@@ -951,8 +951,9 @@ export function Chat() {
       {/* Left column: chat */}
       <div className="flex min-w-0 flex-1 flex-col min-h-0">
         {/* Toolbar - fixed at top via flex */}
-        <div className="flex shrink-0 items-center justify-end px-4 py-2 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex shrink-0 items-center justify-end border-b border-border bg-white px-4 py-2 dark:bg-black">
           <ChatToolbar
+            changeCount={allGeneratedFiles.length}
             questionDirectoryOpen={questionDirectoryVisible}
             questionDirectoryCount={questionDirectoryItems.length}
             onToggleQuestionDirectory={() =>
@@ -1149,7 +1150,7 @@ export function Chat() {
           {/* Artifact Panel - absolute positioned on the right */}
           {panelOpen && (
             <div
-              className="absolute top-0 right-0 z-30 h-full border-l border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/50"
+              className="absolute top-0 right-0 z-30 h-full border-l border-border bg-white dark:bg-neutral-950"
               style={{ width: `${panelWidthPct}%` }}
             >
               <div className="h-full overflow-y-auto">
@@ -1318,34 +1319,68 @@ function QuestionDirectory({ items }: { items: QuestionDirectoryItem[] }) {
 
 // ── Welcome Screen ──────────────────────────────────────────────
 
+// Module-level so the render stays pure (React Compiler purity rule).
+const WELCOME_NOW_MS = Date.now();
+
 function WelcomeScreen() {
   const { t } = useTranslation('chat');
+  const sessions = useChatStore((s) => s.sessions);
+  const sessionLastActivity = useChatStore((s) => s.sessionLastActivity);
   const quickActions = [
-    { key: 'askQuestions', label: t('welcome.askQuestions') },
-    { key: 'creativeTasks', label: t('welcome.creativeTasks') },
-    { key: 'brainstorming', label: t('welcome.brainstorming') },
-    { key: 'analyzeData', label: t('welcome.analyzeData') },
+    { key: 'askQuestions', label: t('welcome.askQuestions'), desc: t('welcome.askQuestionsDesc'), prompt: t('welcome.askQuestionsPrompt') },
+    { key: 'creativeTasks', label: t('welcome.creativeTasks'), desc: t('welcome.creativeTasksDesc'), prompt: t('welcome.creativeTasksPrompt') },
+    { key: 'brainstorming', label: t('welcome.brainstorming'), desc: t('welcome.brainstormingDesc'), prompt: t('welcome.brainstormingPrompt') },
+    { key: 'analyzeData', label: t('welcome.analyzeData'), desc: t('welcome.analyzeDataDesc'), prompt: t('welcome.analyzeDataPrompt') },
   ];
 
+  // Real activity: session counts per week over the last 6 weeks.
+  const now = WELCOME_NOW_MS;
+  const weeks = Array.from({ length: 6 }, (_, i) => {
+    const start = now - (i + 1) * 7 * 86400000;
+    const end = now - i * 7 * 86400000;
+    return sessions.filter((s) => {
+      const ms = sessionLastActivity[s.key] ?? s.updatedAt ?? 0;
+      return ms > start && ms <= end;
+    }).length;
+  });
+  const maxWeek = Math.max(1, ...weeks);
+
   return (
-    <div className="flex flex-col items-center justify-center text-center h-[60vh]">
-      <h1 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent dark:from-rose-400 dark:to-orange-400 tracking-tight">
+    <div className="flex h-full flex-col items-center justify-center px-6 text-center">
+      <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-indigo-500 to-violet-600 shadow-lg shadow-indigo-200 dark:from-rose-500 dark:to-orange-500 dark:shadow-rose-900/30">
+        <Sparkles className="h-7 w-7 text-white" strokeWidth={1.75} />
+      </div>
+      <h1 className="mb-2 text-3xl font-bold tracking-tight text-foreground md:text-4xl">
         {t('welcome.subtitle')}
       </h1>
-      <p className="text-sm text-muted-foreground mb-8">
+      <p className="mb-6 max-w-md text-sm text-muted-foreground">
         {t('welcome.description')}
       </p>
 
-      <div className="flex flex-wrap items-center justify-center gap-2.5 max-w-lg w-full">
-        {quickActions.map(({ key, label }) => (
-          <button 
+      <div className="mb-6 grid w-full max-w-3xl grid-cols-1 gap-3 sm:grid-cols-2">
+        {quickActions.map(({ key, label, desc, prompt }) => (
+          <button
             key={key}
-            className="px-4 py-2 rounded-full bg-card text-sm text-foreground/70 hover:text-indigo-600 hover:bg-indigo-50 transition-all dark:hover:text-orange-300 shadow-sm"
+            type="button"
+            onClick={() => window.dispatchEvent(new CustomEvent('jy-chat-prefill', { detail: prompt }))}
+            className="rounded-xl border border-border bg-card px-4 py-3 text-left transition-colors hover:border-primary/40 hover:shadow-sm"
           >
-            {label}
+            <div className="text-sm font-medium text-foreground">{label}</div>
+            <div className="mt-1 text-tiny text-muted-foreground">{desc}</div>
           </button>
         ))}
       </div>
+
+      <div className="flex items-end gap-1.5" title="近 6 周会话活跃">
+        {weeks.map((c, i) => (
+          <div
+            key={i}
+            className="w-2.5 rounded-sm bg-primary/25"
+            style={{ height: `${8 + (c / maxWeek) * 24}px` }}
+          />
+        ))}
+      </div>
+      <p className="mt-2 text-tiny text-muted-foreground/70">近 6 周会话活跃</p>
     </div>
   );
 }

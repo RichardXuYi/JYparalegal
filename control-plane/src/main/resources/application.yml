@@ -1,0 +1,35 @@
+server:
+  port: 8281
+
+spring:
+  application:
+    name: jy-control-plane
+
+# ==================== e签宝 SaaS API V3 ====================
+cp:
+  esign:
+    # 沙箱环境域名
+    host: https://smlopenapi.esign.cn
+    # 应用凭证：必须由环境变量注入，严禁明文入库（原明文默认值已移除；该密钥曾入库，建议轮换）
+    app-id: ${ESIGN_APP_ID:}
+    app-secret: ${ESIGN_APP_SECRET:}
+
+  # DP 服务账号（CP 自己的认证，与 e签宝无关）
+  auth:
+    service-username: ${CP_SERVICE_USERNAME:cp-service}
+    service-password: ${CP_SERVICE_PASSWORD:cp-secret}
+
+  # JWT 签发配置
+  jwt:
+    secret: ${CP_JWT_SECRET:cp-dev-jwt-secret-must-be-at-least-32-chars!!}
+    issuer: https://cp.jyparalegal.local
+    expires-in: 900
+
+  # DP 回调转发配置
+  dp:
+    base-url: ${DP_BASE_URL:http://localhost:8181}
+    callback-token: ${CP_ESIGN_CALLBACK_TOKEN:dev-callback-token}
+
+logging:
+  level:
+    com.jyfc.cp: DEBUG

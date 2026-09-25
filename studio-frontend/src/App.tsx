@@ -3,9 +3,9 @@
  * Handles routing and global providers. Renders the desktop shell
  * (MainLayout) or the mobile shell (MobileLayout) based on runtime device
  * detection (see use-device-shell); both shells share stores and routes.
- * Electron-only pieces (setup wizard, update notifier) stay on this build.
+ * Electron-only pieces (update notifier) stay on this build.
  */
-import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { Component, Suspense, lazy, useEffect, useRef } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
 import { Toaster } from 'sonner';
@@ -29,8 +29,8 @@ import { useDeviceShell } from '@/hooks/use-device-shell';
 const MainLayout = lazy(() => import('./components/layout/MainLayout').then((m) => ({ default: m.MainLayout })));
 const MobileLayout = lazy(() => import('./mobile/layout/MobileLayout').then((m) => ({ default: m.MobileLayout })));
 const Chat = lazy(() => import('./pages/Chat').then((m) => ({ default: m.Chat })));
-const Setup = lazy(() => import('./pages/Setup').then((m) => ({ default: m.Setup })));
 const Login = lazy(() => import('./pages/Login').then((m) => ({ default: m.Login })));
+const Register = lazy(() => import('./pages/Register').then((m) => ({ default: m.Register })));
 const SsoBridge = lazy(() => import('./pages/SsoBridge').then((m) => ({ default: m.SsoBridge })));
 const More = lazy(() => import('./mobile/pages/More').then((m) => ({ default: m.More })));
 const Overview = lazy(() => import('./pages/Overview'));
@@ -99,16 +99,12 @@ class ErrorBoundary extends Component<
 
 function App() {
   const navigate = useNavigate();
-  const location = useLocation();
   const shell = useDeviceShell();
   const isMobileShell = shell === 'mobile';
-  const skipSetupForE2E = typeof window !== 'undefined'
-    && new URLSearchParams(window.location.search).get('e2eSkipSetup') === '1';
   const initSettings = useSettingsStore((state) => state.init);
   const settingsInitCompleted = useSettingsStore((state) => state.initCompleted);
   const theme = useSettingsStore((state) => state.theme);
   const language = useSettingsStore((state) => state.language);
-  const setupComplete = useSettingsStore((state) => state.setupComplete);
   const autoSyncSkills = useSettingsStore((state) => state.autoSyncSkills);
   const authStatus = useAuthStore((state) => state.status);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -172,17 +168,11 @@ function App() {
   }, [initProviders]);
 
   useEffect(() => {
-    if (isAuthenticated && !setupComplete && !skipSetupForE2E && !location.pathname.startsWith('/setup')) {
-      navigate('/setup');
-    }
-  }, [isAuthenticated, setupComplete, skipSetupForE2E, location.pathname, navigate]);
-
-  useEffect(() => {
     if (!isAuthenticated) {
       autoSyncTriggeredRef.current = false;
       return;
     }
-    if (authStatus !== 'ready' || !setupComplete || !autoSyncSkills) {
+    if (authStatus !== 'ready' || !autoSyncSkills) {
       return;
     }
     if (autoSyncTriggeredRef.current) {
@@ -190,7 +180,7 @@ function App() {
     }
     autoSyncTriggeredRef.current = true;
     void syncSkills();
-  }, [authStatus, isAuthenticated, setupComplete, autoSyncSkills, syncSkills]);
+  }, [authStatus, isAuthenticated, autoSyncSkills, syncSkills]);
 
   useEffect(() => {
     const unsubscribe = hostEvents.onNavigate((path) => {
@@ -286,6 +276,7 @@ function App() {
         <TooltipProvider delayDuration={300}>
           <Suspense fallback={<CenteredSpinner />}>
             <Routes>
+              <Route path="/register" element={<Register />} />
               <Route path="*" element={<Login />} />
             </Routes>
           </Suspense>
@@ -295,8 +286,7 @@ function App() {
     );
   }
 
-  const needsSetup = !setupComplete && !skipSetupForE2E;
-  if (!needsSetup && !allInitDone) {
+  if (!allInitDone) {
     return (
       <ErrorBoundary>
         <InitializingScreen visible={true} />
@@ -309,7 +299,6 @@ function App() {
       <TooltipProvider delayDuration={300}>
         <Suspense fallback={<CenteredSpinner />}>
           <Routes>
-            <Route path="/setup/*" element={<Setup />} />
             <Route element={isMobileShell ? <MobileLayout /> : <MainLayout />}>
               <Route path="/" element={<Chat />} />
               <Route path="/overview" element={<Overview />} />

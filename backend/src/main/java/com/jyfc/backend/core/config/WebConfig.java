@@ -10,6 +10,8 @@ import org.springframework.lang.NonNull;
 import java.nio.file.Paths;
 import java.nio.file.Path;
 
+import com.jyfc.backend.core.security.EntitlementInterceptor;
+
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
     
@@ -18,6 +20,9 @@ public class WebConfig implements WebMvcConfigurer {
     
     @Autowired
     private SecurityInterceptor securityInterceptor;
+
+    @Autowired
+    private EntitlementInterceptor entitlementInterceptor;
     
     /**
      * 配置静态资源访问路径
@@ -36,5 +41,11 @@ public class WebConfig implements WebMvcConfigurer {
     @Override
     public void addInterceptors(@NonNull InterceptorRegistry registry) {
         registry.addInterceptor(securityInterceptor).addPathPatterns("/api/**").excludePathPatterns("/api/auth/login", "/api/auth/register", "/api/auth/send-sms-code");
+        // 阶段2 套餐门禁：法律域接口按租户 plan 拦截，FREE → 402。豁免 esign 回调（公网 webhook）。
+        registry.addInterceptor(entitlementInterceptor)
+                .addPathPatterns(
+                        "/api/sign/**",
+                        "/api/evidence/**", "/api/templates/**", "/api/review/**")
+                .excludePathPatterns("/api/sign/callbacks/**");
     }
 }

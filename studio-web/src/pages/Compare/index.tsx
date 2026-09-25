@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { LegalPageHeader } from '@/components/legal/LegalPageHeader';
 
 type Seg = { type: 'same' | 'add' | 'del'; text: string };
 
@@ -30,17 +31,21 @@ export default function Compare() {
 
   return (
     <div className="h-full overflow-y-auto p-5">
-      <div className="mb-4 flex items-center gap-3">
-        <h1 className="text-lg font-semibold">合同比对</h1>
-        <button className="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground" disabled={busy} onClick={() => void run()}>
-          {busy ? '比对中…' : '开始比对'}
-        </button>
-        {counts && (
-          <span className="rounded-full bg-muted px-2.5 py-0.5 text-tiny text-muted-foreground">
-            新增 {counts.added} 处 · 删除 {counts.deleted} 处
-          </span>
-        )}
-      </div>
+      <LegalPageHeader
+        title="合同比对"
+        actions={
+          <>
+            {counts && (
+              <span className="rounded-full bg-muted px-2.5 py-0.5 text-tiny text-muted-foreground">
+                新增 {counts.added} 处 · 删除 {counts.deleted} 处
+              </span>
+            )}
+            <button className="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground" disabled={busy} onClick={() => void run()}>
+              {busy ? '比对中…' : '开始比对'}
+            </button>
+          </>
+        }
+      />
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div>
           <h4 className="mb-1 text-xs font-semibold text-muted-foreground">版本 A</h4>

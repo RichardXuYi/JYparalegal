@@ -2687,6 +2687,23 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
+  setSessionModel: async (model: string | null) => {
+    const key = get().currentSessionKey?.trim();
+    if (!key) {
+      const created = await hostApi.gateway.rpc<Record<string, unknown>>('sessions.create', {
+        agentId: get().currentAgentId,
+        ...(model ? { model } : {}),
+      });
+      const createdKey = typeof created?.key === 'string' ? created.key : '';
+      if (createdKey) {
+        set({ currentSessionKey: createdKey, currentAgentId: get().currentAgentId });
+      }
+      if (!model || createdKey) return;
+      throw new Error('No session key for model switch');
+    }
+    await hostApi.gateway.rpc('sessions.patch', { key, model });
+  },
+
   // 鈹€鈹€ Load sessions via sessions.list 鈹€鈹€
 
   loadSessions: async (force = false, reportError = false) => {

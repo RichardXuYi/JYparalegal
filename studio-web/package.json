@@ -3,7 +3,7 @@
     "version": "1.5.0",
     "description": "GrandPoem Studio Web - Browser-based Studio powered by OpenClaw (Web port of GrandPoem Studio)",
     "author": "GrandPoem Team",
-    "license": "MIT",
+    "license": "UNLICENSED",
     "private": true,
     "type": "module",
     "scripts": {
@@ -39,7 +39,7 @@
         "lru-cache": "^11.2.6",
         "ms": "^2.1.3",
         "node-machine-id": "^1.1.12",
-        "openclaw": "2026.6.10",
+        "openclaw": "2026.9.6",
         "posthog-node": "^4.18.0",
         "tar": "^6.2.1",
         "tsx": "^4.20.0",

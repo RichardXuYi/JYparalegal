@@ -34,6 +34,7 @@ import java.util.*;
 import com.jyfc.backend.module.auth.service.UserService;
 import com.jyfc.backend.module.auth.service.AdminService;
 import com.jyfc.backend.module.auth.service.TokenService;
+import com.jyfc.backend.module.auth.service.RegistrationService;
 import com.jyfc.backend.module.dashboard.service.SecurityCheckService;
 import com.jyfc.backend.module.auth.service.EmailVerificationService;
 import com.jyfc.backend.module.dashboard.service.SecurityAuditLogService;
@@ -55,6 +56,7 @@ public class AuthController {
     private final AuthenticationManager authenticationManager;
     private final SmsVerificationService smsVerificationService;
     private final TokenService tokenService;
+    private final RegistrationService registrationService;
 
     @Value("${app.cookie.secure:true}")
     private boolean cookieSecure;
@@ -68,7 +70,8 @@ public class AuthController {
             SecurityAuditLogService auditLogService,
             AuthenticationManager authenticationManager,
             SmsVerificationService smsVerificationService,
-            TokenService tokenService
+            TokenService tokenService,
+            RegistrationService registrationService
     ) {
         this.userService = userService;
         this.adminService = adminService;
@@ -78,6 +81,7 @@ public class AuthController {
         this.authenticationManager = authenticationManager;
         this.smsVerificationService = smsVerificationService;
         this.tokenService = tokenService;
+        this.registrationService = registrationService;
     }
 
     // ==================== User Login ====================
@@ -525,7 +529,54 @@ public class AuthController {
             return ResponseEntity.internalServerError().body(ApiResponse.error(500, "注册失败，请稍后重试"));
         }
     }
-    
+
+    /**
+     * 轻量注册（桌面端）：仅手机号 + 密码；企业另需公司名（信用代码选填）。
+     * 不做短信/邮箱验证。注册后默认 FREE 套餐（未购买，法律域由后续门禁拦截）。
+     * 注册成功不直接下发 token，前端用手机号+密码走 /login 自动登录。
+     */
+    @PostMapping("/register-simple")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> registerSimple(@RequestBody Map<String, Object> body) {
+        String phone = body.get("phone") == null ? null : String.valueOf(body.get("phone")).trim();
+        String password = (String) body.get("password");
+        String userType = body.get("userType") == null ? "PERSONAL" : String.valueOf(body.get("userType"));
+        String ip = getClientIp();
+
+        if (phone == null || phone.isEmpty()) return badRequest(phone, ip, null, null, "手机号不能为空");
+        if (!ValidationUtils.isValidPhone(phone)) return badRequest(phone, ip, null, null, "手机号格式不正确");
+        if (password == null || password.length() < 6) return badRequest(phone, ip, null, null, "密码至少 6 位");
+        if (userService.findByPhone(phone).isPresent() || userService.findByUsername(phone).isPresent()) {
+            return badRequest(phone, ip, null, null, "手机号已被注册");
+        }
+
+        boolean enterprise = "ENTERPRISE".equalsIgnoreCase(userType);
+        String companyName = body.get("companyName") == null ? null : String.valueOf(body.get("companyName")).trim();
+        String unifiedCreditCode = body.get("unifiedCreditCode") == null ? null : String.valueOf(body.get("unifiedCreditCode")).trim();
+        String legalPerson = body.get("legalPerson") == null ? null : String.valueOf(body.get("legalPerson")).trim();
+        String contactEmail = body.get("contactEmail") == null ? null : String.valueOf(body.get("contactEmail")).trim();
+        if (enterprise && (companyName == null || companyName.isEmpty())) {
+            return badRequest(phone, ip, null, null, "请填写公司名称");
+        }
+
+        try {
+            RegistrationService.Result r = registrationService.registerSimple(
+                    phone, password, enterprise, companyName, unifiedCreditCode, legalPerson, contactEmail);
+            auditLogService.logRegistration(phone, ip, null, null, true, null);
+            Map<String, Object> res = new LinkedHashMap<>();
+            res.put("id", r.userId());
+            res.put("username", r.username());
+            res.put("userType", r.userType());
+            res.put("companyId", r.companyId());
+            return ResponseEntity.ok(ApiResponse.success("注册成功", res));
+        } catch (IllegalArgumentException e) {
+            return badRequest(phone, ip, null, null, e.getMessage());
+        } catch (Exception e) {
+            log.error("Simple registration failed for phone: {}", phone, e);
+            auditLogService.logRegistration(phone, ip, null, null, false, e.getMessage());
+            return ResponseEntity.internalServerError().body(ApiResponse.error(500, "注册失败，请稍后重试"));
+        }
+    }
+
     private ResponseEntity<ApiResponse<Map<String, Object>>> badRequest(String username, String ip, String ua, String fingerprint, String msg) {
         auditLogService.logRegistration(username, ip, ua, fingerprint, false, msg);
         return ResponseEntity.badRequest().body(ApiResponse.error(400, msg));

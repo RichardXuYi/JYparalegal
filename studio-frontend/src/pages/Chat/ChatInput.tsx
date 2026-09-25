@@ -19,7 +19,6 @@ import { useChatStore } from '@/stores/chat';
 import { useArtifactPanel } from '@/stores/artifact-panel';
 import { buildPreviewTarget } from '@/components/file-preview/build-preview-target';
 import { useProviderStore } from '@/stores/providers';
-import { useConnectionStatusStore } from '@/stores/connection-status';
 import { buildConfiguredModelOptions, formatModelRefLabel, isConfiguredModelRefAvailable, resolveConfiguredModelRef } from '@/lib/model-options';
 import type { AgentSummary } from '@/types/agent';
 import type { QuickAccessSkill } from '@/types/skill';
@@ -252,10 +251,7 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false }:
   const isComposingRef = useRef(false);
   const gatewayStatus = useGatewayStore((s) => s.status);
   const agents = useAgentsStore((s) => s.agents);
-  const updateAgentModel = useAgentsStore((s) => s.updateAgentModel);
   const defaultModelRef = useAgentsStore((s) => s.defaultModelRef);
-  const beginModelSwitch = useConnectionStatusStore((s) => s.beginModelSwitch);
-  const endModelSwitch = useConnectionStatusStore((s) => s.endModelSwitch);
   const providerAccounts = useProviderStore((s) => s.accounts);
   const providerStatuses = useProviderStore((s) => s.statuses);
   const providerDefaultAccountId = useProviderStore((s) => s.defaultAccountId);
@@ -265,6 +261,8 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false }:
   const thinkingLevel = useChatStore((s) => s.thinkingLevel);
   const thinkingLevels = useChatStore((s) => s.thinkingLevels);
   const setThinkingLevel = useChatStore((s) => s.setThinkingLevel);
+  const setSessionModel = useChatStore((s) => s.setSessionModel);
+  const currentSessionKey = useChatStore((s) => s.currentSessionKey);
   const currentAgent = useMemo(
     () => (agents ?? []).find((agent) => agent.id === currentAgentId) ?? null,
     [agents, currentAgentId],
@@ -336,14 +334,14 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false }:
 
   useEffect(() => {
     setOptimisticModelRef(null);
-  }, [currentAgent?.modelRef, currentAgentId]);
+  }, [currentAgent?.modelRef, currentAgentId, currentSessionKey]);
 
   useEffect(() => {
     if (!currentAgent || switchingModelRef || optimisticModelRef) return;
     const override = (currentAgent.overrideModelRef || '').trim();
     if (!override || isConfiguredModelRefAvailable(override, modelOptions)) return;
-    void updateAgentModel(currentAgent.id, null).catch(() => {});
-  }, [currentAgent, modelOptions, optimisticModelRef, switchingModelRef, updateAgentModel]);
+    void setSessionModel(null).catch(() => {});
+  }, [currentAgent, modelOptions, optimisticModelRef, setSessionModel, switchingModelRef]);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -393,6 +391,15 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false }:
       document.removeEventListener('mousedown', handlePointerDown);
     };
   }, [modelPickerOpen, pickerOpen, skillPickerOpen, thinkingPickerOpen]);
+
+  useEffect(() => {
+    const onPrefill = (event: Event) => {
+      const text = (event as CustomEvent<string>).detail;
+      if (typeof text === 'string' && text.trim()) setInput(text);
+    };
+    window.addEventListener('jy-chat-prefill', onPrefill);
+    return () => window.removeEventListener('jy-chat-prefill', onPrefill);
+  }, []);
 
   useEffect(() => {
     setSelectedSkill((prev) => {
@@ -499,23 +506,19 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false }:
 
     const previousModelRef = effectiveModelRef;
     const desiredOverride = modelRef === (defaultModelRef || '').trim() ? null : modelRef;
-    const targetLabel = modelOptions.find((option) => option.modelRef === modelRef)?.label
-      ?? formatModelRefLabel(modelRef);
     setSwitchingModelRef(modelRef);
     setOptimisticModelRef(modelRef);
     setModelPickerOpen(false);
-    beginModelSwitch(targetLabel);
     try {
-      await updateAgentModel(currentAgent.id, desiredOverride);
+      await setSessionModel(desiredOverride);
     } catch (error) {
       setOptimisticModelRef(previousModelRef);
       toast.error(t('composer.modelSwitchFailed', { error: String(error) }));
     } finally {
       setSwitchingModelRef(null);
-      endModelSwitch();
       textareaRef.current?.focus();
     }
-  }, [beginModelSwitch, currentAgent, defaultModelRef, effectiveModelRef, endModelSwitch, modelOptions, switchingModelRef, t, updateAgentModel]);
+  }, [currentAgent, defaultModelRef, effectiveModelRef, setSessionModel, switchingModelRef, t]);
 
   const handleSelectThinkingLevel = useCallback(async (level: string | null) => {
     setThinkingPickerOpen(false);
@@ -884,7 +887,7 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false }:
 
         {/* Input Container */}
         <div className={cn(
-          'relative bg-surface-modal rounded-2xl shadow-sm px-3 pt-2.5 pb-1.5 transition-all overflow-visible',
+          'relative rounded-2xl border border-border/70 bg-surface-input/50 px-3 pt-2.5 pb-1.5 transition-all overflow-visible',
           dragOver ? 'ring-1 ring-primary' : 'focus-within:shadow-[0_0_0_3px_rgba(99,102,241,0.08)] dark:focus-within:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]'
         )}>
           {selectedTarget && (
@@ -1225,7 +1228,7 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false }:
               className={cn(
                 'ml-auto shrink-0 h-11 w-11 sm:h-8 sm:w-8 rounded-xl transition-all',
                 (sending || canSend)
-                  ? 'bg-gradient-to-br from-indigo-500 to-violet-600 text-white hover:opacity-90 shadow-sm dark:from-rose-500 dark:to-orange-500'
+                  ? 'bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-sm hover:opacity-90 dark:from-red-500 dark:to-orange-500'
                   : 'text-muted-foreground/50 hover:bg-transparent bg-transparent'
               )}
               variant={sending || canSend ? 'default' : 'ghost'}

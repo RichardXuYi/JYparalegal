@@ -12,6 +12,7 @@ import com.jyfc.backend.module.sign.repository.SignTaskRepository;
 import com.jyfc.backend.module.sign.service.SignDraftService;
 import com.jyfc.backend.module.sign.service.SignFlowService;
 import com.jyfc.backend.module.signdoc.repository.SignDocRepository;
+import com.jyfc.backend.module.signdoc.service.SignDocService;
 import com.jyfc.backend.shared.dto.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -42,11 +43,13 @@ public class SignTaskController {
     private final CpSigningClient cpSigningClient;
     private final SignQuotaService signQuotaService;
     private final SignDocRepository signDocRepository;
+    private final SignDocService signDocService;
 
     public SignTaskController(SignTaskRepository taskRepository,
                               SignFlowService flow, SignDraftService draft, UserContextUtil userContextUtil,
                               CpProperties cpProperties, CpSigningClient cpSigningClient,
-                              SignQuotaService signQuotaService, SignDocRepository signDocRepository) {
+                              SignQuotaService signQuotaService, SignDocRepository signDocRepository,
+                              SignDocService signDocService) {
         this.taskRepository = taskRepository;
         this.flow = flow;
         this.draft = draft;
@@ -55,6 +58,7 @@ public class SignTaskController {
         this.cpSigningClient = cpSigningClient;
         this.signQuotaService = signQuotaService;
         this.signDocRepository = signDocRepository;
+        this.signDocService = signDocService;
     }
 
     private void requireTenant() {
@@ -162,8 +166,12 @@ public class SignTaskController {
             return;
         }
         if (cpProperties.isEnabled()) {
+            java.util.Map<String, Object> doc = signDocService.primaryDocForUpload(task.getId());
+            String fileName = doc == null ? null : String.valueOf(doc.get("fileName"));
+            String fileBase64 = doc == null ? null : String.valueOf(doc.get("contentBase64"));
+            java.util.List<java.util.Map<String, Object>> signers = flow.signersForProvider(task.getId());
             java.util.Map<String, Object> issued = cpSigningClient.execute(task.getTaskNo(), task.getTitle(),
-                    primaryDocSha256(task.getId()), bearerToken(request));
+                    primaryDocSha256(task.getId()), fileName, fileBase64, signers, bearerToken(request));
             Object flowId = issued.get("providerTaskId");
             if (flowId != null) {
                 task.setProvider(String.valueOf(issued.getOrDefault("provider", "esign-saas-v3")));

@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Scale, GraduationCap, FileText, Mic } from 'lucide-react';
+import { Scale, GraduationCap, FileText, Mic, FileUp, LayoutTemplate, Sparkles } from 'lucide-react';
 import { billingRuleLabel, planLabel, signStatusLabel } from '@/lib/legal-enums';
+import { LegalPageHeader } from '@/components/legal/LegalPageHeader';
+import { DropZone } from '@/components/legal/DropZone';
 
 type SignTask = { id: number; taskNo: string; title: string; status: string; createdAt: string };
 type Account = { plan: string; signQuota: number; signUsed: number; signRemaining: number; aiQuotaTokens: number; aiUsedTokens: number; billingRule: string };
@@ -12,7 +14,6 @@ export default function Overview() {
   const [tasksState, setTasksState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [counts, setCounts] = useState<{ kpi: Record<string, number>; menu: Record<string, number> } | null>(null);
   const [account, setAccount] = useState<Account | null>(null);
-  const [dragOver, setDragOver] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const nav = useNavigate();
 
@@ -60,7 +61,7 @@ export default function Overview() {
 
   return (
     <div className="h-full overflow-y-auto p-5">
-      <h1 className="mb-4 text-lg font-semibold">工作台</h1>
+      <LegalPageHeader title="工作台" />
 
       {/* KPI 4 cards with colored left bar */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -102,15 +103,16 @@ export default function Overview() {
               <button className="text-meta text-primary hover:underline" onClick={() => nav(`/signing/${t.id}`)}>去签署 ›</button>
             </div>
           ))}
-          <div
-            className={`m-4 cursor-pointer rounded-lg border-[1.5px] border-dashed p-6 text-center text-sm transition-colors ${dragOver ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-muted/30 text-muted-foreground'}`}
-            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files?.[0]; if (f) void uploadFile(f); }}
-            onClick={() => fileRef.current?.click()}
-          >
-            拖拽文件到此处 <b className="cursor-pointer text-primary">开始发起签署</b>，或 <b className="cursor-pointer text-primary" onClick={(e) => { e.stopPropagation(); nav('/'); }}>交给 Agent 审查</b>
-            <div className="mt-1 text-xs">PDF / DOCX / XLSX · ≤50MB</div>
+          <div className="m-4">
+            <DropZone
+              hint="上传文件或使用模板，开始发起签署 · PDF / DOCX / XLSX · ≤50MB"
+              onDropFiles={(files) => { const f = files[0]; if (f) void uploadFile(f); }}
+              actions={[
+                { label: '上传文件', icon: FileUp, onClick: () => fileRef.current?.click() },
+                { label: '选择模板', icon: LayoutTemplate, onClick: () => nav('/templates') },
+                { label: '交给 Agent 审查', icon: Sparkles, onClick: () => nav('/') },
+              ]}
+            />
             <input ref={fileRef} type="file" className="hidden" accept=".pdf,.doc,.docx,.xls,.xlsx"
               onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadFile(f); e.target.value = ''; }} />
           </div>
@@ -129,7 +131,7 @@ export default function Overview() {
               <button className="rounded-lg border border-border p-3 text-left text-meta hover:border-primary" onClick={() => nav('/moot')}>
                 <GraduationCap className="h-5 w-5 text-primary" />
                 <div className="mt-1 font-medium">模拟法庭</div>
-                <div className="mt-0.5 text-tiny text-muted-foreground">多角色庭审演练</div>
+                <div className="mt-0.5 text-tiny text-muted-foreground">多角色庭审演练 · 即将开发</div>
               </button>
               <button className="rounded-lg border border-border p-3 text-left text-meta hover:border-primary" onClick={() => nav('/compare')}>
                 <FileText className="h-5 w-5 text-primary" />
@@ -139,7 +141,7 @@ export default function Overview() {
               <button className="rounded-lg border border-border p-3 text-left text-meta hover:border-primary" onClick={() => nav('/voice')}>
                 <Mic className="h-5 w-5 text-primary" />
                 <div className="mt-1 font-medium">语音通话</div>
-                <div className="mt-0.5 text-tiny text-muted-foreground">实时语音与转写留痕</div>
+                <div className="mt-0.5 text-tiny text-muted-foreground">实时语音与转写留痕 · 即将开发</div>
               </button>
             </div>
           </div>

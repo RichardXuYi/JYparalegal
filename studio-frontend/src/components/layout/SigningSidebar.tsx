@@ -19,7 +19,7 @@ const MENU_ITEMS = [
   { key: 'ALL_SIGNING', label: '全部签署', view: 'ALL_SIGNING', count: true },
 ];
 
-export function SigningSidebar() {
+export function SigningSidebar({ embedded = false }: { embedded?: boolean }) {
   const nav = useNavigate();
   const location = useLocation();
   const [counts, setCounts] = useState<Counts | null>(null);
@@ -39,7 +39,7 @@ export function SigningSidebar() {
   };
 
   return (
-    <div className="flex h-full w-[220px] flex-col overflow-hidden border-r border-border bg-card">
+    <div className={embedded ? 'flex h-full min-h-0 flex-col overflow-hidden' : 'flex h-full w-[220px] flex-col overflow-hidden border-r border-border bg-card'}>
       <div className="p-3">
         <button
           className="w-full rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground"
@@ -68,7 +68,7 @@ export function SigningSidebar() {
               className={`flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-meta transition-colors ${
                 isActive
                   ? 'bg-primary/15 font-semibold text-primary'
-                  : 'text-muted-foreground hover:bg-muted'
+                  : 'text-muted-foreground hover:bg-accent'
               }`}
             >
               <span className="flex-1">{m.label}</span>

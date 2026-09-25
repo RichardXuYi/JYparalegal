@@ -57,6 +57,16 @@ const isE2EMode = process.env.CLAWX_E2E === '1';
 const requestedUserDataDir = process.env.CLAWX_USER_DATA_DIR?.trim();
 const requestedRemoteDebuggingPort = process.env.CLAWX_REMOTE_DEBUGGING_PORT?.trim();
 
+// Dev only: the bundled OpenClaw binary may be older than whatever last wrote
+// the shared ~/.openclaw state dir (e.g. a newer global OpenClaw). The older
+// binary then refuses the newer config/sqlite schema and the Gateway exits
+// code=1, leaving the UI stuck on "connecting". Isolate the dev Gateway state
+// dir so it seeds a fresh, version-compatible one. Respects an explicit
+// OPENCLAW_STATE_DIR and never applies to packaged builds.
+if (!app.isPackaged && !process.env.OPENCLAW_STATE_DIR?.trim()) {
+  process.env.OPENCLAW_STATE_DIR = join(app.getPath('home'), '.grandpoem-studio', 'openclaw-dev');
+}
+
 if (requestedRemoteDebuggingPort) {
   app.commandLine.appendSwitch('remote-debugging-port', requestedRemoteDebuggingPort);
 }
@@ -176,7 +186,6 @@ async function createWindow(): Promise<BrowserWindow> {
   const isMac = process.platform === 'darwin';
   const isWindows = process.platform === 'win32';
   const useCustomTitleBar = isWindows;
-  const shouldSkipSetupForE2E = process.env.CLAWX_E2E_SKIP_SETUP === '1';
 
   // Restore persisted window state (position/size/maximized)
   let windowState: { x?: number; y?: number; width: number; height: number; isMaximized: boolean };
@@ -245,19 +254,12 @@ async function createWindow(): Promise<BrowserWindow> {
     if (rendererUrl.hostname === 'localhost' || rendererUrl.hostname === '[::1]') {
       rendererUrl.hostname = '127.0.0.1';
     }
-    if (shouldSkipSetupForE2E) {
-      rendererUrl.searchParams.set('e2eSkipSetup', '1');
-    }
     win.loadURL(rendererUrl.toString());
     if (!isE2EMode) {
       win.webContents.openDevTools();
     }
   } else {
-    win.loadFile(join(__dirname, '../../dist/index.html'), {
-      query: shouldSkipSetupForE2E
-        ? { e2eSkipSetup: '1' }
-        : undefined,
-    });
+    win.loadFile(join(__dirname, '../../dist/index.html'));
   }
 
   return win;

@@ -498,7 +498,7 @@ export async function writeOpenClawConfig(config: OpenClawConfig): Promise<void>
     await ensureConfigDir();
 
     try {
-        // Enable graceful in-process reload authorization for SIGUSR1 flows.
+        // commands.restart authorizes SIGUSR2 in-process restart on OpenClaw 2026.9.6.
         const commands =
             config.commands && typeof config.commands === 'object'
                 ? { ...(config.commands as Record<string, unknown>) }

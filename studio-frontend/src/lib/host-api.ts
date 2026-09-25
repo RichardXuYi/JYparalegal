@@ -3,6 +3,7 @@ import type {
   AgentUpdatePayload,
   AttachmentFileRef,
   AttachmentSourceRef,
+  AuthRegisterPayload,
   ChannelAccountsPayload,
   ChannelSaveConfigPayload,
   ChannelTargetsPayload,
@@ -385,6 +386,7 @@ export const hostApi = {
   },
   auth: {
     login: (username: string, password: string, rememberMe?: boolean) => invokeHost('auth', 'login', { username, password, rememberMe }),
+    register: (payload: AuthRegisterPayload) => invokeHost('auth', 'register', payload),
     logout: () => invokeHost('auth', 'logout'),
     me: () => invokeHost('auth', 'me'),
     getState: () => invokeHost('auth', 'getState'),

@@ -71,6 +71,20 @@ public class CompanyManageController {
         return ApiResponse.success(out);
     }
 
+    /**
+     * 绑定/更新企业 e签宝机构号（机构实名后回填），用于企业章签署（signers[].orgSignerInfo.orgId）。
+     * 传空字符串可解绑（回退为个人签署）。
+     */
+    @PutMapping("/{id}/esign-org-id")
+    public ApiResponse<CompanyEntity> bindEsignOrgId(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+        CompanyEntity c = requireCompanyInTenant(id);
+        Object raw = body.get("esignOrgId");
+        String orgId = raw == null ? null : String.valueOf(raw).trim();
+        c.setEsignOrgId(orgId == null || orgId.isBlank() ? null : orgId);
+        em.merge(c);
+        return ApiResponse.success(c);
+    }
+
     /** 跨租户防护：目标公司必须属于当前租户。 */
     private CompanyEntity requireCompanyInTenant(Long id) {
         CompanyEntity c = em.find(CompanyEntity.class, id);

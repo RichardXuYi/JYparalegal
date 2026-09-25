@@ -94,6 +94,28 @@ public class SignDocService {
         return task(id);
     }
 
+    /**
+     * 取任务下第一份签署文档的文件名与 base64（供送签上传 e签宝）；无文档返回 null。
+     * 仅用于送签时把文档内容交给 CP 上传，不做额外落盘。
+     */
+    public Map<String, Object> primaryDocForUpload(Long taskId) {
+        task(taskId);
+        return docRepository.findAllByTaskIdOrderByIdAsc(taskId).stream().findFirst().map(d -> {
+            Map<String, Object> m = new LinkedHashMap<>();
+            String name = d.getDocFileId() == null ? null
+                    : docFileRepository.findById(d.getDocFileId()).map(DocFileEntity::getFileName).orElse(null);
+            byte[] bytes;
+            try {
+                bytes = Files.readAllBytes(Paths.get(d.getFilePath()));
+            } catch (Exception e) {
+                throw new BusinessException("读取签署文档失败: " + e.getMessage());
+            }
+            m.put("fileName", name != null ? name : "contract");
+            m.put("contentBase64", Base64.getEncoder().encodeToString(bytes));
+            return m;
+        }).orElse(null);
+    }
+
     @Transactional
     public SignDocEntity storeUpload(Long taskId, Long actorId, String fileName, String contentBase64) {
         SignTaskEntity t = task(taskId);

@@ -12,6 +12,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth';
+import { TitleBar } from '@/components/layout/TitleBar';
 import { resetAllUserStores } from '@/lib/user-session-reset';
 
 export function SsoBridge() {
@@ -116,7 +117,10 @@ export function SsoBridge() {
   }, [handleSsoLogin]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
+    <div className="flex min-h-screen items-center justify-center bg-background relative">
+      <div className="absolute inset-x-0 top-0 z-20">
+        <TitleBar />
+      </div>
       <div className="flex flex-col items-center gap-4 p-8">
         {loading && !error && (
           <>

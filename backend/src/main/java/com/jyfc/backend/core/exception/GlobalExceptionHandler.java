@@ -29,6 +29,12 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.BAD_REQUEST, ex.getMessage());
     }
 
+    @ExceptionHandler(RequiresPurchaseException.class)
+    public ResponseEntity<ApiResponse<Void>> handleRequiresPurchase(RequiresPurchaseException ex, WebRequest req) {
+        // 套餐未解锁：HTTP 402 + code 402，前端据此弹「请购买」。
+        return build(HttpStatus.PAYMENT_REQUIRED, ex.getMessage());
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiResponse<Void>> handleIllegalArgument(IllegalArgumentException ex, WebRequest req) {
         // IllegalArgumentException 通常来自业务校验，透传可读，但仍然避免直接吐异常 detail 字段

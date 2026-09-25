@@ -138,6 +138,17 @@ export async function launchGatewayProcess(options: {
   // pre-existing value inherited from the user shell cannot re-enable it.
   runtimeEnv.OPENCLAW_DISABLE_BONJOUR = '1';
 
+  // Dev only: the bundled OpenClaw binary may be older than the version that
+  // last wrote the scoped state dir's openclaw.json (e.g. after an openclaw
+  // downgrade in package.json, or a state dir shared with a newer install).
+  // OpenClaw then refuses startup migrations and the Gateway exits code=1, so
+  // the UI hangs on "connecting". Allow the older binary to proceed in dev.
+  // Never ship this bypass in packaged builds (it permits destructive
+  // config downgrades).
+  if (!app.isPackaged) {
+    runtimeEnv.OPENCLAW_ALLOW_OLDER_BINARY_DESTRUCTIVE_ACTIONS = '1';
+  }
+
   // Only apply the fetch/child_process preload in dev mode.
   // In packaged builds Electron's UtilityProcess rejects NODE_OPTIONS
   // with --require, logging "Most NODE_OPTIONs are not supported in

@@ -531,6 +531,65 @@
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 10px 30px -14px rgba(15, 23, 42, 0.14);
 }
 
+/*
+ * ===== Connected app shell (layout-v2 / WorkBuddy-Qoder architecture) =====
+ * The whole window is one saturated blue-purple gradient. The topbar and the
+ * left sidebar sit DIRECTLY on that gradient as transparent/glass regions
+ * (white / glassy text); only the stage is a white rounded card. Because the
+ * topbar + sidebar are part of the same continuous gradient surface there are
+ * NO white seam lines between panels (the previous pale-frame + 3-white-cards
+ * shell showed jarring white gaps).
+ */
+.shell-gradient {
+  background: linear-gradient(145deg, #4f46e5 0%, #6d28d9 48%, #9333ea 100%);
+}
+
+.dark .shell-gradient {
+  background: linear-gradient(145deg, #1e1b4b 0%, #3b0764 48%, #4c1d95 100%);
+}
+
+/* Glassy control surfaces for controls that sit on the gradient. */
+.shell-glass {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.shell-glass:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.shell-glass-strong {
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+/* White CTA button on the gradient (sidebar primary action). */
+.shell-cta {
+  background: #fff;
+  color: #4f46e5;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.16);
+}
+
+.shell-cta:hover {
+  background: #f2f1ff;
+}
+
+.dark .shell-cta {
+  background: #fff;
+  color: #4c1d95;
+}
+
+/* Bottom glass info card in the sidebar (quota / user). */
+.shell-card {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(8px);
+}
+
+/* Shadow for the white stage card floating on the gradient. */
+.shadow-shell {
+  box-shadow: 0 10px 40px -12px rgba(30, 27, 75, 0.45);
+}
+
 .dark .glass-card {
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.09);

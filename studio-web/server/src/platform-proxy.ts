@@ -12,8 +12,6 @@ import { verifySession } from './auth';
 export function registerPlatformProxy(app: FastifyInstance): void {
   const routes: Array<[string, string]> = [
     ['/platform/sign/*', '/api/sign'],
-    ['/platform/moot/*', '/api/moot'],
-    ['/platform/voice/*', '/api/voice'],
     ['/platform/account/*', '/api/account'],
     ['/platform/templates', '/api/templates'],
     ['/platform/templates/*', '/api/templates'],

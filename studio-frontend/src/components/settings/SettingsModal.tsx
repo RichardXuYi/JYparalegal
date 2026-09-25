@@ -49,7 +49,7 @@ import { SettingsPageHeader } from './primitives';
 
 interface NavItem {
   id: SettingsSection;
-  icon: ComponentType<{ className?: string }>;
+  icon: ComponentType<{ className?: string; strokeWidth?: number }>;
   /** i18n key resolved against the settings namespace unless prefixed (e.g. 'common:'). */
   labelKey: string;
   /** Only shown when developer mode is unlocked. */
@@ -228,16 +228,16 @@ export function SettingsModal() {
         <DialogTitle className="sr-only">{t('title')}</DialogTitle>
 
         {/* Left: category navigation */}
-        <nav role="tablist" aria-label={t('title')} className="flex w-60 shrink-0 flex-col gap-4 overflow-y-auto border-r border-border/50 bg-surface-sidebar p-3">
+        <nav role="tablist" aria-label={t('title')} className="shell-gradient flex w-60 shrink-0 flex-col gap-4 overflow-y-auto p-3">
           <div className="px-3 pt-2 pb-1">
-            <h2 className="text-base font-bold tracking-tight">{t('title')}</h2>
+            <h2 className="text-base font-bold tracking-tight text-white">{t('title')}</h2>
           </div>
           {NAV_GROUPS.map((group) => {
             const items = group.items.filter((item) => !item.devOnly || devModeUnlocked);
             if (items.length === 0) return null;
             return (
               <div key={group.titleKey} className="flex flex-col gap-0.5">
-                <p className="px-3 pb-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">
+                <p className="px-3 pb-1.5 text-[10px] font-bold uppercase tracking-widest text-white/55">
                   {t(group.titleKey)}
                 </p>
                 {items.map((item) => {
@@ -253,24 +253,18 @@ export function SettingsModal() {
                       onClick={() => setSection(item.id)}
                       className={cn(
                         'group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition-all',
-                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60',
                         isActive
-                          ? 'bg-gradient-to-r from-primary/20 to-primary/5 text-primary'
-                          : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
+                          ? 'shell-glass-strong font-semibold text-white'
+                          : 'text-white/75 hover:bg-white/10 hover:text-white',
                       )}
                     >
-                      <div className={cn(
-                        'flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br shadow-lg transition-all',
-                        item.gradientClass || 'gradient-general',
-                        isActive ? 'scale-110' : 'opacity-70 group-hover:opacity-100'
-                      )}>
-                        <Icon className="h-4 w-4 text-white" />
-                      </div>
+                      <Icon className="h-4 w-4 shrink-0" strokeWidth={1.75} />
                       <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-medium">
                         {t(item.labelKey)}
                       </span>
                       {isActive && (
-                        <div className="h-1.5 w-1.5 rounded-full bg-primary" />
+                        <div className="h-1.5 w-1.5 rounded-full bg-white" />
                       )}
                     </button>
                   );

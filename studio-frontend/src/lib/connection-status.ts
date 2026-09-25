@@ -6,22 +6,17 @@
 import type { GatewayStatus } from '@/types/gateway';
 import { isGatewayRestarting } from '@/lib/gateway-status';
 
-export type ConnectionReason = 'model' | 'reconnecting' | 'connecting' | null;
+export type ConnectionReason = 'reconnecting' | 'connecting' | null;
 
 /**
  * Decide which (if any) blocking connection status should be surfaced.
- * Priority: an in-flight model switch wins; otherwise a starting/reconnecting
- * gateway. Stopped/error states return `null` (handled by TopBar + the existing
- * GatewayNotRunning UI, not by this overlay).
+ * A starting or reconnecting gateway shows the overlay. Stopped/error states
+ * return `null` (handled by TopBar + the existing GatewayNotRunning UI).
+ * Model switches are session RPC calls and do not use this overlay.
  */
 export function deriveConnectionReason(params: {
   status: GatewayStatus;
-  modelSwitchActive: boolean;
 }): ConnectionReason {
-  if (params.modelSwitchActive) {
-    return 'model';
-  }
-
   const { status } = params;
   if (isGatewayRestarting(status)) {
     if (status.state === 'reconnecting' || (status.reconnectAttempts ?? 0) > 0) {

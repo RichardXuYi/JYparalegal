@@ -116,7 +116,6 @@ export type SettingsSnapshot = Partial<{
   sidebarCollapsed: boolean;
   sidebarWidth: number;
   devModeUnlocked: boolean;
-  setupComplete: boolean;
 }>;
 export type SettingsKey = keyof SettingsSnapshot & string;
 export type SettingsValue = SettingsSnapshot[SettingsKey];

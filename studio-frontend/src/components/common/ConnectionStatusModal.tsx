@@ -3,7 +3,6 @@
  * Global blocking overlay that surfaces slow connection operations:
  *  - initial gateway connection on startup
  *  - reconnection after a network/service restart
- *  - active AI model switching
  * It auto-dismisses once the operation completes. A "continue in background"
  * escape hatch prevents the UI from being permanently locked if the gateway
  * stalls while starting.
@@ -12,16 +11,14 @@ import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useGatewayStore } from '@/stores/gateway';
-import { useConnectionStatusStore } from '@/stores/connection-status';
 import { deriveConnectionReason, type ConnectionReason } from '@/lib/connection-status';
 import { useMinLoading } from '@/hooks/use-min-loading';
 
 export function ConnectionStatusModal() {
   const { t } = useTranslation('common');
   const status = useGatewayStore((s) => s.status);
-  const modelSwitch = useConnectionStatusStore((s) => s.modelSwitch);
 
-  const rawReason = deriveConnectionReason({ status, modelSwitchActive: modelSwitch.active });
+  const rawReason = deriveConnectionReason({ status });
   // Keep the overlay visible for a minimum duration to avoid a jarring flash on
   // very fast operations.
   const show = useMinLoading(rawReason !== null, 600);
@@ -29,9 +26,8 @@ export function ConnectionStatusModal() {
   // Snapshot the last active reason/label so content keeps rendering during the
   // min-loading tail after `rawReason` has already cleared. Manual dismiss is a
   // safety net that resets whenever a new active cycle begins.
-  const [snapshot, setSnapshot] = useState<{ reason: ConnectionReason; modelLabel: string | null }>({
+  const [snapshot, setSnapshot] = useState<{ reason: ConnectionReason }>({
     reason: null,
-    modelLabel: null,
   });
   const [manuallyHidden, setManuallyHidden] = useState(false);
   const [prevReason, setPrevReason] = useState<ConnectionReason>(null);
@@ -41,7 +37,7 @@ export function ConnectionStatusModal() {
   if (rawReason !== prevReason) {
     setPrevReason(rawReason);
     if (rawReason !== null) {
-      setSnapshot({ reason: rawReason, modelLabel: modelSwitch.modelLabel });
+      setSnapshot({ reason: rawReason });
       setManuallyHidden(false);
     }
   }
@@ -52,13 +48,7 @@ export function ConnectionStatusModal() {
 
   let title: string;
   let description: string;
-  if (snapshot.reason === 'model') {
-    title = t('connection.switchingModelTitle', '正在切换模型…');
-    description = t('connection.switchingModelDesc', {
-      model: snapshot.modelLabel ?? '',
-      defaultValue: '正在切换到 {{model}}，请稍候。',
-    });
-  } else if (snapshot.reason === 'reconnecting') {
+  if (snapshot.reason === 'reconnecting') {
     title = t('connection.reconnectingTitle', '正在重新连接…');
     description = t('connection.reconnectingDesc', '正在尝试重新连接 Gateway，请稍候。');
   } else {

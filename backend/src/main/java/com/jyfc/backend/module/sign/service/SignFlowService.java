@@ -8,7 +8,9 @@ import com.jyfc.backend.module.audit.entity.AuditLogEntity;
 import com.jyfc.backend.module.audit.entity.DataAccessLogEntity;
 import com.jyfc.backend.module.audit.repository.AuditLogRepository;
 import com.jyfc.backend.module.audit.repository.DataAccessLogRepository;
+import com.jyfc.backend.module.auth.entity.CompanyEntity;
 import com.jyfc.backend.module.auth.entity.UserEntity;
+import com.jyfc.backend.module.auth.repository.CompanyRepository;
 import com.jyfc.backend.module.auth.repository.UserRepository;
 import com.jyfc.backend.module.notification.entity.NotificationEntity;
 import com.jyfc.backend.module.notification.service.NotificationService;
@@ -56,6 +58,7 @@ public class SignFlowService {
     private final CpProperties cpProperties;
     private final CpSigningClient cpSigningClient;
     private final SignCcRepository signCcRepository;
+    private final CompanyRepository companyRepository;
 
     public SignFlowService(SignTaskRepository taskRepository, SignPartyRepository partyRepository,
                            SignInviteRepository inviteRepository, AuditLogRepository auditLogRepository,
@@ -66,7 +69,8 @@ public class SignFlowService {
                            SignTaskStateMachine stateMachine,
                            CpProperties cpProperties,
                            CpSigningClient cpSigningClient,
-                           SignCcRepository signCcRepository) {
+                           SignCcRepository signCcRepository,
+                           CompanyRepository companyRepository) {
         this.taskRepository = taskRepository;
         this.partyRepository = partyRepository;
         this.inviteRepository = inviteRepository;
@@ -80,6 +84,7 @@ public class SignFlowService {
         this.cpProperties = cpProperties;
         this.cpSigningClient = cpSigningClient;
         this.signCcRepository = signCcRepository;
+        this.companyRepository = companyRepository;
     }
 
     private Long tenant() {
@@ -455,6 +460,44 @@ public class SignFlowService {
     public List<SignPartyEntity> parties(Long taskId, Long actor) {
         taskForActor(taskId, actor);
         return partyRepository.findByTaskIdOrderByIdAsc(taskId);
+    }
+
+    /**
+     * 送签用的签署人描述（供 CP 转 e签宝 create-by-file.signers）。
+     * 企业章路线：内部成员参与方（partyType=ORG 且绑定成员）解析其所属企业的 e签宝机构号 →
+     * 发 {signerType:ORG, orgId}（企业盖章）；无机构号则退回个人签署（account=手机号/邮箱）。
+     */
+    public List<Map<String, Object>> signersForProvider(Long taskId) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (SignPartyEntity p : partyRepository.findByTaskIdOrderByIdAsc(taskId)) {
+            boolean signing = Boolean.TRUE.equals(p.getCanSign()) || "SIGNER".equals(p.getPartyRole());
+            if (!signing) continue;
+            String orgId = "ORG".equals(p.getPartyType()) && p.getMemberUserId() != null
+                    ? resolveEsignOrgId(p.getMemberUserId()) : null;
+            Map<String, Object> m = new LinkedHashMap<>();
+            if (orgId != null) {
+                m.put("signerType", "ORG");
+                m.put("orgId", orgId);
+            } else {
+                m.put("signerType", "PERSON");
+                m.put("account", p.getExternalPhone());
+                m.put("phone", p.getExternalPhone());
+                m.put("email", p.getExternalEmail());
+            }
+            m.put("signOrder", p.getSignOrder() == null ? 1 : p.getSignOrder());
+            out.add(m);
+        }
+        return out;
+    }
+
+    /** 用户 → 其所属企业 → e签宝机构号；任一缺失返回 null（退回个人签署）。 */
+    private String resolveEsignOrgId(Long memberUserId) {
+        return userRepository.findById(memberUserId)
+                .map(UserEntity::getCompanyId)
+                .flatMap(companyRepository::findById)
+                .map(CompanyEntity::getEsignOrgId)
+                .filter(s -> s != null && !s.isBlank())
+                .orElse(null);
     }
 
     public List<SignInviteEntity> myInvites(Long userId) {

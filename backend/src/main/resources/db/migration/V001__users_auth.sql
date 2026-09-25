@@ -1,4 +1,10 @@
 -- ============================================================
+-- V001__users_auth.sql (本档合并原 V001 + V112)
+-- 功能组【用户与鉴权】版本号区间：V001-V009
+-- 内容：用户/管理员/租户基础表 + admins 索引补齐(原 V112)
+-- ============================================================
+
+-- ============================================================
 -- V001__users_auth.sql
 -- 功能组【账号与安全】版本号区间：V001–V009
 -- 表：users / admins / user_refresh_tokens / security_audit_logs
@@ -114,3 +120,21 @@ CREATE TABLE IF NOT EXISTS `security_audit_logs` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='安全审计日志表';
 
 SET FOREIGN_KEY_CHECKS = 1;
+
+-- ===== 合并自 V112__admin_indexes =====
+
+-- Add missing indexes on admins table
+-- MySQL 8.0 does not support CREATE INDEX IF NOT EXISTS (MariaDB syntax),
+-- so use information_schema + prepared statement for idempotency.
+
+SET @idx_exists = (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'admins' AND index_name = 'idx_admins_username');
+SET @sql = IF(@idx_exists = 0, 'CREATE UNIQUE INDEX `idx_admins_username` ON `admins` (`username`)', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @idx_exists = (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'admins' AND index_name = 'idx_admins_email');
+SET @sql = IF(@idx_exists = 0, 'CREATE INDEX `idx_admins_email` ON `admins` (`email`)', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;

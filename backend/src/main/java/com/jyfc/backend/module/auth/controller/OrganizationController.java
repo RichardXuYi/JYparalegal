@@ -10,6 +10,7 @@ import com.jyfc.backend.module.auth.service.CompanyService;
 import com.jyfc.backend.module.auth.service.DepartmentService;
 import com.jyfc.backend.module.auth.service.PositionService;
 import com.jyfc.backend.module.auth.service.UserService;
+import com.jyfc.backend.module.tenant.service.TenantProvisioningService;
 import com.jyfc.backend.shared.dto.ApiResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,18 +42,21 @@ public class OrganizationController {
     private final PositionService positionService;
     private final UserService userService;
     private final UserContextUtil userContextUtil;
+    private final TenantProvisioningService tenantProvisioningService;
 
     public OrganizationController(
             CompanyService companyService,
             DepartmentService departmentService,
             PositionService positionService,
             UserService userService,
-            UserContextUtil userContextUtil) {
+            UserContextUtil userContextUtil,
+            TenantProvisioningService tenantProvisioningService) {
         this.companyService = companyService;
         this.departmentService = departmentService;
         this.positionService = positionService;
         this.userService = userService;
         this.userContextUtil = userContextUtil;
+        this.tenantProvisioningService = tenantProvisioningService;
     }
 
     // ==================== 权限辅助 ====================
@@ -511,6 +515,9 @@ public class OrganizationController {
             user.setPositionId(positionId);
             if (employeeNo != null) {
             }
+
+            // 运行时租户供给：成员挂到该企业的 ENTERPRISE 租户（幂等）
+            tenantProvisioningService.bindUserToCompany(user, companyId);
 
             UserEntity updated = userService.updateUser(user);
             return ResponseEntity.ok(ApiResponse.success("用户已分配到企业", updated));

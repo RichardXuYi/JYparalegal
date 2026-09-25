@@ -116,7 +116,6 @@ export type SettingsSnapshot = Partial<{
   sidebarCollapsed: boolean;
   sidebarWidth: number;
   devModeUnlocked: boolean;
-  setupComplete: boolean;
 }>;
 export type SettingsKey = keyof SettingsSnapshot & string;
 export type SettingsValue = SettingsSnapshot[SettingsKey];
@@ -140,6 +139,22 @@ export type AuthStateSnapshot = {
   user: AuthUser | null;
 };
 export type AuthLoginResult = HostSuccess & { user?: AuthUser | null; deviceId?: number };
+
+export type AuthRegisterPayload = {
+  phone: string;
+  password: string;
+  userType: 'PERSONAL' | 'ENTERPRISE';
+  companyName?: string;
+  unifiedCreditCode?: string;
+  legalPerson?: string;
+  contactEmail?: string;
+};
+export type AuthRegisterResult = HostSuccess & {
+  id?: number;
+  username?: string;
+  userType?: string;
+  companyId?: number | null;
+};
 
 export type AuthDevice = {
   id: number;
@@ -1055,6 +1070,7 @@ export type HostApiContract = {
   };
   auth: {
     login: (payload: AuthLoginPayload) => AuthLoginResult;
+    register: (payload: AuthRegisterPayload) => AuthRegisterResult;
     logout: () => HostSuccess;
     me: () => AuthStateSnapshot;
     getState: () => AuthStateSnapshot;

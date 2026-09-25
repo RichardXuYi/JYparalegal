@@ -48,7 +48,42 @@ interface AgentListEntry extends Record<string, unknown> {
 
 interface AgentsConfig extends Record<string, unknown> {
   defaults?: AgentDefaultsConfig;
+  /** Legacy OpenClaw roster. 2026.9.6 migrates this to `entries` and then deletes it. */
   list?: AgentListEntry[];
+  /** Canonical OpenClaw 2026.9.6 roster, keyed by agent id. */
+  entries?: Record<string, Omit<AgentListEntry, 'id'>>;
+}
+
+function readAgentRoster(agentsConfig: AgentsConfig): AgentListEntry[] {
+  const keyed = agentsConfig.entries;
+  if (keyed && typeof keyed === 'object' && !Array.isArray(keyed)) {
+    return Object.entries(keyed).flatMap(([id, value]) => {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
+      const trimmed = id.trim();
+      if (!trimmed) return [];
+      return [{ ...(value as Omit<AgentListEntry, 'id'>), id: trimmed }];
+    });
+  }
+  if (!Array.isArray(agentsConfig.list)) return [];
+  return agentsConfig.list.filter((entry): entry is AgentListEntry => (
+    Boolean(entry) && typeof entry === 'object' && typeof entry.id === 'string' && entry.id.trim().length > 0
+  ));
+}
+
+function assignAgentRoster(
+  config: AgentConfigDocument,
+  agentsConfig: AgentsConfig,
+  entries: AgentListEntry[],
+): void {
+  const nextAgents: AgentsConfig = { ...agentsConfig };
+  delete nextAgents.list;
+  const keyed: Record<string, Omit<AgentListEntry, 'id'>> = {};
+  for (const entry of entries) {
+    const { id, ...rest } = entry;
+    keyed[id] = rest;
+  }
+  nextAgents.entries = keyed;
+  config.agents = nextAgents;
 }
 
 interface BindingMatch extends Record<string, unknown> {
@@ -196,11 +231,7 @@ function normalizeAgentsConfig(config: AgentConfigDocument): {
   const agentsConfig = (config.agents && typeof config.agents === 'object'
     ? { ...(config.agents as AgentsConfig) }
     : {}) as AgentsConfig;
-  const rawEntries = Array.isArray(agentsConfig.list)
-    ? agentsConfig.list.filter((entry): entry is AgentListEntry => (
-      Boolean(entry) && typeof entry === 'object' && typeof entry.id === 'string' && entry.id.trim().length > 0
-    ))
-    : [];
+  const rawEntries = readAgentRoster(agentsConfig);
 
   if (rawEntries.length === 0) {
     const main = createImplicitMainEntry(config);
@@ -620,10 +651,7 @@ export async function createAgent(
     }
     nextEntries.push(newAgent);
 
-    config.agents = {
-      ...agentsConfig,
-      list: nextEntries,
-    };
+    assignAgentRoster(config, agentsConfig, nextEntries);
 
     await provisionAgentFilesystem(config, newAgent, { inheritWorkspace: options?.inheritWorkspace });
     await writeOpenClawConfig(config);
@@ -647,10 +675,7 @@ export async function updateAgentName(agentId: string, name: string): Promise<Ag
       name: normalizedName,
     };
 
-    config.agents = {
-      ...agentsConfig,
-      list: entries,
-    };
+    assignAgentRoster(config, agentsConfig, entries);
 
     await writeOpenClawConfig(config);
     logger.info('Updated agent name', { agentId, name: normalizedName });
@@ -685,10 +710,7 @@ export async function updateAgentModel(agentId: string, modelRef: string | null)
     }
 
     entries[index] = nextEntry;
-    config.agents = {
-      ...agentsConfig,
-      list: entries,
-    };
+    assignAgentRoster(config, agentsConfig, entries);
 
     await writeOpenClawConfig(config);
     logger.info('Updated agent model', { agentId, modelRef: normalizedModelRef || null });
@@ -711,20 +733,17 @@ export async function deleteAgentConfig(agentId: string): Promise<{ snapshot: Ag
       throw new Error(`Agent "${agentId}" not found`);
     }
 
-    config.agents = {
-      ...agentsConfig,
-      list: nextEntries,
-    };
-    config.bindings = Array.isArray(config.bindings)
-      ? config.bindings.filter((binding) => !(isChannelBinding(binding) && binding.agentId === agentId))
-      : undefined;
-
     if (defaultAgentId === agentId && nextEntries.length > 0) {
       nextEntries[0] = {
         ...nextEntries[0],
         default: true,
       };
     }
+
+    assignAgentRoster(config, agentsConfig, nextEntries);
+    config.bindings = Array.isArray(config.bindings)
+      ? config.bindings.filter((binding) => !(isChannelBinding(binding) && binding.agentId === agentId))
+      : undefined;
 
     const normalizedAgentId = normalizeAgentIdForBinding(agentId);
     const legacyAccountId = resolveAccountIdForAgent(agentId);
