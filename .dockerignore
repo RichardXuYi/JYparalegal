@@ -1,0 +1,38 @@
+# Docker build context exclusions (build runs from the repo root).
+# Prevents secrets, host dependencies and large/local-only artifacts from being
+# baked into images (see audit C2/H9: studio-web/.env with JWT_SECRET was being
+# COPYied into the runtime image because there was no .dockerignore).
+
+# VCS / editor / tooling
+.git
+.gitignore
+.ai-memory
+.idea
+.vscode
+
+# Secrets & local env — never ship into an image
+**/.env
+**/.env.*
+!**/.env.example
+
+# Host-installed dependencies & build outputs (images install/build their own)
+**/node_modules
+**/dist
+**/dist-electron
+**/target
+**/*.tsbuildinfo
+
+# Logs
+**/*.log
+**/logs
+
+# Local-only data / dumps / vendor material (large, sensitive, not needed at runtime)
+backend/*.sql
+backend/db_migration_backup_*/
+backend/data
+e签宝sdk/
+ui-demo/
+案例图/
+法大大截图/
+docs/
+TEST-REPORT.md

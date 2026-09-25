@@ -82,6 +82,20 @@ public class OrganizationController {
     }
 
     /**
+     * 高敏组织操作（分配/改部门/删成员）的更严格校验：仅管理员或企业 owner 放行，
+     * 普通成员不放行。{@link #hasCompanyAccess} 会把"任意同公司成员"也判为有权，
+     * 用于只读访问尚可，但用于"把任意 userId 划进本企业租户"会造成跨租户绑架。
+     */
+    private boolean isCompanyOwnerOrAdmin(Long currentUserId, Long companyId) {
+        if (currentUserId == null || companyId == null) return false;
+        if (userContextUtil.isAdmin()) return true;
+        for (CompanyEntity c : companyService.findByUserId(currentUserId)) {
+            if (c.getId() != null && c.getId().equals(companyId)) return true;
+        }
+        return false;
+    }
+
+    /**
      * 拒绝时统一返回 403。泛型为 Object 以便在多种返回类型中复用。
      */
     @SuppressWarnings("unchecked")
@@ -490,8 +504,8 @@ public class OrganizationController {
                 return ResponseEntity.badRequest().body(ApiResponse.error(400, "companyId is required"));
             }
             Long companyId = Long.parseLong(companyIdObj.toString());
-            // 只有该企业的 owner / 成员 才能分配用户；管理员也可执行
-            if (!hasCompanyAccess(currentUserId, companyId)) {
+            // 只有该企业的 owner（或平台管理员）才能分配用户；普通成员不放行。
+            if (!isCompanyOwnerOrAdmin(currentUserId, companyId)) {
                 return forbidden("无权在该企业下分配用户");
             }
             log.info("分配用户到企业: userId={}, companyId={}, departmentId={}, positionId={}",
@@ -508,6 +522,17 @@ public class OrganizationController {
             String employeeNo = (String) body.get("employeeNo");
 
             UserEntity user = userService.findById(userId).orElseThrow(() -> new IllegalArgumentException("用户不存在"));
+
+            // 拒绝跨租户"绑架"：目标用户若已属于其它非空租户，禁止划入本企业租户。
+            Long companyTenantId = companyService.findById(companyId).map(CompanyEntity::getTenantId).orElse(null);
+            Long userTenantId = user.getTenantId();
+            boolean userBound = userTenantId != null && userTenantId != 0L;
+            boolean sameTenant = companyTenantId != null && companyTenantId.equals(userTenantId);
+            if (userBound && !sameTenant) {
+                log.warn("拒绝跨租户分配用户: targetUserId={}, userTenantId={}, companyId={}, companyTenantId={}",
+                        userId, userTenantId, companyId, companyTenantId);
+                return forbidden("目标用户已属于其它租户，禁止跨租户划入");
+            }
 
             user.setUserType("ENTERPRISE");
             user.setCompanyId(companyId);

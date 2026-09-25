@@ -1006,10 +1006,16 @@ function registerProviderHandlers(gatewayManager: GatewayManager): void {
     return await providerService.hasLegacyProviderApiKey(providerId);
   });
 
-  // Get the actual API key (for internal use only - be careful!)
+  // Get a masked view of the API key for display in the renderer. Only the last
+  // 4 characters are shown; the host API path (providers.getApiKey) handles
+  // legitimate internal key access. Mirrors the desktop implementation so the
+  // legacy channel never hands the full plaintext key to the web renderer (H5).
   ipcMain.handle('provider:getApiKey', async (_, providerId: string) => {
     logLegacyProviderChannel('provider:getApiKey');
-    return await providerService.getLegacyProviderApiKey(providerId);
+    const key = await providerService.getLegacyProviderApiKey(providerId);
+    if (!key) return null;
+    if (key.length <= 4) return '****';
+    return `${'*'.repeat(key.length - 4)}${key.slice(-4)}`;
   });
 
   // Set default provider and update OpenClaw default model
@@ -1405,12 +1411,14 @@ async function resolveSandboxedPath(
     throw new Error('readOnlyRoot');
   }
 
-  // Read-only preview should work for any real local path surfaced by the
-  // desktop app/runtime. `realpath()` above canonicalizes Windows casing,
-  // Unicode path segments and symlinks; individual handlers still enforce
-  // file-vs-directory checks, size caps, hidden directory skips and binary
-  // detection where appropriate.
-  return { realPath: real, readOnly: true };
+  // Reads are confined to the same per-scope roots as writes. This host runs
+  // multi-tenant: each fleet worker gets its own DATA_DIR / OPENCLAW_STATE_DIR,
+  // so returning arbitrary real paths here would let one account read every
+  // other account's data dir, the server .env, /etc/passwd, etc. `realpath()`
+  // above canonicalizes casing, Unicode segments and symlinks so the containment
+  // check cannot be escaped; handlers still enforce file-vs-dir, size caps and
+  // binary detection.
+  throw new Error('outsideSandbox');
 }
 
 function looksLikeBinary(buf: Buffer): boolean {

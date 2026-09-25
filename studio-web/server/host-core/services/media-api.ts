@@ -17,6 +17,7 @@ import {
   type ImageGenerationModelConfig,
 } from '../utils/openclaw-image-generation';
 import { isRecord } from './payload-utils';
+import { resolveHostReadablePath } from './files-api';
 
 // Image format MIME type mapping (browser-supported formats)
 const IMAGE_MIME_MAP: Record<string, string> = {
@@ -191,9 +192,10 @@ export function createMediaApi(): CompleteHostServiceRegistry['media'] {
         const mimeType = typeof entry.mimeType === 'string' ? entry.mimeType : 'application/octet-stream';
         if (typeof entry.filePath === 'string' && entry.filePath) {
           try {
-            const stat = await fsP.stat(entry.filePath);
+            const source = await resolveHostReadablePath(entry.filePath);
+            const stat = await fsP.stat(source);
             const preview = mimeType.startsWith('image/')
-              ? await generateImagePreview(entry.filePath, mimeType)
+              ? await generateImagePreview(source, mimeType)
               : null;
             results[entry.filePath] = { preview, fileSize: stat.size };
           } catch {
@@ -265,8 +267,9 @@ export function createMediaApi(): CompleteHostServiceRegistry['media'] {
       const fsP = await import('node:fs/promises');
       if (typeof body.filePath === 'string' && body.filePath) {
         try {
-          await fsP.access(body.filePath);
-          await fsP.copyFile(body.filePath, result.filePath);
+          const source = await resolveHostReadablePath(body.filePath);
+          await fsP.access(source);
+          await fsP.copyFile(source, result.filePath);
         } catch {
           return { success: false, error: 'Source file not found' };
         }

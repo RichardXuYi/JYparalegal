@@ -47,6 +47,19 @@ export const AUTH_DISABLED = process.env.DISABLE_AUTH === '1';
  */
 export const FLEET_DISABLED = process.env.FLEET_DISABLED === '1';
 
+/**
+ * Extra origins (comma-separated) allowed to open the /ws WebSocket, in addition
+ * to same-origin. Browsers always send Origin on a WS handshake and auto-attach
+ * cookies, so without an Origin check a malicious site could ride a logged-in
+ * user's session (CSWSH). When Origin is present it must match the request host
+ * or this allowlist; in non-production, localhost origins are also accepted so
+ * the Vite dev server works without extra config.
+ */
+export const WS_ALLOWED_ORIGINS = (process.env.WS_ALLOWED_ORIGINS ?? '')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+
 mkdirSync(DATA_DIR, { recursive: true });
 mkdirSync(join(DATA_DIR, 'logs'), { recursive: true });
 

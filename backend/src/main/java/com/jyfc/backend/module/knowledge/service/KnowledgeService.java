@@ -1,5 +1,6 @@
 package com.jyfc.backend.module.knowledge.service;
 
+import com.jyfc.backend.core.tenant.JyTenantContext;
 import com.jyfc.backend.module.knowledge.dto.KnowledgeSearchResponse;
 import com.jyfc.backend.module.knowledge.dto.KnowledgeSearchResult;
 import com.jyfc.backend.module.knowledge.entity.KnowledgeCategory;
@@ -96,10 +97,11 @@ public class KnowledgeService {
         int safePage = Math.max(0, page);
         int safeSize = Math.min(Math.max(1, size), 100);
 
-        // 使用数据库分页
+        // 使用数据库分页（租户作用域：平台行 tenant_id IS NULL ∪ 本租户私有行，
+        // 绝不含他租户行；tenantId 为 null 时只回平台行）。
         String likeKeyword = escapeLikeWildcards(safeKeyword);
         Page<KnowledgeEntry> matchedPage = repository.searchByKeywordPaged(likeKeyword,
-                PageRequest.of(safePage, safeSize));
+                JyTenantContext.get(), PageRequest.of(safePage, safeSize));
 
         List<KnowledgeEntry> entries = matchedPage.getContent();
 

@@ -33,14 +33,20 @@ public class SignQuotaService {
         this.taskEventRepository = taskEventRepository;
     }
 
-    /** 配额行（缺失时按默认 upsert：PRO / 11000）。 */
+    /**
+     * 配额行（缺失时按默认 upsert：FREE / 0）。
+     *
+     * <p>安全口径：读路径的兜底必须是**最保守**的 FREE/0，绝不能在读路径上把租户
+     * 升级成付费套餐。此前默认写 PRO/11000，导致任何缺配额行的租户被 EntitlementInterceptor
+     * 当作已付费放行（购买门禁 fail-open）。套餐升级只能由显式的购买/供给路径写入。
+     */
     @Transactional
     public TenantQuotaEntity quotaOf(Long tenantId) {
         return quotaRepository.findByTenantId(tenantId).orElseGet(() -> {
             TenantQuotaEntity n = new TenantQuotaEntity();
             n.setTenantId(tenantId);
-            n.setPlan("PRO");
-            n.setSignQuota(11000);
+            n.setPlan("FREE");
+            n.setSignQuota(0);
             n.setAiQuotaTokens(0L);
             n.setAiUsedTokens(0L);
             return quotaRepository.save(n);

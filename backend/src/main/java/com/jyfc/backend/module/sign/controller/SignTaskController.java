@@ -45,6 +45,11 @@ public class SignTaskController {
     private final SignDocRepository signDocRepository;
     private final SignDocService signDocService;
 
+    /** 送签并发防护：按 taskId 分段的锁条带，单实例内串行化 chargeForSigning。 */
+    private static final int CHARGE_LOCK_STRIPES = 64;
+    private final Object[] chargeLockStripes = java.util.stream.IntStream
+            .range(0, CHARGE_LOCK_STRIPES).mapToObj(i -> new Object()).toArray();
+
     public SignTaskController(SignTaskRepository taskRepository,
                               SignFlowService flow, SignDraftService draft, UserContextUtil userContextUtil,
                               CpProperties cpProperties, CpSigningClient cpSigningClient,
@@ -162,26 +167,34 @@ public class SignTaskController {
 
     /** 进入可签署态之前扣配额并记下 e签宝流程号。同一任务只建一次流程。 */
     private void chargeForSigning(SignTaskEntity task, HttpServletRequest request) {
-        if (task.getProviderFlowId() != null && !task.getProviderFlowId().isBlank()) {
-            return;
-        }
-        if (cpProperties.isEnabled()) {
-            java.util.Map<String, Object> doc = signDocService.primaryDocForUpload(task.getId());
-            String fileName = doc == null ? null : String.valueOf(doc.get("fileName"));
-            String fileBase64 = doc == null ? null : String.valueOf(doc.get("contentBase64"));
-            java.util.List<java.util.Map<String, Object>> signers = flow.signersForProvider(task.getId());
-            java.util.Map<String, Object> issued = cpSigningClient.execute(task.getTaskNo(), task.getTitle(),
-                    primaryDocSha256(task.getId()), fileName, fileBase64, signers, bearerToken(request));
-            Object flowId = issued.get("providerTaskId");
-            if (flowId != null) {
-                task.setProvider(String.valueOf(issued.getOrDefault("provider", "esign-saas-v3")));
-                task.setProviderFlowId(String.valueOf(flowId));
-                Object mode = issued.get("esignMode");
-                if (mode != null) task.setProviderMode(String.valueOf(mode));
-                taskRepository.save(task);
+        Long taskId = task.getId();
+        // 单实例内按 taskId 分段加锁，串行化并发 SUBMIT：进入临界区后以库中最新状态复检
+        // providerFlowId，避免两个请求都读到 null 后各自创建一条 e签宝流程（双扣费）。
+        // 跨实例由 provider_flow_id 唯一索引（V150）兜底。
+        Object lock = chargeLockStripes[Math.floorMod(Long.hashCode(taskId), CHARGE_LOCK_STRIPES)];
+        synchronized (lock) {
+            SignTaskEntity current = taskRepository.findById(taskId).orElse(task);
+            if (current.getProviderFlowId() != null && !current.getProviderFlowId().isBlank()) {
+                return;
             }
-        } else if (cpProperties.isLocalQuota()) {
-            signQuotaService.assertCanSign(JyTenantContext.get());
+            if (cpProperties.isEnabled()) {
+                java.util.Map<String, Object> doc = signDocService.primaryDocForUpload(current.getId());
+                String fileName = doc == null ? null : String.valueOf(doc.get("fileName"));
+                String fileBase64 = doc == null ? null : String.valueOf(doc.get("contentBase64"));
+                java.util.List<java.util.Map<String, Object>> signers = flow.signersForProvider(current.getId());
+                java.util.Map<String, Object> issued = cpSigningClient.execute(current.getTaskNo(), current.getTitle(),
+                        primaryDocSha256(current.getId()), fileName, fileBase64, signers, bearerToken(request));
+                Object flowId = issued.get("providerTaskId");
+                if (flowId != null) {
+                    current.setProvider(String.valueOf(issued.getOrDefault("provider", "esign-saas-v3")));
+                    current.setProviderFlowId(String.valueOf(flowId));
+                    Object mode = issued.get("esignMode");
+                    if (mode != null) current.setProviderMode(String.valueOf(mode));
+                    taskRepository.save(current);
+                }
+            } else if (cpProperties.isLocalQuota()) {
+                signQuotaService.assertCanSign(JyTenantContext.get());
+            }
         }
     }
 

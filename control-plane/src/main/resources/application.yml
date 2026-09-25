@@ -17,18 +17,21 @@ cp:
   # DP 服务账号（CP 自己的认证，与 e签宝无关）
   auth:
     service-username: ${CP_SERVICE_USERNAME:cp-service}
-    service-password: ${CP_SERVICE_PASSWORD:cp-secret}
+    # 不再内置弱默认口令；必须由环境变量注入（见 CpSecretGuard 启动校验）。
+    service-password: ${CP_SERVICE_PASSWORD:}
 
   # JWT 签发配置
   jwt:
-    secret: ${CP_JWT_SECRET:cp-dev-jwt-secret-must-be-at-least-32-chars!!}
-    issuer: https://cp.jyparalegal.local
+    # 不再内置已知默认密钥：否则任何读到仓库的人都能伪造服务账号 passport，
+    # 绕过 /cp/v1/signing/** 的鉴权。必须由环境变量注入 >=32 字节随机密钥。
+    secret: ${CP_JWT_SECRET:}
+    issuer: ${CP_JWT_ISSUER:https://cp.jyparalegal.local}
     expires-in: 900
 
   # DP 回调转发配置
   dp:
     base-url: ${DP_BASE_URL:http://localhost:8181}
-    callback-token: ${CP_ESIGN_CALLBACK_TOKEN:dev-callback-token}
+    callback-token: ${CP_ESIGN_CALLBACK_TOKEN:}
 
 logging:
   level:

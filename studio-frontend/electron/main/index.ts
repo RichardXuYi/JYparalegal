@@ -63,8 +63,15 @@ const requestedRemoteDebuggingPort = process.env.CLAWX_REMOTE_DEBUGGING_PORT?.tr
 // code=1, leaving the UI stuck on "connecting". Isolate the dev Gateway state
 // dir so it seeds a fresh, version-compatible one. Respects an explicit
 // OPENCLAW_STATE_DIR and never applies to packaged builds.
+//
+// 2026-09-25: bumped to a 9.6-era dir name. The previous `openclaw-dev` dir holds
+// old-format legacy workspace state (workspace/, state/, workspace-attestations/);
+// openclaw 9.6's legacy workspace-state migration fsyncs it and gets EPERM on
+// Windows, so the gateway exits code=78 and the UI reconnects forever. A fresh dir
+// skips that migration and reaches ready in ~10s. The old dir is left on disk
+// untouched (unused).
 if (!app.isPackaged && !process.env.OPENCLAW_STATE_DIR?.trim()) {
-  process.env.OPENCLAW_STATE_DIR = join(app.getPath('home'), '.grandpoem-studio', 'openclaw-dev');
+  process.env.OPENCLAW_STATE_DIR = join(app.getPath('home'), '.grandpoem-studio', 'openclaw-dev-96');
 }
 
 if (requestedRemoteDebuggingPort) {
@@ -658,20 +665,22 @@ if (gotTheLock) {
       }
     });
 
-    // Restrict navigation to trusted origins only
+    // Restrict navigation to trusted origins only. The main window carries the
+    // preload bridge (full host capabilities), so it must never navigate to an
+    // arbitrary external origin — a clicked link switching this window to an
+    // attacker site would hand that site the host API. External http/https links
+    // are opened in the system browser by setWindowOpenHandler above instead.
     contents.on('will-navigate', (event, url) => {
       try {
         const parsed = new URL(url);
-        // Allow navigation to:
-        // - file:// (local app resources)
-        // - http://localhost / 127.0.0.1 (Gateway, Vite dev server)
-        // - https:// (external trusted sites)
-        const isFile = parsed.protocol === 'file:';
         const isLocalhost = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
-        const isHttp = parsed.protocol === 'http:' && isLocalhost;
-        const isHttps = parsed.protocol === 'https:';
-        
-        if (!isFile && !isHttp && !isHttps) {
+        // Allow only:
+        // - file:// inside the packaged app directory (local app resources)
+        // - http://localhost / 127.0.0.1 (Vite dev server, Gateway)
+        const isAppFile = parsed.protocol === 'file:' && parsed.pathname.startsWith(app.getAppPath());
+        const isLocalHttp = parsed.protocol === 'http:' && isLocalhost;
+
+        if (!isAppFile && !isLocalHttp) {
           logger.warn(`Blocked navigation to disallowed URL: ${url}`);
           event.preventDefault();
         }

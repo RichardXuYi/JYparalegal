@@ -169,8 +169,9 @@ public class AuthController {
         UserEntity user = userOpt.get();
         if (!userService.validatePassword(password, user.getPassword())) {
             handleLoginFailure(identifier, ip, ua, fingerprint);
-            int failureCount = securityCheckService.getLoginFailureCount(identifier);
-            return ResponseEntity.badRequest().body(ApiResponse.error(400, "用户名或密码错误，剩余尝试次数: " + Math.max(0, SecurityConstants.MAX_LOGIN_ATTEMPTS - failureCount)));
+            // 与"用户不存在"分支返回完全一致的文案，避免通过响应差异枚举有效账号。
+            // 剩余尝试次数仅记入服务端日志/审计，不回传给客户端。
+            return ResponseEntity.badRequest().body(ApiResponse.error(400, "用户名或密码错误"));
         }
 
         // Login Success

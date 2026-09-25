@@ -24,7 +24,7 @@ import fastifyStatic from '@fastify/static';
 import fastifyWebsocket from '@fastify/websocket';
 import type { WebSocket } from 'ws';
 import jwt from 'jsonwebtoken';
-import { AUTH_DISABLED, FLEET_DISABLED, JWT_SECRET, PORT, PROJECT_ROOT } from './env';
+import { AUTH_DISABLED, FLEET_DISABLED, JWT_SECRET, PORT, PROJECT_ROOT, WS_ALLOWED_ORIGINS } from './env';
 import { registerAuthRoutes, verifySession } from './auth';
 import { registerPlatformProxy } from './platform-proxy';
 import { invokeLegacyChannel } from './legacy-router';
@@ -79,8 +79,30 @@ function send(socket: WebSocket, message: unknown): void {
  * verified session so events only fan back to that account's sockets.
  */
 function registerWebSocket(app: FastifyInstance, backend: WsBackend): void {
+  const isProd = process.env.NODE_ENV === 'production';
+  // CSWSH guard: browsers send Origin on every WS handshake and auto-attach the
+  // session cookie, so an attacker page could otherwise ride a logged-in session.
+  // Allow same-origin, the explicit allowlist, and (dev only) localhost.
+  const isAllowedWsOrigin = (origin: string, hostHeader?: string): boolean => {
+    let parsed: URL;
+    try {
+      parsed = new URL(origin);
+    } catch {
+      return false;
+    }
+    if (hostHeader && parsed.host === hostHeader) return true;
+    if (WS_ALLOWED_ORIGINS.includes(origin) || WS_ALLOWED_ORIGINS.includes(parsed.origin)) return true;
+    if (!isProd && (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1')) return true;
+    return false;
+  };
+
   app.register(async (scope: FastifyInstance) => {
     scope.get('/ws', { websocket: true }, (socket: WebSocket, request: FastifyRequest) => {
+      const origin = request.headers.origin;
+      if (typeof origin === 'string' && origin && !isAllowedWsOrigin(origin, request.headers.host)) {
+        socket.close(4403, 'Forbidden origin');
+        return;
+      }
       // Support token from URL query param (iframe) or Authorization header
       const url = new URL(request.url, `http://${request.headers.host}`);
       const wsToken = url.searchParams.get('token');

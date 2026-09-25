@@ -405,10 +405,24 @@ async function resolveSandboxedPath(
   if (writeRoots.some((root) => isPathInside(real, root))) {
     return { realPath: real, readOnly: false };
   }
+  // Reads are confined to the same per-scope roots as writes. On the
+  // multi-tenant web host every worker runs with its own DATA_DIR /
+  // OPENCLAW_STATE_DIR, so allowing arbitrary real paths here would let one
+  // account read every other account's data dir, the server .env, etc.
   if (mode === 'write') {
     throw new Error('readOnlyRoot');
   }
-  return { realPath: real, readOnly: true };
+  throw new Error('outsideSandbox');
+}
+
+/**
+ * Resolve a client-supplied path for reading, confined to this account's host
+ * roots. Throws `outsideSandbox` when the path escapes. Shared by the file and
+ * media services so every read-side entry point enforces the same boundary.
+ */
+export async function resolveHostReadablePath(input: string): Promise<string> {
+  const { realPath } = await resolveSandboxedPath(input, 'read');
+  return realPath;
 }
 
 function looksLikeBinary(buf: Buffer): boolean {
@@ -452,22 +466,26 @@ export function createFilesApi(): CompleteHostServiceRegistry['files'] {
       for (const filePath of filePaths) {
         const id = crypto.randomUUID();
         const fileName = basename(filePath);
-        const sourceStat = await fsP.stat(filePath);
+        // Confine to this account's roots before touching the filesystem;
+        // otherwise stagePaths becomes an arbitrary-read primitive (copy any
+        // server file into outbound, then read it back).
+        const { realPath: source } = await resolveSandboxedPath(filePath, 'read');
+        const sourceStat = await fsP.stat(source);
         if (sourceStat.isDirectory()) {
           results.push({
             id,
             fileName,
             mimeType: DIRECTORY_MIME_TYPE,
             fileSize: 0,
-            stagedPath: filePath,
+            stagedPath: source,
             preview: null,
           });
           continue;
         }
 
-        const ext = extname(filePath);
+        const ext = extname(source);
         const stagedPath = join(getOutboundDir(), `${id}${ext}`);
-        await fsP.copyFile(filePath, stagedPath);
+        await fsP.copyFile(source, stagedPath);
         const s = await fsP.stat(stagedPath);
         const mimeType = getMimeType(ext);
         const preview = mimeType.startsWith('image/')

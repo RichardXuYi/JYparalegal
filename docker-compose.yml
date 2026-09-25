@@ -44,6 +44,11 @@ services:
     ports:
       - "8181:8181"
     environment:
+      # 本 compose 面向本地开发：默认 dev profile（跳过生产强校验），可用
+      # SPRING_PROFILES_ACTIVE=prod 覆盖。生产部署必须注入 prod + 真实密钥 + TLS，
+      # 并单独编排 control-plane 服务（此处未含 CP，故默认 CP_MODE=local）。
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      CP_MODE: ${CP_MODE:-local}
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/jy_financial?useSSL=false&allowPublicKeyRetrieval=true
       SPRING_DATASOURCE_USERNAME: jy_app
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-app_password}
@@ -65,7 +70,9 @@ services:
       PORT: 8788
       DATA_DIR: /data
       BACKEND_URL: http://backend:8181
-      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      # 强制显式注入（>=32 字符随机值）。移除原 change-me-in-production 弱兜底：
+      # 它既短于 web env.ts 要求的 32 字符（会启动失败），又是仓库内已知值（可伪造 JWT）。
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set to a random value of at least 32 chars}
     volumes:
       - studio_web_data:/data
     depends_on:

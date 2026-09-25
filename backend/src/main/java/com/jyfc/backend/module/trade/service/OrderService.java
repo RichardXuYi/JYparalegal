@@ -165,19 +165,21 @@ public class OrderService {
         String skuSpecs = null;
 
         if (skuId != null) {
-            Optional<Sku> skuOpt = skuRepository.findById(skuId);
-            if (skuOpt.isPresent()) {
-                Sku sku = skuOpt.get();
-                // F1-2: 原子扣减库存（条件 WHERE stock >= qty 防止超卖）
-                int updated = skuRepository.deductStockAtomic(skuId, quantity);
-                if (updated == 0) {
-                    throw new RuntimeException("SKU库存不足: " + sku.getSpecs() + ", 需要: " + quantity);
-                }
-                unitPrice = sku.getPrice();
-                skuSpecs = sku.getSpecs();
-            } else {
-                unitPrice = product.getPrice();
+            // H12/H5：skuId 显式提供时必须存在且属于本商品。此前"SKU 不存在→静默回退
+            // 商品价且不扣库存"可被用来无限超卖，"不校验 sku.productId"可用廉价 SKU
+            // 配高价商品名绕过定价。
+            Sku sku = skuRepository.findById(skuId)
+                    .orElseThrow(() -> new RuntimeException("SKU不存在: " + skuId));
+            if (!productId.equals(sku.getProductId())) {
+                throw new RuntimeException("SKU与商品不匹配: skuId=" + skuId + ", productId=" + productId);
             }
+            // F1-2: 原子扣减库存（条件 WHERE stock >= qty 防止超卖）
+            int updated = skuRepository.deductStockAtomic(skuId, quantity);
+            if (updated == 0) {
+                throw new RuntimeException("SKU库存不足: " + sku.getSpecs() + ", 需要: " + quantity);
+            }
+            unitPrice = sku.getPrice();
+            skuSpecs = sku.getSpecs();
         } else {
             unitPrice = product.getPrice();
         }

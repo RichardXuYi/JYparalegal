@@ -61,6 +61,22 @@ public class ProductionConfigValidator implements ApplicationRunner {
         validateJwtSecret(environment.getProperty("jwt.secret"));
 
         validateDbTls(dbUrl);
+
+        validatePaymentProvider(environment.getProperty("payment.provider"));
+    }
+
+    /**
+     * 生产环境禁止使用模拟支付通道。默认 {@code payment.provider=simulated} 时，
+     * 任意已登录用户可对自己的待支付流水调用 {@code /api/app/pay/simulate/confirm}
+     * 免费把订单标记为已付（购买门禁因此失效）。真实网关未接入前应显式失败，
+     * 而不是静默放开免费购买。
+     */
+    private void validatePaymentProvider(String provider) {
+        if (provider == null || provider.trim().isEmpty() || "simulated".equalsIgnoreCase(provider.trim())) {
+            throw new IllegalStateException(
+                    "Production must not use the simulated payment provider. "
+                    + "Set PAYMENT_PROVIDER to a real gateway (wechat/alipay) before going live.");
+        }
     }
 
     /**

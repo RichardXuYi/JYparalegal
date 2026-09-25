@@ -26,6 +26,7 @@ public interface KnowledgeEntryRepository extends JpaRepository<KnowledgeEntry, 
         SELECT k.*
         FROM knowledge_entries k
         WHERE k.is_active = 1
+          AND (k.tenant_id IS NULL OR k.tenant_id = :tenantId)
           AND (
                 LOWER(k.title)   LIKE LOWER(CONCAT('%', :keyword, '%'))
              OR LOWER(CAST(k.content AS CHAR)) LIKE LOWER(CONCAT('%', :keyword, '%'))
@@ -37,6 +38,7 @@ public interface KnowledgeEntryRepository extends JpaRepository<KnowledgeEntry, 
         SELECT count(*)
         FROM knowledge_entries k
         WHERE k.is_active = 1
+          AND (k.tenant_id IS NULL OR k.tenant_id = :tenantId)
           AND (
                 LOWER(k.title)   LIKE LOWER(CONCAT('%', :keyword, '%'))
              OR LOWER(CAST(k.content AS CHAR)) LIKE LOWER(CONCAT('%', :keyword, '%'))
@@ -44,7 +46,9 @@ public interface KnowledgeEntryRepository extends JpaRepository<KnowledgeEntry, 
           )
         """,
         nativeQuery = true)
-    Page<KnowledgeEntry> searchByKeywordPaged(@Param("keyword") String keyword, Pageable pageable);
+    Page<KnowledgeEntry> searchByKeywordPaged(@Param("keyword") String keyword,
+                                              @Param("tenantId") Long tenantId,
+                                              Pageable pageable);
 
     @Query(value = """
         SELECT

@@ -8,7 +8,7 @@
 # Run standalone (or via the root docker-compose.yml `studio-web` service):
 #   docker run -p 8788:8788 \
 #     -e BACKEND_URL=http://host.docker.internal:8181 \
-#     -e JWT_SECRET=change-me \
+#     -e JWT_SECRET=<random-value-at-least-32-chars> \
 #     -v studio_web_data:/data jy-studio-web
 
 # ===========================================================================
