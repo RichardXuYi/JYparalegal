@@ -1,47 +1,46 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
 # Build outputs
-target/
-build/
-*.jar
-*.war
-*.class
 dist/
 dist-electron/
+target/
+*.jar
+*.jar.original
+*.war
+*.class
 
-# Runtime data (uploaded sign documents, DB dumps)
-backend/data/
-*.sql.gz
-jy_financial_predrop_*.sql
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.iml
 
-# Secrets
+# OS
+.DS_Store
+Thumbs.db
+Thumbs_store
+desktop.ini
+
+# Environment
 .env
 .env.local
 .env.*.local
-*.pem
-*.key
-credentials.json
 
 # Logs
-*.log
 logs/
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# IDE / OS
-.idea/
-.vscode/
-*.iml
-*.swp
-*.swo
-*~
-.DS_Store
-Thumbs_store
-desktop.ini
-
-# Dependencies
-node_modules/
-.pnpm-store/
+# Testing
+coverage/
+.nyc_output/
 
 # Misc
 *.tsbuildinfo
@@ -65,10 +64,7 @@ e签宝sdk/
 # 草稿/备份/个人笔记，不入库
 .ai-memory/
 backend/db_migration_backup_*/
+backend/jy_financial_predrop_*.sql
 
 # Build tools (downloaded during packaging)
 resources/bin/
-
-# Testing
-coverage/
-.nyc_output/

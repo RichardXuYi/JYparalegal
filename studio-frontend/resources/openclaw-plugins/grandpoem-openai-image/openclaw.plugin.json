@@ -1,0 +1,28 @@
+﻿{
+  "id": "grandpoem-studio-openai-image",
+  "name": "GrandPoem Studio OpenAI Image",
+  "description": "Independent OpenAI-compatible image generation provider managed by GrandPoem Studio.",
+  "version": "1.0.0",
+  "entry": "index.mjs",
+  "enabledByDefault": false,
+  "contracts": {
+    "imageGenerationProviders": [
+      "grandpoem-studio-openai-image"
+    ]
+  },
+  "imageGenerationProviderMetadata": {
+    "grandpoem-studio-openai-image": {
+      "capabilities": [
+        "image"
+      ],
+      "defaultModels": {
+        "image": "gpt-image-2"
+      }
+    }
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}

@@ -1,0 +1,132 @@
+{
+  "sidebar": {
+    "chat": "Discussion",
+    "newChat": "Nouvelle discussion",
+    "cronTasks": "Tâches planifiées",
+    "capabilities": "Capacités",
+    "skills": "Compétences",
+    "agents": "Agents",
+    "channels": "Canaux",
+    "dashboard": "Tableau de bord",
+    "settings": "Paramètres",
+    "devConsole": "Console développeur",
+    "models": "Modèles",
+    "deleteSessionConfirm": "Supprimer « {{label}} » ?",
+    "openClawPage": "Page OpenClaw",
+    "openClawDreams": "Rêves",
+    "renameSession": "Renommer",
+    "deleteSession": "Supprimer",
+    "renameSessionPlaceholder": "Titre de la session",
+    "saveSessionRename": "Enregistrer le titre",
+    "cancelSessionRename": "Annuler le renommage",
+    "imageGeneration": "Génération d'images"
+  },
+  "actions": {
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "delete": "Supprimer",
+    "edit": "Modifier",
+    "refresh": "Actualiser",
+    "close": "Fermer",
+    "copy": "Copier",
+    "search": "Rechercher",
+    "confirm": "Confirmer",
+    "dismiss": "Ignorer",
+    "load": "Charger",
+    "install": "Installer",
+    "uninstall": "Désinstaller",
+    "enable": "Activer",
+    "disable": "Désactiver",
+    "back": "Retour",
+    "next": "Suivant",
+    "skip": "Passer",
+    "restart": "Redémarrer",
+    "show": "Afficher",
+    "hide": "Masquer",
+    "clear": "Effacer"
+  },
+  "status": {
+    "running": "En cours",
+    "stopped": "Arrêté",
+    "error": "Erreur",
+    "connected": "Connecté",
+    "disconnected": "Déconnecté",
+    "enabled": "Activé",
+    "disabled": "Désactivé",
+    "active": "Actif",
+    "paused": "En pause",
+    "configured": "Configuré",
+    "loading": "Chargement...",
+    "saving": "Enregistrement..."
+  },
+  "gateway": {
+    "connected": "Connecté",
+    "disconnected": "Non connecté",
+    "starting": "Démarrage de la passerelle…",
+    "reconnecting": "Reconnexion…",
+    "failed": "Échec de la passerelle",
+    "banner": {
+      "reconnecting": "Reconnexion… tentative {{attempt}}/{{max}}, prochaine dans {{seconds}} s",
+      "reconnectingSimple": "Reconnexion… tentative {{attempt}}/{{max}}",
+      "degraded": "La passerelle n’est pas pleinement opérationnelle.",
+      "retry": "Réessayer",
+      "details": "Détails"
+    },
+    "popover": {
+      "title": "État de la passerelle",
+      "state": "État",
+      "port": "Port",
+      "uptime": "Disponibilité",
+      "ready": "Prête",
+      "valueUnknown": "—",
+      "valueSeconds": "{{seconds}} s",
+      "valueMinutes": "{{minutes}} min",
+      "valueHours": "{{hours}} h",
+      "valueNo": "Non"
+    },
+    "failure": {
+      "title": "Échec du démarrage de la passerelle",
+      "tier": "Niveau de préparation : {{tier}}",
+      "stderrTail": "Journaux récents de la passerelle",
+      "rawError": "Erreur brute",
+      "stateMigration": "La migration du répertoire d’état a échoué (code {{exitCode}}). La passerelle n’a pas pu démarrer sur un répertoire d’état hérité.",
+      "invalidConfig": "La configuration de la passerelle est invalide et la réparation automatique a échoué.",
+      "portOccupied": "Le port de la passerelle est toujours occupé ({{streak}} tentatives consécutives).",
+      "spawnFailed": "Le processus de la passerelle s’est terminé prématurément (code {{exitCode}}).",
+      "startupTimeout": "Le processus est vivant mais n’a jamais été prêt à temps.",
+      "maxReconnects": "Tentatives de reconnexion épuisées ({{attempts}} essais). Une relance manuelle est nécessaire.",
+      "unknown": "La passerelle s’est arrêtée avec une erreur non classifiée.",
+      "retry": "Réessayer",
+      "viewLogs": "Voir les journaux",
+      "copyReport": "Copier le rapport de démarrage",
+      "reportCopied": "Rapport de démarrage copié",
+      "reportFailed": "Rapport de démarrage indisponible",
+      "runDoctor": "Lancer Doctor (réparer)",
+      "doctorRunning": "Réparation Doctor en cours…",
+      "doctorDone": "Réparation Doctor terminée",
+      "doctorFailed": "Échec de la réparation Doctor",
+      "close": "Fermer",
+      "tierNames": {
+        "spawn": "lancement du processus",
+        "port": "occupation du port",
+        "handshake": "poignée de main",
+        "rpc": "préparation RPC",
+        "config": "validation de configuration"
+      }
+    }
+  },
+  "connection": {
+    "switchingModelTitle": "Changement de modèle…",
+    "switchingModelDesc": "Passage à {{model}}. Veuillez patienter."
+  },
+  "init": {
+    "tagline": "Banque de travail contractuelle IA pour les juristes chinois",
+    "configuring": "Configuration de l’environnement…",
+    "firstLoadHint": "Le premier chargement peut prendre un instant"
+  },
+  "topbar": {
+    "guest": "Non connecté",
+    "workspace": "Espace de travail",
+    "employeeView": "Vue employé"
+  }
+}

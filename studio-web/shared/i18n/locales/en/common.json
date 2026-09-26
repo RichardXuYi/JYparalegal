@@ -1,0 +1,133 @@
+{
+  "sidebar": {
+    "chat": "Chat",
+    "newChat": "New Chat",
+    "cronTasks": "Cron Tasks",
+    "capabilities": "Capabilities",
+    "skills": "Skills",
+    "agents": "Agents",
+    "channels": "Channels",
+    "dashboard": "Dashboard",
+    "settings": "Settings",
+    "devConsole": "Developer Console",
+    "models": "Models",
+    "deleteSessionConfirm": "Delete \"{{label}}\"?",
+    "openClawPage": "OpenClaw Page",
+    "openClawDreams": "Dreams",
+    "renameSession": "Rename",
+    "deleteSession": "Delete",
+    "renameSessionPlaceholder": "Session title",
+    "saveSessionRename": "Save session title",
+    "cancelSessionRename": "Cancel renaming",
+    "imageGeneration": "Image Generation",
+    "openSessions": "Open sessions"
+  },
+  "actions": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "refresh": "Refresh",
+    "close": "Close",
+    "copy": "Copy",
+    "search": "Search",
+    "confirm": "Confirm",
+    "dismiss": "Dismiss",
+    "load": "Load",
+    "install": "Install",
+    "uninstall": "Uninstall",
+    "enable": "Enable",
+    "disable": "Disable",
+    "back": "Back",
+    "next": "Next",
+    "skip": "Skip",
+    "restart": "Restart",
+    "show": "Show",
+    "hide": "Hide",
+    "clear": "Clear"
+  },
+  "status": {
+    "running": "Running",
+    "stopped": "Stopped",
+    "error": "Error",
+    "connected": "Connected",
+    "disconnected": "Disconnected",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "active": "Active",
+    "paused": "Paused",
+    "configured": "Configured",
+    "loading": "Loading...",
+    "saving": "Saving..."
+  },
+  "gateway": {
+    "connected": "Connected",
+    "disconnected": "Not connected",
+    "starting": "Starting gateway…",
+    "reconnecting": "Reconnecting…",
+    "failed": "Gateway failed",
+    "banner": {
+      "reconnecting": "Reconnecting… attempt {{attempt}}/{{max}}, next try in {{seconds}}s",
+      "reconnectingSimple": "Reconnecting… attempt {{attempt}}/{{max}}",
+      "degraded": "The gateway is not fully operational.",
+      "retry": "Retry",
+      "details": "Details"
+    },
+    "popover": {
+      "title": "Gateway status",
+      "state": "State",
+      "port": "Port",
+      "uptime": "Uptime",
+      "ready": "Ready",
+      "valueUnknown": "—",
+      "valueSeconds": "{{seconds}}s",
+      "valueMinutes": "{{minutes}} min",
+      "valueHours": "{{hours}} h",
+      "valueNo": "No"
+    },
+    "failure": {
+      "title": "Gateway failed to start",
+      "tier": "Readiness tier: {{tier}}",
+      "stderrTail": "Recent gateway logs",
+      "rawError": "Raw error",
+      "stateMigration": "State-directory migration failed (exit {{exitCode}}). The gateway could not start over a legacy state directory.",
+      "invalidConfig": "The gateway configuration is invalid and the automatic repair did not succeed.",
+      "portOccupied": "The gateway port is still occupied ({{streak}} consecutive attempts).",
+      "spawnFailed": "The gateway process exited early (exit {{exitCode}}).",
+      "startupTimeout": "The gateway process stayed alive but never became ready in time.",
+      "maxReconnects": "Reconnect attempts exhausted ({{attempts}} tries). The gateway needs a manual retry.",
+      "unknown": "The gateway stopped with an unclassified error.",
+      "retry": "Retry",
+      "viewLogs": "View logs",
+      "copyReport": "Copy startup report",
+      "reportCopied": "Startup report copied to clipboard",
+      "reportFailed": "Startup report unavailable",
+      "runDoctor": "Run Doctor (repair)",
+      "doctorRunning": "Doctor repair running…",
+      "doctorDone": "Doctor repair finished",
+      "doctorFailed": "Doctor repair failed",
+      "close": "Close",
+      "tierNames": {
+        "spawn": "process spawn",
+        "port": "port takeover",
+        "handshake": "connection handshake",
+        "rpc": "RPC readiness",
+        "config": "config validation"
+      }
+    }
+  },
+  "connection": {
+    "switchingModelTitle": "Switching model…",
+    "switchingModelDesc": "Switching to {{model}}. Please wait."
+  },
+  "init": {
+    "tagline": "AI contract workbench for legal professionals in China",
+    "configuring": "Configuring environment…",
+    "firstLoadHint": "First load may take a moment"
+  },
+  "topbar": {
+    "guest": "Not signed in",
+    "workspace": "Workspace",
+    "employeeView": "Employee view"
+  }
+}

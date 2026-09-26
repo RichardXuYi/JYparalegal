@@ -1,0 +1,723 @@
+@import "tailwindcss";
+
+/*
+ * IMPORTANT: use `@theme inline` so Tailwind emits utilities that reference
+ * the raw CSS variable (preserving the `hsl(...)` wrapper declared on
+ * :root / .dark). With a plain `@theme`, Tailwind treats the value as
+ * channels and writes `.bg-card { background-color: var(--color-card) }`,
+ * which is invalid because `var(--color-card)` resolves to bare HSL
+ * channels like `0 0% 100%` (no `hsl()`), making every themed surface
+ * transparent. `@theme inline` keeps the wrapper intact.
+ *
+ * Surface tokens map to existing semantic tokens in dark mode so we don't
+ * maintain a second dark palette.
+ */
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-surface-modal: hsl(var(--surface-modal));
+  --color-surface-input: hsl(var(--surface-input));
+  --color-surface-sidebar: hsl(var(--surface-sidebar));
+  --color-usage-input: hsl(var(--usage-input));
+  --color-usage-output: hsl(var(--usage-output));
+  --color-usage-cache: hsl(var(--usage-cache));
+  --radius: 0.75rem;
+
+  /* Named font-size scale. These were referenced throughout the app
+   * (text-meta / text-2xs / text-tiny / text-stat / text-subtitle) but never
+   * defined, so Tailwind emitted no rule and the font-size silently fell back
+   * to inheritance. Defining them here makes all 219 usages take effect. */
+  --text-2xs: 0.625rem;       /* 10px - machine strings (hash, id) only */
+  --text-tiny: 0.6875rem;     /* 11px */
+  --text-meta: 0.8125rem;     /* 13px */
+  --text-subtitle: 0.9375rem; /* 15px */
+  --text-stat: 1.875rem;      /* 30px */
+}
+
+/* Tailwind v4: make `dark:` variant respond to .dark class instead of prefers-color-scheme */
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * GrandpoemStudio design tokens - CSS variable layer
+ *
+ * This file is the CSS variable layer only. HSL channel triplets are
+ * stored without an hsl() wrapper - the `@theme inline` block above
+ * re-assembles them through hsl(var(--xxx)).
+ *
+ * Two groups of variables:
+ *
+ *   1. shadcn semantic tokens (--background / --foreground / --primary
+ *      / ...). The standard shadcn/ui palette - do not rename or remove,
+ *      Radix-driven components read these directly.
+ *
+ *   2. Surface tokens (--surface-modal / --surface-input /
+ *      --surface-sidebar). In dark mode each one is redirected to an existing
+ *      shadcn token (--card / --muted / --background) so we don't have
+ *      to maintain a second dark palette.
+ *
+ * Usage:
+ *   - Application code should always go through Tailwind utilities, e.g.
+ *       bg-foreground   bg-surface-modal   bg-brand
+ *     Do NOT hand-write var(--xxx) or hsl(var(--xxx)) in components.
+ *   - Adding a new color: define the CSS variable here -> map it to a
+ *     utility token in tailwind.config.js -> use the utility in code.
+ */
+
+/*
+ * Component conventions - substitution table
+ *
+ * Idioms captured from the global normalisation pass. When writing or
+ * reviewing a component, prefer the replacement over the antipattern.
+ *
+ *   PANEL SURFACES
+ *   ----------------
+ *     bg-white dark:bg-card           -> bg-surface-modal
+ *     bg-white dark:bg-background     -> bg-surface-modal
+ *     hover:bg-white dark:hover:bg-card -> hover:bg-surface-modal
+ *     bg-muted   (when used as a panel) -> bg-surface-input
+ *     bg-[hsl(var(--xxx))] / arbitrary  -> bg-<named-token>
+ *
+ *     bg-surface-modal = raised panels, popovers, inputs, cards
+ *     bg-surface-input = recessed code/log <pre>, segmented track
+ *
+ *     Never write dark:bg-card / dark:bg-muted companion classes - the
+ *     surface tokens already redirect in dark mode.
+ *
+ *   SELECTED / ACTIVE STATE  (sidebar nav, theme & language picker,
+ *                             segmented controls, composer chips)
+ *   ----------------
+ *     selected   :  bg-black/5 dark:bg-white/10 text-foreground
+ *     hover      :  hover:bg-black/5 dark:hover:bg-white/5
+ *     idle text  :  text-muted-foreground (or text-foreground/80 / 70)
+ *
+ *     Reference: components/layout/Sidebar.tsx, pages/Settings/index.tsx
+ *     (theme + language picker).
+ *
+ *   MODAL / SCRIM BACKDROPS
+ *   ----------------
+ *     bg-black/30 dark:bg-black/60      (canonical: components/ui/sheet.tsx)
+ *
+ *     Image lightbox may use bg-black/80 when a darker scrim is intentional
+ *     (see pages/Chat/ChatMessage.tsx).
+ *
+ *   STATUS COLOURS  (success / warning / error)
+ *   ----------------
+ *     icon + inline text  :  text-{green|yellow|red}-700  dark:text-*-400
+ *     lighter accent text :  text-{...}-600                 dark:text-*-500
+ *                            (welcome feature checks, secondary captions)
+ *     panel surface       :  bg-{...}-500/10  border border-{...}-500/20
+ *     status dot          :  bg-{green|yellow|red}-500    (no dark variant)
+ *
+ *     Avoid text-X-400 alone - that shade is tuned for dark mode and
+ *     washes out against the light theme. Same for bg-red-900/20
+ *     panel backgrounds (a dark-only relic).
+ *
+ *   NEUTRAL GREYS  (escape hatches -> semantic tokens)
+ *   ----------------
+ *     bg-slate-600 / bg-gray-400        -> bg-muted-foreground/30
+ *                                          (inactive dots, dividers)
+ *     text-slate-300 / 400              -> text-muted-foreground
+ *     text-gray-400                     -> text-muted-foreground
+ *     border-slate-600                  -> border-border
+ *
+ *   TYPOGRAPHY
+ *   ----------------
+ *     page H1 / H2     :  font-bold tracking-tight
+ *                         - hero pages   text-4xl md:text-5xl  (Settings,
+ *                                                               Cron, Models)
+ *                         - wizard steps text-3xl / section H2 text-xl
+ *                                                              (Setup)
+ *     monospace        :  font-mono     (NOT font-monospace - dead class)
+ *     pixel text       :  text-[13px] -> text-meta
+ *                         text-[10px] -> text-2xs
+ *                         Full named scale (2xs / tiny / meta / subtitle /
+ *                         stat) defined in the `@theme inline` block above.
+ *
+ *   PRIMARY CTA
+ *   ----------------
+ *     Use the default <Button> styling (variant="default", which renders
+ *     bg-primary with gradient). Do not hand-apply bg-brand to action buttons -
+ *     bg-brand / bg-brand-hover are reserved for branded surfaces
+ *     where a divergent Apple-blue is explicitly desired (rare).
+ *     Reference: pages/Models "+ Add Provider" trigger.
+ */
+
+@layer base {
+  :root {
+    /* === shadcn semantic tokens (light) === */
+    /* Cold gray-white business style - matching GrandPoem studio-web-frontend */
+    --background: 210 40% 98%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 243 75% 59%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 250 95% 96%;
+    --secondary-foreground: 243 55% 48%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 14% 47%;
+    --accent: 227 100% 97%;
+    --accent-foreground: 243 55% 48%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 214 32% 91%;
+    --input: 210 40% 96%;
+    --ring: 243 75% 59%;
+    --radius: 0.75rem;
+
+    /* Surface tokens (light) */
+    --surface-modal: 0 0% 100%;
+    --surface-input: 210 40% 96%;
+    --surface-sidebar: 210 40% 98%;
+
+    /* Usage accents (light) */
+    --usage-input: 217 91% 60%;
+    --usage-output: 142 71% 45%;
+    --usage-cache: 48 96% 53%;
+  }
+
+  /* Dark mode - indigo-violet accent (consistent with light) */
+  .dark {
+    --background: 240 27% 5%;
+    --foreground: 248 100% 96%;
+    --card: 240 18% 9%;
+    --card-foreground: 248 100% 96%;
+    --popover: 240 18% 9%;
+    --popover-foreground: 248 100% 96%;
+    --primary: 243 75% 59%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 18% 13%;
+    --secondary-foreground: 250 17% 80%;
+    --muted: 240 18% 13%;
+    --muted-foreground: 246 8% 46%;
+    --accent: 240 18% 13%;
+    --accent-foreground: 248 100% 96%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 6% 16%;
+    --input: 240 6% 14%;
+    --ring: 243 75% 59%;
+
+    /* Surface tokens (dark) - redirect to existing shadcn tokens */
+    --surface-modal: 240 18% 9%;
+    --surface-input: 240 18% 13%;
+    --surface-sidebar: 240 27% 5%;
+
+    /* Usage accents (dark) - lifted shades for vivid bars */
+    --usage-input: 217 91% 65%;
+    --usage-output: 142 71% 52%;
+    --usage-cache: 48 96% 60%;
+  }
+}
+
+@layer base {
+  * {
+    border-color: hsl(var(--border));
+  }
+
+  /*
+   * Suppress the default Chromium yellow :focus-visible ring.
+   * Windows Chromium draws a yellow outline on every keyboard-focused control;
+   * we replace it with a design-system ring via the .focus-ring utility
+   * (and any explicit focus-visible:ring-* on buttons/links).
+   * Mouse clicks don't trigger :focus-visible, so accessibility is preserved.
+   */
+  :focus {
+    outline: none;
+  }
+
+  :focus-visible {
+    outline: none;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer components {
+  .sidebar-nav-text.sidebar-nav-text {
+    @apply text-sm font-normal leading-4;
+  }
+
+  .grandpoem-studio-dialog-overlay {
+    @apply fixed inset-0 z-50 bg-black/30 dark:bg-black/60;
+  }
+
+  .grandpoem-studio-dialog-content {
+    @apply fixed left-1/2 top-1/2 z-50 w-full outline-none;
+    transform: translate(-50%, -50%);
+    transform-origin: center;
+    will-change: opacity, transform;
+  }
+
+  .grandpoem-studio-dialog-overlay[data-state='open'] {
+    animation: grandpoem-studio-dialog-overlay-in 100ms ease-out both;
+  }
+
+  .grandpoem-studio-dialog-overlay[data-state='closed'] {
+    animation: grandpoem-studio-dialog-overlay-out 80ms ease-in both;
+  }
+
+  .grandpoem-studio-dialog-content[data-state='open'] {
+    animation: grandpoem-studio-dialog-content-in 100ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .grandpoem-studio-dialog-content[data-state='closed'] {
+    animation: grandpoem-studio-dialog-content-out 80ms ease-in both;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .grandpoem-studio-dialog-overlay[data-state],
+    .grandpoem-studio-dialog-content[data-state] {
+      animation: none;
+    }
+  }
+}
+
+@keyframes grandpoem-studio-dialog-overlay-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes grandpoem-studio-dialog-overlay-out {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes grandpoem-studio-dialog-content-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes grandpoem-studio-dialog-content-out {
+  from {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.99);
+  }
+}
+
+/* Custom scrollbar: keep scrollbars visually quiet until the user hovers a scroll area. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+*:hover {
+  scrollbar-color: hsl(var(--border)) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-transparent rounded-full;
+}
+
+*:hover::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--border));
+}
+
+*:hover::-webkit-scrollbar-thumb:hover {
+  @apply bg-muted-foreground/30;
+}
+
+/* Monaco's default light diff theme is pure white; keep it aligned with the app background. */
+:root:not(.dark) .grandpoem-studio-diff-editor .monaco-diff-editor,
+:root:not(.dark) .grandpoem-studio-diff-editor .monaco-editor,
+:root:not(.dark) .grandpoem-studio-diff-editor .monaco-editor-background,
+:root:not(.dark) .grandpoem-studio-diff-editor .monaco-editor .margin,
+:root:not(.dark) .grandpoem-studio-diff-editor .monaco-editor .gutter,
+:root:not(.dark) .grandpoem-studio-diff-editor .diffOverview {
+  background-color: hsl(var(--background)) !important;
+}
+
+/* macOS traffic light spacing */
+.drag-region {
+  -webkit-app-region: drag;
+}
+
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+
+/* Smooth transitions */
+.transition-theme {
+  @apply transition-colors duration-200;
+}
+
+/* Focus ring */
+.focus-ring {
+  @apply focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2;
+}
+
+/* Prose styling for markdown */
+.prose {
+  line-height: 1.6;
+}
+
+.prose p {
+  margin-bottom: 0.75em;
+}
+
+.prose p:last-child {
+  margin-bottom: 0;
+}
+
+.prose ul,
+.prose ol {
+  list-style: disc outside;
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+  padding-left: 1.5em;
+}
+
+.prose ol {
+  list-style: decimal;
+}
+
+.prose li::marker {
+  color: hsl(var(--foreground));
+}
+
+.prose li {
+  margin-bottom: 0.25em;
+}
+
+.prose h1 {
+  font-size: 1.875rem;
+  line-height: 1.25;
+  margin: 1rem 0 0.6rem;
+}
+
+.prose h2 {
+  font-size: 1.5rem;
+  line-height: 1.3;
+  margin: 0.9rem 0 0.5rem;
+}
+
+.prose h3 {
+  font-size: 1.25rem;
+  line-height: 1.35;
+  margin: 0.8rem 0 0.45rem;
+}
+
+.prose h4 {
+  font-size: 1.125rem;
+  line-height: 1.4;
+  margin: 0.7rem 0 0.4rem;
+}
+
+.prose h5,
+.prose h6 {
+  font-size: 1rem;
+  line-height: 1.45;
+  margin: 0.6rem 0 0.35rem;
+}
+
+.prose pre {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+.prose blockquote {
+  border-left: 3px solid hsl(var(--border));
+  padding-left: 1em;
+  margin: 0.5em 0;
+  color: hsl(var(--muted-foreground));
+}
+
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.5em 0;
+}
+
+.prose th,
+.prose td {
+  border: 1px solid hsl(var(--border));
+  padding: 0.5em;
+  text-align: left;
+}
+
+.prose th {
+  background: transparent;
+  font-weight: 700;
+}
+
+.dark .prose th {
+  background: hsl(var(--muted));
+}
+
+/* Typing indicator animation */
+@keyframes bounce {
+
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+  }
+
+  30% {
+    transform: translateY(-4px);
+  }
+}
+
+/* Settings category gradient colors */
+.gradient-models { background: linear-gradient(135deg, #3b82f6, #06b6d4); }
+.gradient-agents { background: linear-gradient(135deg, #a855f7, #ec4899); }
+.gradient-channels { background: linear-gradient(135deg, #22c55e, #10b981); }
+.gradient-skills { background: linear-gradient(135deg, #f97316, #ef4444); }
+.gradient-cron { background: linear-gradient(135deg, #6366f1, #a855f7); }
+.gradient-general { background: linear-gradient(135deg, #64748b, #9ca3af); }
+.gradient-gateway { background: linear-gradient(135deg, #14b8a6, #06b6d4); }
+.gradient-developer { background: linear-gradient(135deg, #f43f5e, #ec4899); }
+.gradient-updates { background: linear-gradient(135deg, #f59e0b, #f97316); }
+.gradient-about { background: linear-gradient(135deg, #8b5cf6, #a855f7); }
+
+/* Clean solid card surface (visible border + soft shadow) */
+.glass-card {
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 10px 30px -14px rgba(15, 23, 42, 0.14);
+}
+
+/*
+ * ===== Connected app shell (layout-v2 / WorkBuddy-Qoder architecture) =====
+ * The whole window is one saturated aurora surface: a base gradient plus two
+ * drifting soft-blob layers (::before / ::after) so the colour reads as
+ * clouds/waves instead of a hard linear ramp (Instagram / Fluent style).
+ * The topbar and the left sidebar sit DIRECTLY on that surface as
+ * frosted-glass regions (white / glassy text); only the stage is a white
+ * rounded card. Because topbar + sidebar share the same continuous surface
+ * there are NO white seam lines between panels.
+ */
+.shell-gradient {
+  position: relative;
+  isolation: isolate;
+  background: linear-gradient(160deg, #4f46e5 0%, #6d28d9 52%, #7e22ce 100%);
+}
+
+.shell-gradient::before,
+.shell-gradient::after {
+  content: '';
+  position: absolute;
+  inset: -20%;
+  z-index: -1;
+  pointer-events: none;
+  contain: paint;
+  backface-visibility: hidden;
+  will-change: transform;
+}
+
+.shell-gradient::before {
+  background:
+    radial-gradient(30% 36% at 80% 14%, rgba(232, 121, 249, 0.95) 0%, rgba(232, 121, 249, 0) 100%),
+    radial-gradient(44% 48% at 70% 82%, rgba(244, 114, 182, 0.85) 0%, rgba(244, 114, 182, 0) 100%);
+  animation: shell-drift-a 18s ease-in-out infinite alternate;
+}
+
+.shell-gradient::after {
+  background:
+    radial-gradient(36% 42% at 28% 82%, rgba(96, 165, 250, 0.95) 0%, rgba(96, 165, 250, 0) 100%),
+    radial-gradient(26% 32% at 90% 56%, rgba(196, 181, 253, 1) 0%, rgba(196, 181, 253, 0) 100%),
+    radial-gradient(22% 28% at 52% 40%, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0) 100%);
+  animation: shell-drift-b 24s ease-in-out infinite alternate;
+}
+
+/* Pure transform animation — layers are rasterised once and then only
+ * composited, so the drift costs no per-frame paint. */
+@keyframes shell-drift-a {
+  0% { transform: translate3d(-22%, -18%, 0) scale(1) rotate(-6deg); }
+  50% { transform: translate3d(12%, 16%, 0) scale(1.14) rotate(4deg); }
+  100% { transform: translate3d(24%, -14%, 0) scale(1.05) rotate(9deg); }
+}
+
+@keyframes shell-drift-b {
+  0% { transform: translate3d(25%, 18%, 0) scale(1.12) rotate(7deg); }
+  50% { transform: translate3d(-14%, 10%, 0) scale(0.94) rotate(-9deg); }
+  100% { transform: translate3d(-24%, -20%, 0) scale(1.16) rotate(8deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell-gradient::before,
+  .shell-gradient::after {
+    animation: none;
+  }
+}
+
+/* Settings toggle (Appearance): freeze the aurora drift but keep the gradient. */
+.shell-anim-off .shell-gradient::before,
+.shell-anim-off .shell-gradient::after {
+  animation: none;
+}
+
+.dark .shell-gradient {
+  background: linear-gradient(160deg, #b91c1c 0%, #ea580c 36%, #f59e0b 76%, #fbbf24 100%);
+}
+
+.dark .shell-gradient::before {
+  background:
+    radial-gradient(30% 36% at 78% 16%, rgba(251, 191, 36, 0.85) 0%, rgba(251, 191, 36, 0) 100%),
+    radial-gradient(44% 48% at 70% 80%, rgba(239, 68, 68, 0.8) 0%, rgba(239, 68, 68, 0) 100%);
+}
+
+.dark .shell-gradient::after {
+  background:
+    radial-gradient(36% 42% at 26% 80%, rgba(249, 115, 22, 0.85) 0%, rgba(249, 115, 22, 0) 100%),
+    radial-gradient(26% 32% at 88% 56%, rgba(245, 158, 11, 0.8) 0%, rgba(245, 158, 11, 0) 100%),
+    radial-gradient(22% 28% at 50% 38%, rgba(254, 240, 138, 0.3) 0%, rgba(254, 240, 138, 0) 100%);
+}
+
+/*
+ * Static aurora variant for small floating panels (settings nav). Same palette
+ * as .shell-gradient, but painted entirely as background-image layers with no
+ * pseudo-elements: a -inset pseudo-element inside a scroll container becomes
+ * part of that container's scrollable overflow and forces a scrollbar, and
+ * animating a backdrop inside a modal is wasted work anyway.
+ */
+.shell-panel-gradient {
+  background-color: #5b4fe0;
+  background-image:
+    radial-gradient(120% 85% at 12% 10%, rgba(129, 140, 248, 0.8) 0%, rgba(129, 140, 248, 0) 62%),
+    radial-gradient(95% 70% at 95% 20%, rgba(217, 70, 239, 0.62) 0%, rgba(217, 70, 239, 0) 58%),
+    radial-gradient(105% 80% at 72% 102%, rgba(236, 72, 153, 0.5) 0%, rgba(236, 72, 153, 0) 60%),
+    linear-gradient(160deg, #4f46e5 0%, #6d28d9 52%, #7e22ce 100%);
+}
+
+.dark .shell-panel-gradient {
+  background-color: #b91c1c;
+  background-image:
+    radial-gradient(120% 85% at 12% 10%, rgba(239, 68, 68, 0.72) 0%, rgba(239, 68, 68, 0) 62%),
+    radial-gradient(95% 70% at 95% 20%, rgba(251, 191, 36, 0.55) 0%, rgba(251, 191, 36, 0) 58%),
+    radial-gradient(105% 80% at 72% 102%, rgba(249, 115, 22, 0.55) 0%, rgba(249, 115, 22, 0) 60%),
+    linear-gradient(160deg, #b91c1c 0%, #ea580c 36%, #f59e0b 76%, #fbbf24 100%);
+}
+
+/* Glassy control surfaces for controls that sit on the gradient.
+ * Backdrop blur is deliberately shallow: the backdrop is animating, so this
+ * re-filters every frame — keeping the radius small keeps that cheap. */
+.shell-glass {
+  background: rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(11px) saturate(150%);
+  -webkit-backdrop-filter: blur(11px) saturate(150%);
+}
+
+.shell-glass:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.shell-glass-strong {
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(13px) saturate(165%);
+  -webkit-backdrop-filter: blur(13px) saturate(165%);
+}
+
+/* White CTA button on the gradient (sidebar primary action). */
+.shell-cta {
+  background: #fff;
+  color: #4f46e5;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.16);
+}
+
+.shell-cta:hover {
+  background: #f2f1ff;
+}
+
+.dark .shell-cta {
+  background: #fff;
+  color: #c2410c;
+}
+
+/* Bottom glass info card in the sidebar (quota / user). */
+.shell-card {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(12px) saturate(150%);
+  -webkit-backdrop-filter: blur(12px) saturate(150%);
+}
+
+/* Shadow for the white stage card floating on the gradient. */
+.shadow-shell {
+  box-shadow: 0 10px 40px -12px rgba(30, 27, 75, 0.45);
+}
+
+.dark .glass-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 30px -14px rgba(0, 0, 0, 0.55);
+}
+
+/* Gradient text */
+.gradient-text {
+  background: linear-gradient(135deg, hsl(var(--foreground)), hsl(var(--foreground) / 0.7));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Hover animations */
+@keyframes slideInFromBottom {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-in {
+  animation: slideInFromBottom 0.3s ease-out;
+}

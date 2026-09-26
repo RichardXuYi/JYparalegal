@@ -1,0 +1,404 @@
+{
+    "title": "消息频道",
+    "subtitle": "管理消息频道、账户、账户与 Agent 绑定关系，以及每个频道的默认账户。",
+    "refresh": "刷新",
+    "addChannel": "添加频道",
+    "stats": {
+        "total": "频道总数",
+        "connected": "已连接",
+        "disconnected": "已断开"
+    },
+    "gatewayWarning": "网关服务未运行。频道无法连接。",
+    "availableChannels": "可用频道",
+    "supportedChannels": "支持的频道",
+    "available": "可用频道",
+    "availableDesc": "连接新频道",
+    "configured": "已配置频道",
+    "configuredDesc": "管理已配置的频道",
+    "configuredBadge": "已配置",
+    "deleteConfirm": "确定要删除此频道吗？",
+    "showAll": "显示全部",
+    "pluginBadge": "插件",
+    "toast": {
+        "whatsappConnected": "WhatsApp 连接成功",
+        "whatsappFailed": "WhatsApp 连接失败: {{error}}",
+        "qrConnected": "{{name}} 连接成功",
+        "qrFailed": "{{name}} 连接失败: {{error}}",
+        "channelSaved": "频道 {{name}} 已保存",
+        "channelConnecting": "正在连接到 {{name}}...",
+        "savedButRefreshFailed": "配置已保存，但刷新页面数据失败。请手动刷新。",
+        "restartManual": "请手动重启网关",
+        "configFailed": "配置失败: {{error}}",
+        "bindingUpdated": "账户绑定已更新",
+        "defaultUpdated": "默认账户已更新",
+        "accountDeleted": "账户已删除",
+        "channelDeleted": "频道已删除"
+    },
+    "account": {
+        "add": "添加账户",
+        "edit": "编辑",
+        "delete": "删除账户",
+        "deleteChannel": "删除频道",
+        "deleteConfirm": "确定要删除此账户吗？",
+        "default": "当前默认",
+        "setDefault": "设为频道默认",
+        "bindAgentLabel": "绑定 Agent",
+        "unassigned": "未分配",
+        "mainAccount": "主账户",
+        "customIdLabel": "账户 ID",
+        "customIdPlaceholder": "例如 feishu-sales-bot",
+        "customIdHint": "使用小写账户 ID（字母、数字、连字符、下划线）来区分同一频道下的多个账户。",
+        "invalidId": "账户 ID 不能为空",
+        "invalidCanonicalId": "账户 ID 必须使用小写字母、数字、连字符或下划线，以字母或数字开头，最多 64 个字符。",
+        "idLabel": "ID: {{id}}",
+        "boundTo": "绑定到: {{agent}}",
+        "handledBy": "由 {{agent}} 处理",
+        "bindingStatusLabel": "绑定: {{status}}",
+        "connectionStatusLabel": "连接: {{status}}",
+        "bindingStatus": {
+            "bound": "已绑定",
+            "unbound": "未绑定"
+        },
+        "connectionStatus": {
+            "connected": "已连接",
+            "connecting": "连接中",
+            "degraded": "降级",
+            "disconnected": "已断开",
+            "error": "错误"
+        },
+        "accountIdPrompt": "为此频道输入新的账户 ID",
+        "accountIdExists": "账户 ID {{accountId}} 已存在"
+    },
+    "dialog": {
+        "updateTitle": "更新 {{name}}",
+        "configureTitle": "配置 {{name}}",
+        "addTitle": "添加频道",
+        "existingDesc": "更新您的现有配置",
+        "selectDesc": "选择要配置的频道类型",
+        "qrCode": "二维码",
+        "token": "令牌",
+        "scanQR": "使用 {{name}} 扫描此二维码",
+        "refreshCode": "刷新验证码",
+        "loadingConfig": "正在加载配置...",
+        "existingHint": "您已有此频道的现有配置",
+        "howToConnect": "如何连接",
+        "viewDocs": "查看文档",
+        "channelName": "频道名称",
+        "channelNamePlaceholder": "我的 {{name}}",
+        "enableChannel": "启用频道",
+        "enableChannelDesc": "关闭时，配置会保存但频道保持禁用状态",
+        "credentialsVerified": "凭据已验证",
+        "validationFailed": "验证失败",
+        "warnings": "警告",
+        "back": "返回",
+        "validating": "验证中...",
+        "validateConfig": "验证配置",
+        "generatingQR": "生成二维码中...",
+        "validatingAndSaving": "验证并保存中...",
+        "generateQRCode": "生成二维码",
+        "updateAndReconnect": "更新并重新连接",
+        "saveAndConnect": "保存并连接",
+        "envVar": "环境变量: {{var}}"
+    },
+    "health": {
+        "state": {
+            "degraded": "网关降级",
+            "unresponsive": "网关无响应"
+        },
+        "reasons": {
+            "gateway_degraded": "网关心跳最近降级。",
+            "gateway_unresponsive": "网关控制平面似乎无响应。",
+            "channels_status_timeout": "频道运行时状态探测超时。",
+            "rpc_timeout": "最近的网关 RPC 调用超时。",
+            "gateway_not_running": "网关未运行。",
+            "gateway_error": "网关处于错误状态。",
+            "runtime_error": "频道运行时报告了错误。"
+        },
+        "restartGateway": "重启网关",
+        "copyDiagnostics": "复制诊断信息",
+        "viewDiagnostics": "查看诊断信息",
+        "hideDiagnostics": "隐藏诊断信息",
+        "diagnosticsTitle": "网关诊断快照",
+        "diagnosticsCopied": "诊断信息已复制到剪贴板",
+        "diagnosticsCopyFailed": "收集诊断信息失败: {{error}}",
+        "restartTriggered": "已请求重启网关",
+        "restartFailed": "重启网关失败: {{error}}"
+    },
+    "meta": {
+        "telegram": {
+            "description": "使用 @BotFather 的机器人令牌连接 Telegram",
+            "docsUrl": "https://icnnp7d0dymg.feishu.cn/wiki/TjiGwxsMWi7hpDkDAQBc0ydMnEf#MEkKdqXP1orZU2x4SrFcdUHgnl1",
+            "fields": {
+                "botToken": {
+                    "label": "机器人令牌",
+                    "placeholder": "123456:ABC-DEF..."
+                },
+                "allowedUsers": {
+                    "label": "允许的用户 ID",
+                    "placeholder": "例如 123456789, 987654321",
+                    "description": "允许使用机器人的用户 ID 列表（逗号分隔）。出于安全考虑必须填写。"
+                }
+            },
+            "instructions": [
+                "打开 Telegram 并搜索 @BotFather",
+                "发送 /newbot 并按照说明操作",
+                "复制提供的机器人令牌",
+                "将令牌粘贴到下方",
+                "从 @userinfobot 获取您的用户 ID 并粘贴到下方"
+            ]
+        },
+        "discord": {
+            "description": "使用开发者门户的机器人令牌连接 Discord",
+            "docsUrl": "https://icnnp7d0dymg.feishu.cn/wiki/BkOywJYCAiYRN9k4KTTceKPMnxg#QS6LdxnA2oNtfcxtFc8cgabnnNd",
+            "fields": {
+                "token": {
+                    "label": "机器人令牌",
+                    "placeholder": "您的 Discord 机器人令牌"
+                },
+                "guildId": {
+                    "label": "服务器 ID",
+                    "placeholder": "例如 123456789012345678",
+                    "description": "将机器人限制在特定服务器。右键服务器 → 复制服务器 ID。"
+                },
+                "channelId": {
+                    "label": "频道 ID（可选）",
+                    "placeholder": "例如 123456789012345678",
+                    "description": "将机器人限制在特定频道。右键频道 → 复制频道 ID。"
+                }
+            },
+            "instructions": [
+                "前往 Discord 开发者门户 → 应用 → 新建应用",
+                "在机器人部分：添加机器人，然后复制机器人令牌",
+                "在机器人 → 特权网关意图中启用消息内容意图 + 服务器成员意图",
+                "在 OAuth2 → URL 生成器中：选择 \"bot\" + \"applications.commands\"，添加消息权限",
+                "使用生成的 URL 将机器人邀请到您的服务器",
+                "将机器人令牌粘贴到下方"
+            ]
+        },
+        "whatsapp": {
+            "description": "通过扫描二维码连接 WhatsApp（无需电话号码）",
+            "docsUrl": "https://icnnp7d0dymg.feishu.cn/wiki/ES7fwUfH8iGl8FkHYfFcyWB3n4d#doxcnUElomBZLi0NnKLUzn6zLbd",
+            "instructions": [
+                "在手机上打开 WhatsApp",
+                "前往设置 > 已关联设备 > 关联设备",
+                "扫描下方显示的二维码",
+                "系统将自动识别您的电话号码"
+            ]
+        },
+        "wechat": {
+            "description": "通过扫描二维码使用腾讯官方 OpenClaw 插件连接个人微信",
+            "docsUrl": "https://icnnp7d0dymg.feishu.cn/wiki/GHYZwuPCriF0gWkXwkFcJ9zon3b",
+            "instructions": [
+                "点击生成二维码以在 OpenClaw 内安装并启用官方微信插件",
+                "使用微信扫描下方二维码并在手机上确认连接",
+                "关联成功后，微信中将自动出现一个新的微信 ClawBot 聊天",
+                "您之后可以重复二维码流程来添加另一个微信账户或重新连接现有账户"
+            ]
+        },
+        "dingtalk": {
+            "description": "通过 OpenClaw 频道插件（Stream 模式）连接钉钉",
+            "docsUrl": "https://icnnp7d0dymg.feishu.cn/wiki/Y5eNwiSiZidkLskrwtJc1rUln0b#doxcnDgA78n43DbkiQjI1OqUA7b",
+            "fields": {
+                "clientId": {
+                    "label": "Client ID (AppKey)",
+                    "placeholder": "dingxxxxxx"
+                },
+                "clientSecret": {
+                    "label": "Client Secret (AppSecret)",
+                    "placeholder": "您的应用密钥"
+                }
+            },
+            "instructions": [
+                "在 OpenClaw 中安装并启用钉钉插件",
+                "创建一个钉钉内部应用并启用 Stream 模式",
+                "填写 Client ID (AppKey) 和 Client Secret (AppSecret)"
+            ]
+        },
+        "signal": {
+            "description": "使用 signal-cli 连接 Signal",
+            "docsUrl": "https://docs.openclaw.ai/channels/signal",
+            "fields": {
+                "phoneNumber": {
+                    "label": "电话号码",
+                    "placeholder": "+1234567890"
+                }
+            },
+            "instructions": [
+                "在您的系统上安装 signal-cli",
+                "注册或关联您的电话号码",
+                "在下方输入您的电话号码"
+            ]
+        },
+        "feishu": {
+            "description": "通过 WebSocket 连接飞书/Lark 机器人",
+            "docsUrl": "https://icnnp7d0dymg.feishu.cn/wiki/GKn8wOvHnibpPNkNkPzcAvGlnzK#GdHUdp9t9oqyegxwV8ScLvVGn1c",
+            "fields": {
+                "appId": {
+                    "label": "App ID",
+                    "placeholder": "cli_xxxxxx"
+                },
+                "appSecret": {
+                    "label": "App Secret",
+                    "placeholder": "您的应用密钥"
+                }
+            },
+            "instructions": [
+                "阅读文档，然后前往飞书开放平台",
+                "创建一个新应用",
+                "获取 App ID 和 App Secret",
+                "配置事件订阅"
+            ]
+        },
+        "wecom": {
+            "description": "通过插件连接企业微信机器人",
+            "docsUrl": "https://icnnp7d0dymg.feishu.cn/wiki/JTGnwoV0RixKPtkr4w7c7gpAnDc",
+            "fields": {
+                "botId": {
+                    "label": "Bot ID",
+                    "placeholder": "ww_xxxxxx"
+                },
+                "secret": {
+                    "label": "App Secret",
+                    "placeholder": "您的企业微信机器人密钥"
+                }
+            },
+            "instructions": [
+                "在企业微信管理后台创建应用以获取配置信息",
+                "确保已启用接收消息服务器配置",
+                "输入您的 Bot ID（或 Corp ID）和 Secret 以建立连接"
+            ]
+        },
+        "imessage": {
+            "description": "通过 BlueBubbles 连接 iMessage（macOS）",
+            "docsUrl": "https://docs.openclaw.ai/channels/bluebubbles",
+            "fields": {
+                "serverUrl": {
+                    "label": "BlueBubbles 服务器 URL",
+                    "placeholder": "http://localhost:1234"
+                },
+                "password": {
+                    "label": "服务器密码",
+                    "placeholder": "您的服务器密码"
+                }
+            },
+            "instructions": [
+                "在 Mac 上安装 BlueBubbles 服务器",
+                "记录服务器 URL 和密码",
+                "在下方输入连接详情"
+            ]
+        },
+        "matrix": {
+            "description": "连接 Matrix 协议",
+            "docsUrl": "https://docs.openclaw.ai/channels/matrix",
+            "fields": {
+                "homeserver": {
+                    "label": "Homeserver URL",
+                    "placeholder": "https://matrix.org"
+                },
+                "accessToken": {
+                    "label": "Access Token",
+                    "placeholder": "您的访问令牌"
+                }
+            },
+            "instructions": [
+                "创建 Matrix 账户或使用现有账户",
+                "从您的客户端获取访问令牌",
+                "在下方输入 homeserver 和令牌"
+            ]
+        },
+        "line": {
+            "description": "连接 LINE Messaging API",
+            "docsUrl": "https://docs.openclaw.ai/channels/line",
+            "fields": {
+                "channelAccessToken": {
+                    "label": "Channel Access Token",
+                    "placeholder": "您的 LINE 频道访问令牌"
+                },
+                "channelSecret": {
+                    "label": "Channel Secret",
+                    "placeholder": "您的 LINE 频道密钥"
+                }
+            },
+            "instructions": [
+                "前往 LINE 开发者控制台",
+                "创建一个 Messaging API 频道",
+                "获取 Channel Access Token 和 Secret"
+            ]
+        },
+        "msteams": {
+            "description": "通过 Bot Framework 连接 Microsoft Teams",
+            "docsUrl": "https://docs.openclaw.ai/channels/msteams",
+            "fields": {
+                "appId": {
+                    "label": "App ID",
+                    "placeholder": "您的 Microsoft App ID"
+                },
+                "appPassword": {
+                    "label": "App Password",
+                    "placeholder": "您的 Microsoft App Password"
+                }
+            },
+            "instructions": [
+                "前往 Azure 门户",
+                "注册一个新的 Bot 应用",
+                "获取 App ID 并创建密码",
+                "配置 Teams 频道"
+            ]
+        },
+        "googlechat": {
+            "description": "通过 webhook 连接 Google Chat",
+            "docsUrl": "https://docs.openclaw.ai/channels/googlechat",
+            "fields": {
+                "serviceAccountKey": {
+                    "label": "服务账户 JSON 路径",
+                    "placeholder": "/path/to/service-account.json"
+                }
+            },
+            "instructions": [
+                "创建一个 Google Cloud 项目",
+                "启用 Google Chat API",
+                "创建一个服务账户",
+                "下载 JSON 密钥文件"
+            ]
+        },
+        "mattermost": {
+            "description": "通过 Bot API 连接 Mattermost",
+            "docsUrl": "https://docs.openclaw.ai/channels/mattermost",
+            "fields": {
+                "serverUrl": {
+                    "label": "服务器 URL",
+                    "placeholder": "https://your-mattermost.com"
+                },
+                "botToken": {
+                    "label": "机器人访问令牌",
+                    "placeholder": "您的机器人访问令牌"
+                }
+            },
+            "instructions": [
+                "前往 Mattermost 集成",
+                "创建一个新的机器人账户",
+                "复制访问令牌"
+            ]
+        },
+        "qqbot": {
+            "description": "连接 QQ 机器人频道（OpenClaw 3.31 起内置）",
+            "docsUrl": "https://icnnp7d0dymg.feishu.cn/wiki/KPIJwlyiGiupMrkiS9ice39Zn2c",
+            "fields": {
+                "appId": {
+                    "label": "App ID",
+                    "placeholder": "您的 QQ 机器人 App ID"
+                },
+                "clientSecret": {
+                    "label": "Client Secret",
+                    "placeholder": "您的 QQ 机器人 Client Secret"
+                }
+            },
+            "instructions": [
+                "在 QQ 机器人开放平台注册应用",
+                "获取 App ID 和 Client Secret",
+                "在下方填写您的凭据"
+            ]
+        }
+    },
+    "viewDocs": "查看文档"
+}

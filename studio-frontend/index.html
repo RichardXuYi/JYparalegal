@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/src/assets/logo.svg" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content"
+    />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#111827" media="(prefers-color-scheme: dark)" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <title>JYparalegal</title>
+    <!-- 首屏前置脚本走独立文件而非内联：内联 <script>/<style> 会被严格 CSP 整块拦掉
+         （见 vite.config.ts 的 build-time CSP）。经典脚本阻塞执行，保住"先涂主题再渲染"的时序。 -->
+    <link rel="stylesheet" href="./bootstrap/loading.css" />
+    <script src="./bootstrap/theme.js"></script>
+    <script src="./bootstrap/crypto-polyfill.js"></script>
+  </head>
+  <body>
+    <div id="root">
+      <!-- 打包产物载入前可见的首屏占位；样式见 public/bootstrap/loading.css -->
+      <div class="app-init-loading">
+        <div class="app-init-loading-brand">
+          <div class="app-init-loading-logo">
+            <span>JY</span>
+          </div>
+          <div>
+            <div class="app-init-loading-title">JYparalegal</div>
+            <div class="app-init-loading-subtitle">给中国法律人用的 AI 合同工作台</div>
+          </div>
+        </div>
+        <div class="app-init-loading-dots">
+          <div class="app-init-loading-dot"></div>
+          <div class="app-init-loading-dot"></div>
+          <div class="app-init-loading-dot"></div>
+        </div>
+        <div class="app-init-loading-text">
+          <p>正在配置环境...</p>
+          <p>首次加载可能需要片刻时间</p>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
