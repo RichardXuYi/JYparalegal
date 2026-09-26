@@ -106,6 +106,31 @@ export async function isPythonReady(): Promise<boolean> {
 }
 
 /**
+ * Resolve the absolute path of the uv-managed Python 3.12 interpreter.
+ * Returns null when uv is unavailable or has no 3.12 installed. Callers that
+ * need the interpreter to exist should run `setupManagedPython()` first.
+ */
+export async function resolveManagedPython(): Promise<string | null> {
+  const { bin: uvBin } = resolveUvBin();
+  const useShell = needsWinShell(uvBin);
+
+  return new Promise<string | null>((resolve) => {
+    try {
+      const child = spawn(useShell ? quoteForCmd(uvBin) : uvBin, ['python', 'find', '3.12'], {
+        shell: useShell,
+        windowsHide: true,
+      });
+      let output = '';
+      child.stdout?.on('data', (data) => { output += data; });
+      child.on('close', (code) => resolve(code === 0 ? output.trim() || null : null));
+      child.on('error', () => resolve(null));
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
+/**
  * Run `uv python install 3.12` once with the given environment.
  * Returns on success, throws with captured stderr on failure.
  */
@@ -206,23 +231,10 @@ export async function setupManagedPython(): Promise<void> {
   }
 
   // After installation, verify and log the Python path
-  const verifyShell = needsWinShell(uvBin);
-  try {
-    const findPath = await new Promise<string>((resolve) => {
-      const child = spawn(verifyShell ? quoteForCmd(uvBin) : uvBin, ['python', 'find', '3.12'], {
-        shell: verifyShell,
-        env: { ...process.env, ...uvEnv },
-        windowsHide: true,
-      });
-      let output = '';
-      child.stdout?.on('data', (data) => { output += data; });
-      child.on('close', () => resolve(output.trim()));
-    });
-
-    if (findPath) {
-      logger.info(`Managed Python 3.12 installed at: ${findPath}`);
-    }
-  } catch (err) {
-    logger.warn('Could not determine Python path after install:', err);
+  const findPath = await resolveManagedPython();
+  if (findPath) {
+    logger.info(`Managed Python 3.12 installed at: ${findPath}`);
+  } else {
+    logger.warn('Could not determine Python path after install');
   }
 }

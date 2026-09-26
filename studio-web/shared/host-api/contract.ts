@@ -100,6 +100,8 @@ export type SettingsSnapshot = Partial<{
   theme: 'light' | 'dark' | 'system';
   language: string;
   startMinimized: boolean;
+  /** Drift animation of the shell aurora background. */
+  shellAnimation: boolean;
   launchAtStartup: boolean;
   telemetryEnabled: boolean;
   gatewayAutoStart: boolean;

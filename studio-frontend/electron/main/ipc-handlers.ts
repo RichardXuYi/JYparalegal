@@ -64,6 +64,7 @@ import { createMediaApi } from '../services/media-api';
 import { createProvidersApi } from '../services/providers-api';
 import { createSessionsApi } from '../services/sessions-api';
 import { createSkillsApi } from '../services/skills-api';
+import { SkillHubService } from '../services/skills/skillhub-service';
 import { createUsageApi } from '../services/usage-api';
 import { createSyncApi } from '../services/sync-api';
 import { createAuthApi } from '../services/backend-auth-api';
@@ -161,6 +162,9 @@ function registerTypedHostHandlers(
   mainWindow: BrowserWindow,
   hostApiRegistry: HostApiRegistry,
 ): void {
+  // Stateless: the kit and managed Python are resolved lazily on first use.
+  const skillHubService = new SkillHubService();
+
   hostApiRegistry.registerCoreServices({
     app: createAppApi(),
     openclaw: createOpenClawApi(),
@@ -180,7 +184,7 @@ function registerTypedHostHandlers(
     sessions: createSessionsApi({ gatewayManager }),
     chat: createChatApi({ gatewayManager }),
     cron: createCronApi({ gatewayManager }),
-    skills: createSkillsApi({ clawHubService, gatewayManager }),
+    skills: createSkillsApi({ clawHubService, skillHubService, gatewayManager }),
     usage: createUsageApi(),
     sync: createSyncApi(),
     auth: createAuthApi({ gatewayManager }),

@@ -53,6 +53,7 @@ const PREFERENCE_KEYS: (keyof AppSettings)[] = [
   'theme',
   'language',
   'startMinimized',
+  'shellAnimation',
   'launchAtStartup',
   'updateChannel',
   'autoCheckUpdate',

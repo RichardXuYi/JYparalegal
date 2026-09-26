@@ -65,12 +65,18 @@
     },
     "marketplace": {
         "title": "Marktplatz", "installDialogTitle": "Fähigkeiten installieren",
+        "sourceSkillHub": "SkillHub",
+        "preparing": "SkillHub-Store wird vorbereitet…",
+        "preparingHint": "Beim ersten Start werden Komponenten und eine Laufzeit heruntergeladen; das kann ein bis zwei Minuten dauern.",
+        "prepareFailed": "SkillHub-Store konnte nicht vorbereitet werden",
+        "retry": "Erneut versuchen",
+        "install": "Installieren",
         "installDialogSubtitle": "Standardmäßig Explore durchsuchen oder Schlüsselwörter eingeben.",
         "sourceLabel": "Quelle", "sourceClawHub": "ClawHub",
         "securityNote": "Klicken Sie auf die Fähigkeitskarte, um deren Dokumentation und Sicherheitsinformationen auf ClawHub vor der Installation anzusehen.",
         "manualInstallHint": "Netzwerkprobleme? Sie können jederzeit Fähigkeits-ZIPs von ClawHub.ai herunterladen und manuell nach \"{{path}}\" extrahieren.",
-        "searching": "ClawHub wird durchsucht...", "noResults": "Keine passenden Fähigkeiten gefunden.",
+        "searching": "SkillHub wird durchsucht...", "noResults": "Keine passenden Fähigkeiten gefunden.",
         "emptyPrompt": "Suchen Sie nach neuen Fähigkeiten, um Ihre Möglichkeiten zu erweitern.",
-        "searchError": "ClawHub-Suche fehlgeschlagen. Prüfen Sie Ihre Verbindung oder Installation."
+        "searchError": "SkillHub-Suche fehlgeschlagen. Prüfen Sie Ihre Verbindung oder Installation."
     }
 }

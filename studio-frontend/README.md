@@ -49,7 +49,7 @@ GP_GATEWAY_ENTRY_OVERRIDE="scripts/dev/fake-gateway-exit78.mjs" pnpm dev
 
 ## 界面范围
 
-聊天、签署任务、合同模板、证据、企业、比对。签署草稿的「任务设置」是业务步骤，不是安装向导。
+聊天、模拟法庭、签署任务、合同模板、证据、企业、比对。技能页可从 SkillHub（skillhub.cn）搜索并安装技能，商店组件在首次打开时自动准备（下载 kit 并使用随包的 uv Python，不依赖系统 Python）。签署草稿的「任务设置」是业务步骤，不是安装向导。
 
 ## 许可
 

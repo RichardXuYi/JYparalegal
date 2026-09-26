@@ -320,7 +320,7 @@ export function SettingsModal() {
         )}
 
         {/* ========== DESKTOP: two-pane layout (hidden on mobile) ========== */}
-        <nav role="tablist" aria-label={t('title')} className="shell-gradient hidden sm:relative sm:flex w-[35%] sm:w-60 shrink-0 flex-col gap-4 overflow-y-auto p-3">
+        <nav role="tablist" aria-label={t('title')} className="shell-panel-gradient hidden sm:relative sm:flex w-[35%] sm:w-60 shrink-0 flex-col gap-4 overflow-y-auto p-3">
           <div className="px-3 pt-2 pb-1">
             <h2 className="text-base font-bold tracking-tight text-white">{t('title')}</h2>
           </div>

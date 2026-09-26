@@ -13,6 +13,8 @@
     "light": "Light",
     "dark": "Dark",
     "system": "System",
+    "shellAnimation": "Gradient animation",
+    "shellAnimationDesc": "Slowly drifts the aurora background; turn it off to keep the background static and save power.",
     "language": "Language",
     "menuLanguageUpdated": "Menu language updated",
     "shellMode": "Interface mode",

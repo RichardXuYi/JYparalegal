@@ -2,8 +2,9 @@
  * Appearance settings section.
  * Theme, language, interface mode (device shell).
  */
-import { Sun, Moon, Monitor, Palette, Globe, Smartphone, Wand2 } from 'lucide-react';
+import { Sun, Moon, Monitor, Palette, Globe, Smartphone, Wand2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { useSettingsStore } from '@/stores/settings';
 import { useTranslation } from 'react-i18next';
@@ -31,6 +32,8 @@ export function AppearanceSection({ gradientClass }: AppearanceSectionProps) {
   const { t, i18n } = useTranslation('settings');
   const theme = useSettingsStore((state) => state.theme);
   const setTheme = useSettingsStore((state) => state.setTheme);
+  const shellAnimation = useSettingsStore((state) => state.shellAnimation);
+  const setShellAnimation = useSettingsStore((state) => state.setShellAnimation);
   const language = useSettingsStore((state) => state.language);
   const setLanguage = useSettingsStore((state) => state.setLanguage);
   const shellPreference = useShellPreference();
@@ -68,6 +71,12 @@ export function AppearanceSection({ gradientClass }: AppearanceSectionProps) {
             </Button>
           </div>
         }
+      />
+      <SettingRow
+        icon={Sparkles}
+        label={t('appearance.shellAnimation')}
+        description={t('appearance.shellAnimationDesc')}
+        control={<Switch checked={shellAnimation} onCheckedChange={setShellAnimation} />}
       />
       <SettingRow
         icon={Globe}

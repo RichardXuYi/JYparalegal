@@ -134,14 +134,20 @@
     "marketplace": {
         "title": "市场",
         "installDialogTitle": "安装技能",
+        "sourceSkillHub": "SkillHub",
+        "preparing": "正在准备 SkillHub 商店…",
+        "preparingHint": "首次使用需要下载商店组件并准备运行环境，可能需要一两分钟。",
+        "prepareFailed": "SkillHub 商店准备失败",
+        "retry": "重试",
+        "install": "安装",
         "installDialogSubtitle": "默认展示 Explore，输入关键词后执行搜索。",
         "sourceLabel": "来源",
         "sourceClawHub": "ClawHub",
         "securityNote": "安装前请点击技能卡片，在 ClawHub 上查看其文档和安全信息。",
         "manualInstallHint": "遇到网络问题？您可以随时从 ClawHub.ai 下载技能压缩包，并将其解压至 \"{{path}}\" 目录来完成手动安装。",
-        "searching": "正在搜索 ClawHub...",
+        "searching": "正在搜索 SkillHub...",
         "noResults": "未找到匹配的技能。",
         "emptyPrompt": "搜索新技能以扩展您的能力。",
-        "searchError": "ClawHub 搜索失败。请检查您的连接或安装。"
+        "searchError": "SkillHub 搜索失败。请检查您的连接或安装。"
     }
 }

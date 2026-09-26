@@ -3,9 +3,10 @@
  * brand + tenant switcher | drag region | role / gateway / notify / settings / avatar (+ Windows window controls).
  */
 import { useState, useEffect } from 'react';
-import { Bell, Building2, Minus, Square, X, RectangleHorizontal, Settings as SettingsIcon } from 'lucide-react';
+import { Bell, Building2, Minus, Square, X, RectangleHorizontal, Settings as SettingsIcon, Sun, Moon } from 'lucide-react';
 import { GatewayStatusChip } from '@/components/common/GatewayStatusChip';
 import { useSettingsUiStore } from '@/stores/settings-ui';
+import { useSettingsStore } from '@/stores/settings';
 import { useAuthStore } from '@/stores/auth';
 import { hostApi } from '@/lib/host-api';
 import { useTranslation } from 'react-i18next';
@@ -15,6 +16,8 @@ export function TopBar() {
   const { t } = useTranslation('common');
   const platform = window.electron?.platform;
   const openSettings = useSettingsUiStore((s) => s.openSettings);
+  const theme = useSettingsStore((s) => s.theme);
+  const setTheme = useSettingsStore((s) => s.setTheme);
   // 真实登录身份：头像/标题一律取自会话，不再硬编码姓名或角色。
   const user = useAuthStore((s) => s.user);
   const displayName = user?.username?.trim() ?? '';
@@ -22,6 +25,15 @@ export function TopBar() {
   const avatarTitle = user
     ? (user.role ? `${displayName} · ${user.role}` : displayName)
     : t('topbar.guest');
+
+  const toggleTheme = () => {
+    if (theme === 'light') setTheme('dark');
+    else if (theme === 'dark') setTheme('system');
+    else setTheme('light');
+  };
+
+  const ThemeIcon = theme === 'dark' ? Moon : Sun;
+  const themeTitle = theme === 'light' ? t('appearance.light', '浅色') : theme === 'dark' ? t('appearance.dark', '深色') : t('appearance.system', '跟随系统');
 
   return (
     <div className="drag-region flex h-12 shrink-0 items-center gap-3 px-4">
@@ -45,10 +57,15 @@ export function TopBar() {
 
       {/* Right: role / gateway / notify / settings / avatar (+ window controls) */}
       <div className="no-drag flex shrink-0 items-center gap-2">
-        <label className="shell-glass flex cursor-pointer select-none items-center gap-1.5 rounded-lg px-2.5 py-1 text-tiny text-white/90">
-          <input type="checkbox" className="h-3 w-3 accent-white" />
-          {t('topbar.employeeView')}
-        </label>
+        <button
+          type="button"
+          onClick={toggleTheme}
+          className="shell-glass flex cursor-pointer select-none items-center gap-1.5 rounded-lg px-2.5 py-1 text-tiny text-white/90 hover:bg-white/15 transition-colors"
+          title={themeTitle}
+          aria-label={themeTitle}
+        >
+          <ThemeIcon className="h-3.5 w-3.5" strokeWidth={1.75} />
+        </button>
         <GatewayStatusChip glass />
         <button
           type="button"

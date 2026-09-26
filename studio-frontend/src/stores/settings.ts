@@ -18,6 +18,8 @@ interface SettingsState {
   theme: Theme;
   language: string;
   startMinimized: boolean;
+  /** Drift animation of the shell aurora background. */
+  shellAnimation: boolean;
   launchAtStartup: boolean;
   telemetryEnabled: boolean;
 
@@ -51,6 +53,7 @@ interface SettingsState {
   setTheme: (theme: Theme) => void;
   setLanguage: (language: string) => void;
   setStartMinimized: (value: boolean) => void;
+  setShellAnimation: (value: boolean) => void;
   setLaunchAtStartup: (value: boolean) => void;
   setTelemetryEnabled: (value: boolean) => void;
   setGatewayAutoStart: (value: boolean) => void;
@@ -104,6 +107,7 @@ const defaultSettings = {
   theme: 'system' as Theme,
   language: resolveBrowserLanguage(),
   startMinimized: false,
+  shellAnimation: true,
   launchAtStartup: false,
   telemetryEnabled: true,
   gatewayAutoStart: true,
@@ -177,6 +181,10 @@ export const useSettingsStore = create<SettingsState>()(
         void hostApi.settings.set('language', resolvedLanguage).catch((e) => toast.error(`Failed to save language: ${toUserMessage(e)}`));
       },
       setStartMinimized: (startMinimized) => set({ startMinimized }),
+      setShellAnimation: (shellAnimation) => {
+        set({ shellAnimation });
+        void hostApi.settings.set('shellAnimation', shellAnimation).catch((e) => toast.error(`Failed to save shell animation: ${toUserMessage(e)}`));
+      },
       setLaunchAtStartup: (launchAtStartup) => {
         set({ launchAtStartup });
         void hostApi.settings.set('launchAtStartup', launchAtStartup).catch((e) => toast.error(`Failed to save launch at startup: ${toUserMessage(e)}`));

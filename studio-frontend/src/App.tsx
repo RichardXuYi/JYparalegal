@@ -41,6 +41,7 @@ const TaskSetup = lazy(() => import('./pages/CreateTask/TaskSetup'));
 const TaskCompose = lazy(() => import('./pages/CreateTask/TaskCompose'));
 const TaskDetail = lazy(() => import('./pages/TaskDetail'));
 const MockCourt = lazy(() => import('./pages/MockCourt'));
+const Features = lazy(() => import('./pages/Features'));
 
 const Templates = lazy(() => import('./pages/Templates'));
 const Evidence = lazy(() => import('./pages/Evidence'));
@@ -105,6 +106,7 @@ function App() {
   const initSettings = useSettingsStore((state) => state.init);
   const settingsInitCompleted = useSettingsStore((state) => state.initCompleted);
   const theme = useSettingsStore((state) => state.theme);
+  const shellAnimation = useSettingsStore((state) => state.shellAnimation);
   const language = useSettingsStore((state) => state.language);
   const autoSyncSkills = useSettingsStore((state) => state.autoSyncSkills);
   const authStatus = useAuthStore((state) => state.status);
@@ -248,6 +250,12 @@ function App() {
     }
   }, [theme]);
 
+  // Gates the shell aurora drift in globals.css — a CSS class keeps the switch
+  // working without re-rendering the layout tree.
+  useEffect(() => {
+    window.document.documentElement.classList.toggle('shell-anim-off', !shellAnimation);
+  }, [shellAnimation]);
+
   useEffect(() => {
     loadExternalRendererExtensions();
     void rendererExtensionRegistry.initializeAll();
@@ -327,6 +335,7 @@ function App() {
               <Route path="/signing/:id/compose" element={<TaskCompose />} />
               <Route path="/signing/:id" element={<TaskDetail />} />
               <Route path="/moot" element={<MockCourt />} />
+              <Route path="/features" element={<Features />} />
 
               <Route path="/templates" element={<Templates />} />
               <Route path="/evidence" element={<Evidence />} />

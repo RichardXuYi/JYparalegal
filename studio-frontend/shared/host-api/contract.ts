@@ -100,6 +100,8 @@ export type SettingsSnapshot = Partial<{
   theme: 'light' | 'dark' | 'system';
   language: string;
   startMinimized: boolean;
+  /** Drift animation of the shell aurora background. */
+  shellAnimation: boolean;
   launchAtStartup: boolean;
   telemetryEnabled: boolean;
   gatewayAutoStart: boolean;
@@ -781,6 +783,11 @@ export type ClawHubOpenPayload = {
   slug?: string;
   baseDir?: string;
 };
+export type SkillHubPrepareResult = HostSuccess & { ready?: boolean };
+export type SkillHubSearchPayload = { query?: string };
+export type SkillHubSearchResult = HostSuccess & { results?: MarketplaceSkill[] };
+export type SkillHubInstallPayload = { slug: string };
+export type SkillHubUninstallPayload = { slug: string };
 
 // ---- Cross-platform skill sync (user-managed skills <-> backend) ----
 export type SkillSyncPlanItem = {
@@ -1060,6 +1067,10 @@ export type HostApiContract = {
     clawhubUninstall: (payload: ClawHubUninstallPayload) => HostSuccess;
     clawhubOpenSkillReadme: (payload: ClawHubOpenPayload) => HostSuccess;
     clawhubOpenSkillPath: (payload: ClawHubOpenPayload) => HostSuccess;
+    skillhubPrepare: () => SkillHubPrepareResult;
+    skillhubSearch: (payload: SkillHubSearchPayload) => SkillHubSearchResult;
+    skillhubInstall: (payload: SkillHubInstallPayload) => HostSuccess;
+    skillhubUninstall: (payload: SkillHubUninstallPayload) => HostSuccess;
     sync: () => SkillSyncResult;
     syncStatus: () => SkillSyncStatusResult;
     upload: (payload: SkillUploadPayload) => SkillUploadResult;

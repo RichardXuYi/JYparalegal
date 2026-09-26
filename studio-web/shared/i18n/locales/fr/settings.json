@@ -13,6 +13,8 @@
     "light": "Clair",
     "dark": "Sombre",
     "system": "Système",
+    "shellAnimation": "Animation du dégradé",
+    "shellAnimationDesc": "Fait dériver lentement l'arrière-plan aurora ; désactivez-la pour l'immobiliser et économiser l'énergie.",
     "language": "Langue",
     "menuLanguageUpdated": "Langue du menu mise à jour",
     "shellMode": "Mode d'interface",

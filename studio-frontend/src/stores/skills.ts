@@ -158,11 +158,17 @@ interface SkillsState {
   searchError: string | null;
   installing: Record<string, boolean>;
   error: string | null;
+  /** SkillHub store: true once the kit + managed Python are usable. */
+  storeReady: boolean;
+  storePreparing: boolean;
+  storeError: string | null;
 
   fetchSkills: () => Promise<boolean>;
   syncSkills: () => Promise<SkillSyncResult>;
+  /** Download the SkillHub kit and prepare Python. Idempotent. */
+  prepareStore: () => Promise<boolean>;
   searchSkills: (query: string) => Promise<void>;
-  installSkill: (slug: string, version?: string) => Promise<void>;
+  installSkill: (slug: string) => Promise<void>;
   uninstallSkill: (slug: string) => Promise<void>;
   enableSkill: (skillId: string) => Promise<void>;
   disableSkill: (skillId: string) => Promise<void>;
@@ -185,6 +191,9 @@ export const useSkillsStore = create<SkillsState>((set, get) => ({
   searchError: null,
   installing: {},
   error: null,
+  storeReady: false,
+  storePreparing: false,
+  storeError: null,
 
   fetchSkills: async () => {
     if (get().skills.length === 0) {
@@ -262,10 +271,37 @@ export const useSkillsStore = create<SkillsState>((set, get) => ({
     }
   },
 
+  prepareStore: async () => {
+    if (get().storeReady) return true;
+    set({ storePreparing: true, storeError: null });
+    try {
+      const result = await hostApi.skills.skillhubPrepare();
+      if (!result.success || !result.ready) {
+        set({ storeError: result.error || 'SkillHub preparation failed' });
+        return false;
+      }
+      set({ storeReady: true });
+      return true;
+    } catch (error) {
+      const appError = normalizeAppError(error, { module: 'skills', operation: 'install' });
+      set({ storeError: appError.message });
+      return false;
+    } finally {
+      set({ storePreparing: false });
+    }
+  },
+
   searchSkills: async (query: string) => {
+    const trimmed = query.trim();
+    // SkillHub has no "browse all" mode: an empty query returns nothing, so skip
+    // the CLI round-trip and let the sheet show its search prompt.
+    if (!trimmed) {
+      set({ searchResults: [], searchError: null, searching: false });
+      return;
+    }
     set({ searching: true, searchError: null });
     try {
-      const result = await hostApi.skills.clawhubSearch({ query });
+      const result = await hostApi.skills.skillhubSearch({ query: trimmed });
       if (result.success) {
         set({ searchResults: result.results || [] });
       } else {
@@ -283,10 +319,10 @@ export const useSkillsStore = create<SkillsState>((set, get) => ({
     }
   },
 
-  installSkill: async (slug: string, version?: string) => {
+  installSkill: async (slug: string) => {
     set((state) => ({ installing: { ...state.installing, [slug]: true } }));
     try {
-      const result = await hostApi.skills.clawhubInstall({ slug, version });
+      const result = await hostApi.skills.skillhubInstall({ slug });
       if (!result.success) {
         const appError = normalizeAppError(new Error(result.error || 'Install failed'), {
           module: 'skills',
@@ -295,7 +331,10 @@ export const useSkillsStore = create<SkillsState>((set, get) => ({
         const errorKey = mapErrorCodeToSkillErrorKey(appError.code, 'install');
         throw new Error(errorKey ?? appError.message);
       }
-      await get().setSkillsEnabled([slug], true);
+      // The scanner keys skills by directory name, so enable by the trailing
+      // slug segment ('@handle/pdf' -> 'pdf') to match the installed folder.
+      const skillKey = slug.includes('/') ? slug.slice(slug.lastIndexOf('/') + 1) : slug;
+      await get().setSkillsEnabled([skillKey], true);
       await get().fetchSkills();
     } catch (error) {
       console.error('Install error:', error);
@@ -312,7 +351,7 @@ export const useSkillsStore = create<SkillsState>((set, get) => ({
   uninstallSkill: async (slug: string) => {
     set((state) => ({ installing: { ...state.installing, [slug]: true } }));
     try {
-      const result = await hostApi.skills.clawhubUninstall({ slug });
+      const result = await hostApi.skills.skillhubUninstall({ slug });
       if (!result.success) {
         throw new Error(result.error || 'Uninstall failed');
       }
@@ -391,6 +430,9 @@ export const useSkillsStore = create<SkillsState>((set, get) => ({
       searchError: null,
       installing: {},
       error: null,
+      storeReady: false,
+      storePreparing: false,
+      storeError: null,
     });
   },
 }));

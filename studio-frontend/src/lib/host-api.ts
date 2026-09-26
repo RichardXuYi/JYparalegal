@@ -31,6 +31,8 @@ import type {
   SettingsValue,
   ShellOpenExternalPayload,
   ShellPathPayload,
+  SkillHubPrepareResult,
+  SkillHubSearchResult,
   SkillQuickAccessPayload,
   SkillUpdateConfigPayload,
   SkillUpdatePayload,
@@ -83,6 +85,8 @@ export type {
   SettingsSnapshot,
   SkillConfigsResult,
   SkillsStatusResult,
+  SkillHubPrepareResult,
+  SkillHubSearchResult,
   SkillSyncPlanItem,
   SkillSyncResult,
   SkillSyncStatusResult,
@@ -374,6 +378,12 @@ export const hostApi = {
     clawhubOpenSkillPath: (input: { skillKey?: string; slug?: string; baseDir?: string }) => (
       invokeHost('skills', 'clawhubOpenSkillPath', input)
     ),
+    skillhubPrepare: (): Promise<SkillHubPrepareResult> => invokeHost('skills', 'skillhubPrepare'),
+    skillhubSearch: (input: { query: string }): Promise<SkillHubSearchResult> => (
+      invokeHost('skills', 'skillhubSearch', input)
+    ),
+    skillhubInstall: (input: { slug: string }) => invokeHost('skills', 'skillhubInstall', input),
+    skillhubUninstall: (input: { slug: string }) => invokeHost('skills', 'skillhubUninstall', input),
   },
   usage: {
     recentTokenHistory: (limit?: number) => (

@@ -223,12 +223,19 @@ export function SettingsModal() {
       <DialogContent
         data-testid="settings-modal"
         className="w-[min(1100px,92vw)] max-w-[92vw] h-[85vh] max-h-[85vh] p-0 overflow-hidden gap-0 flex flex-row"
-        onOpenAutoFocus={(e) => e.preventDefault()}
+        onOpenAutoFocus={(event) => {
+          // Radix would walk to the first focusable child (a nav tab) and scroll
+          // it into view; focusing the dialog container keeps focus inside the
+          // dialog instead. Without this the trigger button keeps focus while
+          // the rest of the page is aria-hidden, which browsers block.
+          event.preventDefault();
+          (event.currentTarget as HTMLElement | null)?.focus();
+        }}
       >
         <DialogTitle className="sr-only">{t('title')}</DialogTitle>
 
         {/* Left: category navigation */}
-        <nav role="tablist" aria-label={t('title')} className="shell-gradient flex w-60 shrink-0 flex-col gap-4 overflow-y-auto p-3">
+        <nav role="tablist" aria-label={t('title')} className="shell-panel-gradient flex w-60 shrink-0 flex-col gap-4 overflow-y-auto p-3">
           <div className="px-3 pt-2 pb-1">
             <h2 className="text-base font-bold tracking-tight text-white">{t('title')}</h2>
           </div>

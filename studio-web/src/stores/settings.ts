@@ -17,6 +17,8 @@ interface SettingsState {
   theme: Theme;
   language: string;
   startMinimized: boolean;
+  /** Drift animation of the shell aurora background. */
+  shellAnimation: boolean;
   telemetryEnabled: boolean;
 
   // Gateway
@@ -45,6 +47,7 @@ interface SettingsState {
   setTheme: (theme: Theme) => void;
   setLanguage: (language: string) => void;
   setStartMinimized: (value: boolean) => void;
+  setShellAnimation: (value: boolean) => void;
   setTelemetryEnabled: (value: boolean) => void;
   setGatewayAutoStart: (value: boolean) => void;
   setGatewayPort: (port: number) => void;
@@ -95,6 +98,7 @@ const defaultSettings = {
   theme: 'system' as Theme,
   language: resolveBrowserLanguage(),
   startMinimized: false,
+  shellAnimation: true,
   telemetryEnabled: true,
   gatewayAutoStart: true,
   gatewayPort: 18789,
@@ -165,6 +169,10 @@ export const useSettingsStore = create<SettingsState>()(
         void hostApi.settings.set('language', resolvedLanguage).catch((e) => toast.error(`Failed to save language: ${toUserMessage(e)}`));
       },
       setStartMinimized: (startMinimized) => set({ startMinimized }),
+      setShellAnimation: (shellAnimation) => {
+        set({ shellAnimation });
+        void hostApi.settings.set('shellAnimation', shellAnimation).catch((e) => toast.error(`Failed to save shell animation: ${toUserMessage(e)}`));
+      },
       setTelemetryEnabled: (telemetryEnabled) => {
         set({ telemetryEnabled });
         void hostApi.settings.set('telemetryEnabled', telemetryEnabled).catch((e) => toast.error(`Failed to save telemetry setting: ${toUserMessage(e)}`));

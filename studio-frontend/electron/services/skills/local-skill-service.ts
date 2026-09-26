@@ -39,6 +39,12 @@ type SourceDescriptor = {
   source: string;
   priority: number;
   allowedSkillSlugs?: Set<string>;
+  /**
+   * Also scan one level inside `@handle/` directories. The SkillHub CLI only
+   * installs namespaced (`@handle/slug`), and that extra level would otherwise
+   * be mistaken for a single skill directory with no SKILL.md inside.
+   */
+  namespacedSkills?: boolean;
 };
 
 type ParsedSkillManifest = {
@@ -326,6 +332,18 @@ async function scanRoot(
       if (entry.name === 'node_modules') continue;
       const entryPath = join(descriptor.root, entry.name);
       if (entry.isDirectory()) {
+        if (entry.name.startsWith('@') && descriptor.namespacedSkills) {
+          try {
+            const namespaced = await readdir(entryPath, { withFileTypes: true });
+            for (const child of namespaced) {
+              if (child.name.startsWith('.') || !child.isDirectory()) continue;
+              skillDirs.add(join(entryPath, child.name));
+            }
+          } catch {
+            // Unreadable namespace folder — skip it.
+          }
+          continue;
+        }
         if (!descriptor.allowedSkillSlugs || descriptor.allowedSkillSlugs.has(entry.name)) {
           skillDirs.add(entryPath);
         }
@@ -381,6 +399,7 @@ async function buildDescriptors(): Promise<SourceDescriptor[]> {
       root: getOpenClawSkillsDir(),
       source: 'openclaw-managed',
       priority: 3,
+      namespacedSkills: true,
     },
     {
       root: join(getOpenClawResolvedDir(), 'skills'),

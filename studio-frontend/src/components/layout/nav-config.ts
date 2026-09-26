@@ -4,7 +4,6 @@ import {
   FileDiff,
   FileText,
   LayoutDashboard,
-  Scale,
   ScrollText,
   Shield,
 } from 'lucide-react';
@@ -75,13 +74,6 @@ export const LEGAL_MODULES: LegalModule[] = [
     ],
   },
   {
-    route: '/moot',
-    label: '模拟法庭',
-    icon: Scale,
-    cta: { label: '即将开发', to: '/moot' },
-    groups: [{ title: '模拟法庭', entries: [{ key: 'moot', label: '演练工作台（即将开发）' }] }],
-  },
-  {
     route: '/overview',
     label: '工作台',
     icon: LayoutDashboard,
@@ -119,6 +111,9 @@ export const LEGAL_MODULES: LegalModule[] = [
     groups: [{ title: '文档对比', entries: [{ key: 'compare', label: '对比任务' }] }],
   },
 ];
+
+/** 模拟法庭已升级为一级标签，不再属于智能法务子模块 */
+export const MOOT_ROUTE = '/moot';
 
 /** Level-2 tabs shown inline; overflow modules go into the 更多 menu. */
 export const LEGAL_TAB_MODULES = LEGAL_MODULES.filter((m) => !m.overflow);

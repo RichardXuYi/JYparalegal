@@ -13,6 +13,8 @@
     "light": "浅色",
     "dark": "深色",
     "system": "跟随系统",
+    "shellAnimation": "渐变动画",
+    "shellAnimationDesc": "背景极光缓慢流动；关闭后背景静止，更省电。",
     "language": "语言",
     "menuLanguageUpdated": "菜单语言已更新",
     "shellMode": "界面模式",

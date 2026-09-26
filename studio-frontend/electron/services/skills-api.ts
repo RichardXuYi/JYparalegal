@@ -10,6 +10,7 @@ import {
 import { listLocalSkills } from './skills/local-skill-service';
 import { getSkillSyncStatus, runSkillSync } from './skills/skill-sync-service';
 import { uploadSkill } from './skills/skill-upload-service';
+import type { SkillHubService } from './skills/skillhub-service';
 import { isRecord } from './payload-utils';
 
 type SkillConfigPayload = {
@@ -69,6 +70,14 @@ function getConfigUpdate(payload: unknown): NormalizedSkillConfigUpdate {
   };
 }
 
+function getSkillHubSlug(payload: unknown): string {
+  const body = isRecord(payload) ? payload as { slug?: unknown } : {};
+  if (typeof body.slug !== 'string' || !body.slug.trim()) {
+    throw new Error('slug is required');
+  }
+  return body.slug.trim();
+}
+
 function getConfigUpdates(payload: unknown): NormalizedSkillConfigUpdate[] {
   const body = isRecord(payload) ? payload as SkillConfigsPayload : {};
   if (!Array.isArray(body.updates)) return [];
@@ -87,9 +96,11 @@ function getConfigUpdates(payload: unknown): NormalizedSkillConfigUpdate[] {
 
 export function createSkillsApi({
   clawHubService,
+  skillHubService,
   gatewayManager,
 }: {
   clawHubService: ClawHubService;
+  skillHubService: SkillHubService;
   gatewayManager: GatewayManager;
 }): CompleteHostServiceRegistry['skills'] {
   return {
@@ -188,6 +199,39 @@ export function createSkillsApi({
         const slug = typeof body.slug === 'string' ? body.slug : undefined;
         const baseDir = typeof body.baseDir === 'string' ? body.baseDir : undefined;
         await clawHubService.openSkillPath(skillKey || slug || '', slug, baseDir);
+        return { success: true };
+      } catch (error) {
+        return { success: false, error: errorMessage(error) };
+      }
+    },
+    skillhubPrepare: async () => {
+      try {
+        await skillHubService.prepare();
+        return { success: true, ready: true };
+      } catch (error) {
+        return { success: false, ready: false, error: errorMessage(error) };
+      }
+    },
+    skillhubSearch: async (payload) => {
+      try {
+        const body = isRecord(payload) ? payload as { query?: unknown } : {};
+        const query = typeof body.query === 'string' ? body.query : '';
+        return { success: true, results: await skillHubService.search(query) };
+      } catch (error) {
+        return { success: false, error: errorMessage(error) };
+      }
+    },
+    skillhubInstall: async (payload) => {
+      try {
+        await skillHubService.install(getSkillHubSlug(payload));
+        return { success: true };
+      } catch (error) {
+        return { success: false, error: errorMessage(error) };
+      }
+    },
+    skillhubUninstall: async (payload) => {
+      try {
+        await skillHubService.uninstall(getSkillHubSlug(payload));
         return { success: true };
       } catch (error) {
         return { success: false, error: errorMessage(error) };

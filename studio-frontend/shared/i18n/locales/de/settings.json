@@ -13,6 +13,8 @@
     "light": "Hell",
     "dark": "Dunkel",
     "system": "System",
+    "shellAnimation": "Verlaufsanimation",
+    "shellAnimationDesc": "Der Aurora-Hintergrund bewegt sich langsam; zum Stromsparen abschalten.",
     "language": "Sprache",
     "menuLanguageUpdated": "Menüsprache aktualisiert",
     "launchAtStartup": "Beim Systemstart starten",

@@ -533,24 +533,123 @@
 
 /*
  * ===== Connected app shell (layout-v2 / WorkBuddy-Qoder architecture) =====
- * The whole window is one saturated blue-purple gradient. The topbar and the
- * left sidebar sit DIRECTLY on that gradient as transparent/glass regions
- * (white / glassy text); only the stage is a white rounded card. Because the
- * topbar + sidebar are part of the same continuous gradient surface there are
- * NO white seam lines between panels (the previous pale-frame + 3-white-cards
- * shell showed jarring white gaps).
+ * The whole window is one saturated aurora surface: a base gradient plus two
+ * drifting soft-blob layers (::before / ::after) so the colour reads as
+ * clouds/waves instead of a hard linear ramp (Instagram / Fluent style).
+ * The topbar and the left sidebar sit DIRECTLY on that surface as
+ * frosted-glass regions (white / glassy text); only the stage is a white
+ * rounded card. Because topbar + sidebar share the same continuous surface
+ * there are NO white seam lines between panels.
  */
 .shell-gradient {
-  background: linear-gradient(145deg, #4f46e5 0%, #6d28d9 48%, #9333ea 100%);
+  position: relative;
+  isolation: isolate;
+  background: linear-gradient(160deg, #4f46e5 0%, #6d28d9 52%, #7e22ce 100%);
+}
+
+.shell-gradient::before,
+.shell-gradient::after {
+  content: '';
+  position: absolute;
+  inset: -20%;
+  z-index: -1;
+  pointer-events: none;
+  contain: paint;
+  backface-visibility: hidden;
+  will-change: transform;
+}
+
+.shell-gradient::before {
+  background:
+    radial-gradient(30% 36% at 80% 14%, rgba(232, 121, 249, 0.95) 0%, rgba(232, 121, 249, 0) 100%),
+    radial-gradient(44% 48% at 70% 82%, rgba(244, 114, 182, 0.85) 0%, rgba(244, 114, 182, 0) 100%);
+  animation: shell-drift-a 18s ease-in-out infinite alternate;
+}
+
+.shell-gradient::after {
+  background:
+    radial-gradient(36% 42% at 28% 82%, rgba(96, 165, 250, 0.95) 0%, rgba(96, 165, 250, 0) 100%),
+    radial-gradient(26% 32% at 90% 56%, rgba(196, 181, 253, 1) 0%, rgba(196, 181, 253, 0) 100%),
+    radial-gradient(22% 28% at 52% 40%, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0) 100%);
+  animation: shell-drift-b 24s ease-in-out infinite alternate;
+}
+
+/* Pure transform animation — layers are rasterised once and then only
+ * composited, so the drift costs no per-frame paint. */
+@keyframes shell-drift-a {
+  0% { transform: translate3d(-22%, -18%, 0) scale(1) rotate(-6deg); }
+  50% { transform: translate3d(12%, 16%, 0) scale(1.14) rotate(4deg); }
+  100% { transform: translate3d(24%, -14%, 0) scale(1.05) rotate(9deg); }
+}
+
+@keyframes shell-drift-b {
+  0% { transform: translate3d(25%, 18%, 0) scale(1.12) rotate(7deg); }
+  50% { transform: translate3d(-14%, 10%, 0) scale(0.94) rotate(-9deg); }
+  100% { transform: translate3d(-24%, -20%, 0) scale(1.16) rotate(8deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell-gradient::before,
+  .shell-gradient::after {
+    animation: none;
+  }
+}
+
+/* Settings toggle (Appearance): freeze the aurora drift but keep the gradient. */
+.shell-anim-off .shell-gradient::before,
+.shell-anim-off .shell-gradient::after {
+  animation: none;
 }
 
 .dark .shell-gradient {
-  background: linear-gradient(145deg, #1e1b4b 0%, #3b0764 48%, #4c1d95 100%);
+  background: linear-gradient(160deg, #b91c1c 0%, #ea580c 36%, #f59e0b 76%, #fbbf24 100%);
 }
 
-/* Glassy control surfaces for controls that sit on the gradient. */
+.dark .shell-gradient::before {
+  background:
+    radial-gradient(30% 36% at 78% 16%, rgba(251, 191, 36, 0.85) 0%, rgba(251, 191, 36, 0) 100%),
+    radial-gradient(44% 48% at 70% 80%, rgba(239, 68, 68, 0.8) 0%, rgba(239, 68, 68, 0) 100%);
+}
+
+.dark .shell-gradient::after {
+  background:
+    radial-gradient(36% 42% at 26% 80%, rgba(249, 115, 22, 0.85) 0%, rgba(249, 115, 22, 0) 100%),
+    radial-gradient(26% 32% at 88% 56%, rgba(245, 158, 11, 0.8) 0%, rgba(245, 158, 11, 0) 100%),
+    radial-gradient(22% 28% at 50% 38%, rgba(254, 240, 138, 0.3) 0%, rgba(254, 240, 138, 0) 100%);
+}
+
+/*
+ * Static aurora variant for small floating panels (settings nav). Same palette
+ * as .shell-gradient, but painted entirely as background-image layers with no
+ * pseudo-elements: a -inset pseudo-element inside a scroll container becomes
+ * part of that container's scrollable overflow and forces a scrollbar, and
+ * animating a backdrop inside a modal is wasted work anyway.
+ */
+.shell-panel-gradient {
+  background-color: #5b4fe0;
+  background-image:
+    radial-gradient(120% 85% at 12% 10%, rgba(129, 140, 248, 0.8) 0%, rgba(129, 140, 248, 0) 62%),
+    radial-gradient(95% 70% at 95% 20%, rgba(217, 70, 239, 0.62) 0%, rgba(217, 70, 239, 0) 58%),
+    radial-gradient(105% 80% at 72% 102%, rgba(236, 72, 153, 0.5) 0%, rgba(236, 72, 153, 0) 60%),
+    linear-gradient(160deg, #4f46e5 0%, #6d28d9 52%, #7e22ce 100%);
+}
+
+.dark .shell-panel-gradient {
+  background-color: #b91c1c;
+  background-image:
+    radial-gradient(120% 85% at 12% 10%, rgba(239, 68, 68, 0.72) 0%, rgba(239, 68, 68, 0) 62%),
+    radial-gradient(95% 70% at 95% 20%, rgba(251, 191, 36, 0.55) 0%, rgba(251, 191, 36, 0) 58%),
+    radial-gradient(105% 80% at 72% 102%, rgba(249, 115, 22, 0.55) 0%, rgba(249, 115, 22, 0) 60%),
+    linear-gradient(160deg, #b91c1c 0%, #ea580c 36%, #f59e0b 76%, #fbbf24 100%);
+}
+
+/* Glassy control surfaces for controls that sit on the gradient.
+ * Backdrop blur is deliberately shallow: the backdrop is animating, so this
+ * re-filters every frame — keeping the radius small keeps that cheap. */
 .shell-glass {
   background: rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(11px) saturate(150%);
+  -webkit-backdrop-filter: blur(11px) saturate(150%);
 }
 
 .shell-glass:hover {
@@ -560,6 +659,8 @@
 .shell-glass-strong {
   background: rgba(255, 255, 255, 0.2);
   border: 1px solid rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(13px) saturate(165%);
+  -webkit-backdrop-filter: blur(13px) saturate(165%);
 }
 
 /* White CTA button on the gradient (sidebar primary action). */
@@ -575,14 +676,15 @@
 
 .dark .shell-cta {
   background: #fff;
-  color: #4c1d95;
+  color: #c2410c;
 }
 
 /* Bottom glass info card in the sidebar (quota / user). */
 .shell-card {
   background: rgba(255, 255, 255, 0.12);
   border: 1px solid rgba(255, 255, 255, 0.16);
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(12px) saturate(150%);
+  -webkit-backdrop-filter: blur(12px) saturate(150%);
 }
 
 /* Shadow for the white stage card floating on the gradient. */

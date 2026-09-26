@@ -28,6 +28,8 @@ export interface AppSettings {
   theme: 'light' | 'dark' | 'system';
   language: string;
   startMinimized: boolean;
+  /** Drift animation of the shell aurora background. */
+  shellAnimation: boolean;
   launchAtStartup: boolean;
   telemetryEnabled: boolean;
   machineId: string;
@@ -83,6 +85,7 @@ function createDefaultSettings(): AppSettings {
     theme: 'system',
     language: resolveSupportedLanguage(getSystemLocale()),
     startMinimized: false,
+    shellAnimation: true,
     launchAtStartup: false,
     telemetryEnabled: true,
     machineId: '',

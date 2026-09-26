@@ -2,7 +2,7 @@
  * Appearance settings section.
  * Theme, language, and launch-at-startup.
  */
-import { Sun, Moon, Monitor, Palette, Globe, Power, Smartphone, Wand2 } from 'lucide-react';
+import { Sun, Moon, Monitor, Palette, Globe, Power, Smartphone, Wand2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
@@ -32,6 +32,8 @@ export function AppearanceSection({ gradientClass }: AppearanceSectionProps) {
   const { t, i18n } = useTranslation('settings');
   const theme = useSettingsStore((state) => state.theme);
   const setTheme = useSettingsStore((state) => state.setTheme);
+  const shellAnimation = useSettingsStore((state) => state.shellAnimation);
+  const setShellAnimation = useSettingsStore((state) => state.setShellAnimation);
   const language = useSettingsStore((state) => state.language);
   const setLanguage = useSettingsStore((state) => state.setLanguage);
   const launchAtStartup = useSettingsStore((state) => state.launchAtStartup);
@@ -71,6 +73,12 @@ export function AppearanceSection({ gradientClass }: AppearanceSectionProps) {
             </Button>
           </div>
         }
+      />
+      <SettingRow
+        icon={Sparkles}
+        label={t('appearance.shellAnimation')}
+        description={t('appearance.shellAnimationDesc')}
+        control={<Switch checked={shellAnimation} onCheckedChange={setShellAnimation} />}
       />
       <SettingRow
         icon={Globe}
