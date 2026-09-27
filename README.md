@@ -6,25 +6,28 @@
 
 ```
 .
-├── backend/            数据平面（DP）：Spring Boot 业务主服务，端口 8181
-├── control-plane/      控制平面（CP）：e签宝 SaaS API V3 桥接与签章配额服务，端口 8281
-├── studio-frontend/    GrandPoem Studio 桌面端（Electron + React）
-├── studio-web/         GrandPoem Studio Web 版（React + Fastify host server）
+├── backend/            子模块 → sub/backend     数据平面（DP）：Spring Boot 业务主服务，端口 8181
+├── control-plane/      子模块 → sub/control-plane  控制平面（CP）：e签宝 SaaS API V3 桥接与签章配额服务，端口 8281
+├── studio-frontend/    子模块 → sub/studio-frontend  GrandPoem Studio 桌面端（Electron + React）
+├── studio-web/         子模块 → sub/studio-web   GrandPoem Studio Web 版（React + Fastify host server）
 ├── docs/               PRD、方案与核验文档
 └── README.md
 ```
 
 ## 分支维护模型
 
-本仓库采用"主子分支"结构维护，main 的 git 历史中通过 merge 提交永久保留各子分支的提交链：
+本仓库采用 **submodule（子模块）** 结构维护，main 顶层的四个模块目录均为子模块指针（GitHub 上显示为 `目录 @ 提交哈希`），各自指向本仓库对应的"内容分支"（分支根目录即该模块的完整内容）：
 
-| 分支 | 内容 | 维护方 |
+| main 中的子模块 | 指向分支 | 维护方 |
 |---|---|---|
-| `main` | 全量集成：qianduan + houduan + docs 等小文件 | 本地（集成端） |
-| `qianduan` | 仅 `studio-web/` 与 `studio-frontend/` | 前端工作流 |
-| `houduan` | 仅 `backend/` 与 `control-plane/`（附带 target 编译产物快照，main 不跟踪） | 服务器端 |
+| `backend/` | `sub/backend` | 服务器端（上游为 `houduan` 分支） |
+| `control-plane/` | `sub/control-plane` | 服务器端（上游为 `houduan` 分支） |
+| `studio-web/` | `sub/studio-web` | 前端工作流（上游为 `qianduan` 分支） |
+| `studio-frontend/` | `sub/studio-frontend` | 前端工作流（上游为 `qianduan` 分支） |
 
-日常流程：前端改动提交到 `qianduan`、后端改动提交到 `houduan`，再分别 `git merge` 进 `main` 后推送。结构性节点用带注释 tag 标记（当前：`structure-v1`，2026-09-27）。
+`docs/`、`README.md`、`.gitignore`、`.gitmodules` 为 main 上的普通文件。
+
+日常流程：后端改动照旧推 `houduan`、前端推 `qianduan`；同步时把最新内容刷新到对应 `sub/*` 分支，再在 main 上提交子模块指针更新。克隆本仓库请用 `git clone --recurse-submodules`，或对已有克隆执行 `git submodule update --init --recursive`。结构性节点用带注释 tag 标记（当前：`structure-v1`，2026-09-27）。
 
 ## 架构概览
 
