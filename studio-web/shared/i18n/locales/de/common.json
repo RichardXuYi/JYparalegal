@@ -128,5 +128,10 @@
     "guest": "Nicht angemeldet",
     "workspace": "Arbeitsbereich",
     "employeeView": "Mitarbeiteransicht"
+  },
+  "notice": {
+    "errorTitle": "Nicht abgeschlossen",
+    "lockedTitle": "Tarif erforderlich",
+    "acknowledge": "Verstanden"
   }
 }

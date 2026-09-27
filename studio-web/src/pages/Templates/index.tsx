@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
+import { reportFailure, reportSuccess } from '@/lib/notice';
 import { LegalPageHeader } from '@/components/legal/LegalPageHeader';
 import { EntitlementGate } from '@/components/legal/EntitlementGate';
 import { platformProbe, platformSend, notifyIfEntitlement } from '@/lib/platform-api';
@@ -50,17 +50,17 @@ export default function Templates() {
   const reload = () => { setListState('loading'); load(); };
 
   const create = async () => {
-    if (!form.title.trim()) { toast.error('请填写模板标题'); return; }
+    if (!form.title.trim()) { reportFailure('请填写模板标题'); return; }
     try {
       await platformSend('/platform/templates', 'POST', {
         ...form,
         variables: form.variables.split(',').map((s) => s.trim()).filter(Boolean),
       });
-      toast.success('模板已保存');
+      reportSuccess('模板已保存');
       setShowCreate(false);
       load();
     } catch (e) {
-      if (!notifyIfEntitlement(e)) toast.error(e instanceof Error ? e.message : '网络错误,保存失败');
+      if (!notifyIfEntitlement(e)) reportFailure(e instanceof Error ? e.message : '网络错误,保存失败');
     }
   };
 
@@ -72,7 +72,7 @@ export default function Templates() {
       setRendered(text || '（渲染结果为空）');
     } catch (e) {
       setRendered(null);
-      if (!notifyIfEntitlement(e)) toast.error(`渲染失败：${e instanceof Error ? e.message : '未知原因'}`);
+      if (!notifyIfEntitlement(e)) reportFailure(`渲染失败：${e instanceof Error ? e.message : '未知原因'}`);
     }
   };
 
@@ -84,9 +84,9 @@ export default function Templates() {
     try {
       const r = await platformSend<RenderResult>(`/platform/templates/${sel.id}/render`, 'POST', { variables: vars });
       const text = (r?.rendered ?? '').trim();
-      if (!text) { toast.error('模板渲染结果为空，请先完善模板正文'); return; }
+      if (!text) { reportFailure('模板渲染结果为空，请先完善模板正文'); return; }
       if (Array.isArray(r?.unfilled) && r.unfilled.length > 0) {
-        toast.error(`还有变量未填写：${r.unfilled.join('、')}`);
+        reportFailure(`还有变量未填写：${r.unfilled.join('、')}`);
         return;
       }
       const res = await platformSend<{ taskId?: number; id?: number }>('/platform/sign/tasks/from-file', 'POST', {
@@ -96,9 +96,9 @@ export default function Templates() {
       });
       const newId = res?.taskId ?? res?.id;
       if (newId) nav(`/signing/${newId}/setup`);
-      else toast.error('发起签署失败');
+      else reportFailure('发起签署失败');
     } catch (e) {
-      if (!notifyIfEntitlement(e)) toast.error(e instanceof Error ? `发起签署失败：${e.message}` : '网络错误,发起签署失败');
+      if (!notifyIfEntitlement(e)) reportFailure(e instanceof Error ? `发起签署失败：${e.message}` : '网络错误,发起签署失败');
     } finally {
       setStarting(false);
     }

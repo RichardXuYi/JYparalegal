@@ -205,6 +205,9 @@ export const hostApi = {
         ...input,
       })
     ),
+    updateSkills: (id: string, skillKeys: string[]) => (
+      invokeHost('agents', 'updateSkills', { id, skillKeys })
+    ),
     updateModel: (id: string, modelRef: string | null) => (
       invokeHost('agents', 'updateModel', { id, modelRef })
     ),

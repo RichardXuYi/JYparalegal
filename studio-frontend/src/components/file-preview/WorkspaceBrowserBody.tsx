@@ -7,7 +7,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { ChevronRight, FolderOpen, RefreshCw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { toast } from 'sonner';
+import { reportFailure } from '@/lib/notice';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -215,14 +215,14 @@ export function WorkspaceBrowserBody({
   const handleOpenWorkspaceInFinder = useCallback(() => {
     if (!workspace) return;
     hostApi.shell.openPath(workspace).catch(() => {
-      toast.error(t('filePreview.errors.openInFinderFailed', 'Could not reveal in file manager'));
+      reportFailure(t('filePreview.errors.openInFinderFailed', 'Could not reveal in file manager'));
     });
   }, [workspace, t]);
 
   const handleOpenSelectedInFinder = useCallback(() => {
     if (!selectedNode || selectedNode.isDir) return;
     hostApi.shell.showItemInFolder(selectedNode.absPath).catch(() => {
-      toast.error(t('filePreview.errors.openInFinderFailed', 'Could not reveal in file manager'));
+      reportFailure(t('filePreview.errors.openInFinderFailed', 'Could not reveal in file manager'));
     });
   }, [selectedNode, t]);
 
@@ -241,7 +241,7 @@ export function WorkspaceBrowserBody({
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      toast.error(t('filePreview.errors.openFailed', { defaultValue: 'Open failed: {{error}}', error: message }));
+      reportFailure(t('filePreview.errors.openFailed', { defaultValue: 'Open failed: {{error}}', error: message }));
     }
   }, [selectedNode, fileState, t]);
 

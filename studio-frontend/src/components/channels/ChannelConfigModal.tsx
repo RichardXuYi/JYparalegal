@@ -37,7 +37,7 @@ import {
   isCanonicalOpenClawAccountId,
   usesPluginManagedQrAccounts,
 } from '@/lib/channel-alias';
-import { toast } from 'sonner';
+import { reportFailure, reportSuccess } from '@/lib/notice';
 import { useTranslation } from 'react-i18next';
 import telegramIcon from '@/assets/channels/telegram.svg';
 import discordIcon from '@/assets/channels/discord.svg';
@@ -261,7 +261,7 @@ export function ChannelConfigModal({
 
     const onSuccess = async (data: ChannelSuccessEvent) => {
       void data?.accountId;
-      toast.success(translateRef.current('toast.qrConnected', { name: CHANNEL_NAMES[channelType] }));
+      reportSuccess(translateRef.current('toast.qrConnected', { name: CHANNEL_NAMES[channelType] }));
       try {
         if (channelType === 'whatsapp') {
           const saveResult = await hostApi.channels.saveConfig({
@@ -277,12 +277,12 @@ export function ChannelConfigModal({
         try {
           await finishSaveRef.current(channelType);
         } catch (postSaveError) {
-          toast.warning(translateRef.current('toast.savedButRefreshFailed'));
+          reportFailure(translateRef.current('toast.savedButRefreshFailed'));
           console.warn('Channel saved but post-save refresh failed:', postSaveError);
         }
         onCloseRef.current();
       } catch (error) {
-        toast.error(translateRef.current('toast.configFailed', { error: String(error) }));
+        reportFailure(translateRef.current('toast.configFailed', { error: String(error) }));
         setConnecting(false);
       }
     };
@@ -291,7 +291,7 @@ export function ChannelConfigModal({
       const err = typeof payload === 'string'
         ? payload
         : String(payload.message || payload);
-      toast.error(translateRef.current('toast.qrFailed', { name: CHANNEL_NAMES[channelType], error: err }));
+      reportFailure(translateRef.current('toast.qrFailed', { name: CHANNEL_NAMES[channelType], error: err }));
       setQrCode(null);
       setConnecting(false);
     };
@@ -354,14 +354,14 @@ export function ChannelConfigModal({
         if (!nextAccountId) {
           const message = t('account.invalidId');
           setAccountIdError(message);
-          toast.error(message);
+          reportFailure(message);
           setConnecting(false);
           return;
         }
         if (!isCanonicalOpenClawAccountId(nextAccountId)) {
           const message = t('account.invalidCanonicalId');
           setAccountIdError(message);
-          toast.error(message);
+          reportFailure(message);
           setConnecting(false);
           return;
         }
@@ -369,7 +369,7 @@ export function ChannelConfigModal({
         if (duplicateExists) {
           const message = t('account.accountIdExists', { accountId: nextAccountId });
           setAccountIdError(message);
-          toast.error(message);
+          reportFailure(message);
           setConnecting(false);
           return;
         }
@@ -415,22 +415,22 @@ export function ChannelConfigModal({
         throw new Error(saveResult?.error || 'Failed to save channel config');
       }
       if (typeof saveResult.warning === 'string' && saveResult.warning) {
-        toast.warning(saveResult.warning);
+        reportFailure(saveResult.warning);
       }
 
       try {
         await finishSave(selectedType);
       } catch (postSaveError) {
-        toast.warning(t('toast.savedButRefreshFailed'));
+        reportFailure(t('toast.savedButRefreshFailed'));
         console.warn('Channel saved but post-save refresh failed:', postSaveError);
       }
 
-      toast.success(t('toast.channelSaved', { name: meta.name }));
-      toast.success(t('toast.channelConnecting', { name: meta.name }));
+      reportSuccess(t('toast.channelSaved', { name: meta.name }));
+      reportSuccess(t('toast.channelConnecting', { name: meta.name }));
       await new Promise((resolve) => setTimeout(resolve, 800));
       onClose();
     } catch (error) {
-      toast.error(t('toast.configFailed', { error: String(error) }));
+      reportFailure(t('toast.configFailed', { error: String(error) }));
       setConnecting(false);
     }
   };

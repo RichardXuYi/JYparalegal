@@ -23,7 +23,7 @@ import {
   type RuntimeProviderOption,
 } from '@/lib/model-options';
 import { useTranslation } from 'react-i18next';
-import { toast } from 'sonner';
+import { reportFailure, reportSuccess } from '@/lib/notice';
 import { cn } from '@/lib/utils';
 import telegramIcon from '@/assets/channels/telegram.svg';
 import discordIcon from '@/assets/channels/discord.svg';
@@ -178,7 +178,7 @@ export function Agents() {
         onCreate={async (name, options) => {
           await createAgent(name, options);
           setShowAddDialog(false);
-          toast.success(t('toast.agentCreated'));
+          reportSuccess(t('toast.agentCreated'));
         }}
       />
 
@@ -207,9 +207,9 @@ export function Agents() {
             if (activeAgentId === deletedId) {
               setActiveAgentId(null);
             }
-            toast.success(t('toast.agentDeleted'));
+            reportSuccess(t('toast.agentDeleted'));
           } catch (error) {
-            toast.error(t('toast.agentDeleteFailed', { error: String(error) }));
+            reportFailure(t('toast.agentDeleteFailed', { error: String(error) }));
           }
         }}
         onCancel={() => setAgentToDelete(null)}
@@ -367,7 +367,7 @@ function AddAgentDialog({
     try {
       await onCreate(name.trim(), { inheritWorkspace });
     } catch (error) {
-      toast.error(t('toast.agentCreateFailed', { error: String(error) }));
+      reportFailure(t('toast.agentCreateFailed', { error: String(error) }));
       setSaving(false);
       return;
     }
@@ -493,9 +493,9 @@ function AgentSettingsModal({
     setSavingName(true);
     try {
       await updateAgent(agent.id, name.trim());
-      toast.success(t('toast.agentUpdated'));
+      reportSuccess(t('toast.agentUpdated'));
     } catch (error) {
-      toast.error(t('toast.agentUpdateFailed', { error: String(error) }));
+      reportFailure(t('toast.agentUpdateFailed', { error: String(error) }));
     } finally {
       setSavingName(false);
     }
@@ -751,26 +751,26 @@ function AgentModelModal({
 
   const handleSaveModel = async () => {
     if (!selectedRuntimeProviderKey) {
-      toast.error(t('toast.agentModelProviderRequired'));
+      reportFailure(t('toast.agentModelProviderRequired'));
       return;
     }
     if (!trimmedModelId) {
-      toast.error(t('toast.agentModelIdRequired'));
+      reportFailure(t('toast.agentModelIdRequired'));
       return;
     }
     if (!modelChanged) return;
     if (!nextModelRef.includes('/')) {
-      toast.error(t('toast.agentModelInvalid'));
+      reportFailure(t('toast.agentModelInvalid'));
       return;
     }
 
     setSavingModel(true);
     try {
       await updateAgentModel(agent.id, desiredOverrideModelRef);
-      toast.success(desiredOverrideModelRef ? t('toast.agentModelUpdated') : t('toast.agentModelReset'));
+      reportSuccess(desiredOverrideModelRef ? t('toast.agentModelUpdated') : t('toast.agentModelReset'));
       onClose();
     } catch (error) {
-      toast.error(t('toast.agentModelUpdateFailed', { error: String(error) }));
+      reportFailure(t('toast.agentModelUpdateFailed', { error: String(error) }));
     } finally {
       setSavingModel(false);
     }

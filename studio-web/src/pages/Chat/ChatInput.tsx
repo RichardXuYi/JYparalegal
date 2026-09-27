@@ -23,7 +23,7 @@ import { buildConfiguredModelOptions, formatModelRefLabel, isConfiguredModelRefA
 import type { AgentSummary } from '@/types/agent';
 import type { QuickAccessSkill } from '@/types/skill';
 import { useTranslation } from 'react-i18next';
-import { toast } from 'sonner';
+import { reportFailure } from '@/lib/notice';
 import { rendererExtensionRegistry } from '@/extensions/registry';
 import { collectDroppedFiles } from '@/lib/collect-dropped-files';
 import { fetchQuickAccessSkills } from '@/lib/quick-access-skills';
@@ -474,7 +474,7 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false }:
     }
     const skill = list.find((entry) => entry.name === skillName);
     if (!skill) {
-      toast.error(
+      reportFailure(
         t('composer.skillPreviewNotFound', 'Could not find this skill. Open the skill picker to refresh the list.'),
       );
       return;
@@ -504,7 +504,7 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false }:
       await setSessionModel(desiredOverride);
     } catch (error) {
       setOptimisticModelRef(previousModelRef);
-      toast.error(t('composer.modelSwitchFailed', { error: String(error) }));
+      reportFailure(t('composer.modelSwitchFailed', { error: String(error) }));
     } finally {
       setSwitchingModelRef(null);
       textareaRef.current?.focus();
@@ -521,7 +521,7 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false }:
       await setThinkingLevel(level);
       textareaRef.current?.focus();
     } catch (error) {
-      toast.error(`${t('composer.thinkingLevelFailed')}: ${error instanceof Error ? error.message : String(error)}`);
+      reportFailure(`${t('composer.thinkingLevelFailed')}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }, [setThinkingLevel, thinkingLevel, t]);
 
@@ -697,7 +697,7 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false }:
       });
       if (!guard.ok) {
         if (guard.message) {
-          toast.error(guard.message);
+          reportFailure(guard.message);
         }
         return;
       }
@@ -848,7 +848,7 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false }:
 
       const { pathFiles, bufferFiles } = collectDroppedFiles(e.dataTransfer);
       if (pathFiles.length === 0 && bufferFiles.length === 0) {
-        toast.error(t('composer.folderDropUnsupported'));
+        reportFailure(t('composer.folderDropUnsupported'));
         return;
       }
       if (pathFiles.length > 0) void stagePathFiles(pathFiles);

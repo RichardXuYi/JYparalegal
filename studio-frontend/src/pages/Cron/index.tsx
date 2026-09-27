@@ -45,7 +45,7 @@ import { useChatStore } from '@/stores/chat';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { formatRelativeTime, cn } from '@/lib/utils';
 import { fetchQuickAccessSkills } from '@/lib/quick-access-skills';
-import { toast } from 'sonner';
+import { reportFailure, reportSuccess } from '@/lib/notice';
 import type { CronJob, CronJobCreateInput, CronSchedule, ScheduleType } from '@/types/cron';
 import type { QuickAccessSkill } from '@/types/skill';
 import { CHANNEL_ICONS, CHANNEL_NAMES, type ChannelType } from '@/types/channel';
@@ -920,26 +920,26 @@ function TaskDialog({ open, job, configuredChannels, onClose, onSave }: TaskDial
 
   const handleSubmit = async () => {
     if (!name.trim()) {
-      toast.error(t('toast.nameRequired'));
+      reportFailure(t('toast.nameRequired'));
       return;
     }
     if (!message.trim()) {
-      toast.error(t('toast.messageRequired'));
+      reportFailure(t('toast.messageRequired'));
       return;
     }
 
     if (scheduleForm.mode === 'once') {
       const onceDateTime = new Date(`${scheduleForm.onceDate}T${scheduleForm.onceTime || '00:00'}`);
       if (!scheduleForm.onceDate || Number.isNaN(onceDateTime.getTime())) {
-        toast.error(t('toast.scheduleRequired'));
+        reportFailure(t('toast.scheduleRequired'));
         return;
       }
       if (onceDateTime.getTime() <= Date.now()) {
-        toast.error(t('toast.schedulePast'));
+        reportFailure(t('toast.schedulePast'));
         return;
       }
     } else if (scheduleForm.recurrence === 'custom' && !scheduleForm.customCron.trim()) {
-      toast.error(t('toast.scheduleRequired'));
+      reportFailure(t('toast.scheduleRequired'));
       return;
     }
     const finalSchedule = buildScheduleFromForm(scheduleForm);
@@ -959,15 +959,15 @@ function TaskDialog({ open, job, configuredChannels, onClose, onSave }: TaskDial
 
       if (finalDelivery.mode === 'announce') {
         if (!finalDelivery.channel) {
-          toast.error(t('toast.channelRequired'));
+          reportFailure(t('toast.channelRequired'));
           return;
         }
         if (!isSupportedCronDeliveryChannel(finalDelivery.channel)) {
-          toast.error(t('toast.deliveryChannelUnsupported', { channel: getChannelDisplayName(finalDelivery.channel) }));
+          reportFailure(t('toast.deliveryChannelUnsupported', { channel: getChannelDisplayName(finalDelivery.channel) }));
           return;
         }
         if (!finalDelivery.to) {
-          toast.error(t('toast.deliveryTargetRequired'));
+          reportFailure(t('toast.deliveryTargetRequired'));
           return;
         }
       }
@@ -981,9 +981,9 @@ function TaskDialog({ open, job, configuredChannels, onClose, onSave }: TaskDial
         agentId: selectedAgentId,
       });
       onClose();
-      toast.success(job ? t('toast.updated') : t('toast.created'));
+      reportSuccess(job ? t('toast.updated') : t('toast.created'));
     } catch (err) {
-      toast.error(String(err));
+      reportFailure(String(err));
     } finally {
       setSaving(false);
     }
@@ -1460,10 +1460,10 @@ function CronJobCard({ job, deliveryAccountName, onToggle, onEdit, onDelete, onT
     setTriggering(true);
     try {
       await onTrigger();
-      toast.success(t('toast.triggered'));
+      reportSuccess(t('toast.triggered'));
     } catch (error) {
       console.error('Failed to trigger cron job:', error);
-      toast.error(t('toast.failedTrigger', { error: error instanceof Error ? error.message : String(error) }));
+      reportFailure(t('toast.failedTrigger', { error: error instanceof Error ? error.message : String(error) }));
     } finally {
       setTriggering(false);
     }
@@ -1664,9 +1664,9 @@ export function Cron() {
   const handleToggle = useCallback(async (id: string, enabled: boolean) => {
     try {
       await toggleJob(id, enabled);
-      toast.success(enabled ? t('toast.enabled') : t('toast.paused'));
+      reportSuccess(enabled ? t('toast.enabled') : t('toast.paused'));
     } catch {
-      toast.error(t('toast.failedUpdate'));
+      reportFailure(t('toast.failedUpdate'));
     }
   }, [toggleJob, t]);
 
@@ -1859,7 +1859,7 @@ export function Cron() {
           if (jobToDelete) {
             await deleteJob(jobToDelete.id);
             setJobToDelete(null);
-            toast.success(t('toast.deleted'));
+            reportSuccess(t('toast.deleted'));
           }
         }}
         onCancel={() => setJobToDelete(null)}

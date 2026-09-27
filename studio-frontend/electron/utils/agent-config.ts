@@ -718,6 +718,20 @@ export async function updateAgentModel(agentId: string, modelRef: string | null)
   });
 }
 
+export async function updateAgentSkills(agentId: string, skillKeys: string[]): Promise<AgentsSnapshot> {
+  return withConfigLock(async () => {
+    const config = await readOpenClawConfig() as AgentConfigDocument;
+    const { agentsConfig, entries } = normalizeAgentsConfig(config);
+    const index = entries.findIndex((entry) => entry.id === agentId);
+    if (index === -1) throw new Error(`Agent "${agentId}" not found`);
+    entries[index] = { ...entries[index], skills: skillKeys };
+    assignAgentRoster(config, agentsConfig, entries);
+    await writeOpenClawConfig(config);
+    logger.info('Updated agent skills', { agentId, count: skillKeys.length });
+    return buildSnapshotFromConfig(config);
+  });
+}
+
 export async function deleteAgentConfig(agentId: string): Promise<{ snapshot: AgentsSnapshot; removedEntry: AgentListEntry }> {
   return withConfigLock(async () => {
     if (agentId === MAIN_AGENT_ID) {

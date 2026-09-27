@@ -213,6 +213,9 @@ export const hostApi = {
     updateModel: (id: string, modelRef: string | null) => (
       invokeHost('agents', 'updateModel', { id, modelRef })
     ),
+    updateSkills: (id: string, skillKeys: string[]) => (
+      invokeHost('agents', 'updateSkills', { id, skillKeys })
+    ),
     delete: (id: string) => invokeHost('agents', 'delete', { id }),
     assignChannel: (id: string, channelType: string) => (
       invokeHost('agents', 'assignChannel', { id, channelType })

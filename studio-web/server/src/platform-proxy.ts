@@ -20,6 +20,7 @@ export function registerPlatformProxy(app: FastifyInstance): void {
     ['/platform/companies', '/api/companies'],
     ['/platform/companies/*', '/api/companies'],
     ['/platform/review/*', '/api/review'],
+    ['/platform/moot/*', '/api/moot'],
   ];
   for (const [url, backendPrefix] of routes) {
     app.route({
@@ -50,10 +51,14 @@ export function registerPlatformProxy(app: FastifyInstance): void {
         // 裸路径（rest 为空）不得追加尾斜杠：Spring 6 PathPattern 不匹配 trailing slash
         const target = `${BACKEND_URL}${backendPrefix}${rest ? `/${rest}` : ''}${qs}`;
         const hasBody = request.method === 'POST' || request.method === 'PUT' || request.method === 'PATCH';
+        const raw = Buffer.isBuffer(request.body) ? request.body : null;
+        const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
+        if (raw) headers['Content-Type'] = String(request.headers['content-type'] ?? 'application/octet-stream');
+        else if (hasBody) headers['Content-Type'] = 'application/json';
         const res = await fetch(target, {
           method: request.method,
-          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: hasBody ? JSON.stringify(request.body ?? {}) : undefined,
+          headers,
+          body: raw ?? (hasBody ? JSON.stringify(request.body ?? {}) : undefined),
         });
         const data = await res.json().catch(() => null);
         return reply.code(res.status).send(data);

@@ -5,7 +5,7 @@
 import { Sun, Moon, Monitor, Palette, Globe, Power, Smartphone, Wand2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { toast } from 'sonner';
+import { reportSuccess } from '@/lib/notice';
 import { useSettingsStore } from '@/stores/settings';
 import { useTranslation } from 'react-i18next';
 import { SUPPORTED_LANGUAGES } from '@/i18n';
@@ -49,7 +49,7 @@ export function AppearanceSection({ gradientClass }: AppearanceSectionProps) {
     if (nextLanguage === language) return;
     const translateNext = i18n.getFixedT(nextLanguage, 'settings');
     setLanguage(nextLanguage);
-    toast.success(translateNext('appearance.menuLanguageUpdated'));
+    reportSuccess(translateNext('appearance.menuLanguageUpdated'));
   };
 
   return (

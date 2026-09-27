@@ -20,7 +20,7 @@ import { useLayoutEffect, useMemo, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { Eye, FileEdit, FolderOpen, FolderTree, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { toast } from 'sonner';
+import { reportFailure } from '@/lib/notice';
 import { Button } from '@/components/ui/button';
 import { supportsRichDocumentPreview, type GeneratedFile } from '@/lib/generated-files';
 import { hostApi } from '@/lib/host-api';
@@ -57,7 +57,7 @@ export function ArtifactPanel({ files, agent, runStartedAt, refreshSignal }: Art
   const handleRevealFocusedFile = () => {
     if (!focusedFile) return;
     hostApi.shell.showItemInFolder(focusedFile.filePath).catch(() => {
-      toast.error(t('filePreview.errors.openInFinderFailed', 'Could not reveal in file manager'));
+      reportFailure(t('filePreview.errors.openInFinderFailed', 'Could not reveal in file manager'));
     });
   };
 

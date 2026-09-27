@@ -39,7 +39,7 @@ import { GeneratedFilesPanel } from '@/components/file-preview/GeneratedFilesPan
 import type { FilePreviewTarget } from '@/components/file-preview/types';
 import { buildPreviewTarget } from '@/components/file-preview/build-preview-target';
 import type { AttachedFileMeta } from '@/stores/chat/types';
-import { toast } from 'sonner';
+import { reportFailure } from '@/lib/notice';
 
 const ArtifactPanelLazy = lazy(() =>
   import('@/components/file-preview/ArtifactPanel').then((m) => ({ default: m.ArtifactPanel })),
@@ -213,11 +213,11 @@ export function Chat() {
       void hostApi.shell.openPath(file.filePath)
         .then((error) => {
           if (typeof error === 'string' && error) {
-            toast.error(error);
+            reportFailure(error);
           }
         })
         .catch(() => {
-          toast.error(t('filePreview.errors.openInFinderFailed'));
+          reportFailure(t('filePreview.errors.openInFinderFailed'));
         });
       return;
     }
@@ -228,7 +228,7 @@ export function Chat() {
     // surface; for non-ACP messages we use 'local' / 0 which always exist.
     const uri = file.filePath ?? file.gatewayUrl ?? '';
     if (!uri) {
-      toast.error(t('filePreview.errors.openFailed'));
+      reportFailure(t('filePreview.errors.openFailed'));
       return;
     }
     const ref = {
@@ -263,18 +263,18 @@ export function Chat() {
           if (file.filePath) {
             void hostApi.shell.openPath(file.filePath).then((error) => {
               if (typeof error === 'string' && error) {
-                toast.error(error);
+                reportFailure(error);
               }
             }).catch(() => {
-              toast.error(t('filePreview.errors.openFailed'));
+              reportFailure(t('filePreview.errors.openFailed'));
             });
             return;
           }
-          toast.error(t('filePreview.errors.openFailed'));
+          reportFailure(t('filePreview.errors.openFailed'));
         }
       })
       .catch(() => {
-        toast.error(t('filePreview.errors.openFailed'));
+        reportFailure(t('filePreview.errors.openFailed'));
       });
   }, [openPreview, t, currentSessionKey]);
   // Persistent per-run override for the Execution Graph's expanded/collapsed

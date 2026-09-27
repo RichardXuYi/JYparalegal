@@ -27,7 +27,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { cn } from '@/lib/utils';
 import { hostApi } from '@/lib/host-api';
 import { isGatewayStopped } from '@/lib/gateway-status';
-import { toast } from 'sonner';
+import { reportFailure, reportSuccess } from '@/lib/notice';
 import type { Skill } from '@/types/skill';
 import type { GatewayStatus } from '@/types/gateway';
 import { rendererExtensionRegistry } from '@/extensions/registry';
@@ -333,13 +333,13 @@ export function Skills() {
     try {
       if (enable) {
         await enableSkill(skillId);
-        toast.success(t('toast.enabled'));
+        reportSuccess(t('toast.enabled'));
       } else {
         await disableSkill(skillId);
-        toast.success(t('toast.disabled'));
+        reportSuccess(t('toast.disabled'));
       }
     } catch (err) {
-      toast.error(String(err));
+      reportFailure(String(err));
     }
   }, [enableSkill, disableSkill, t]);
 
@@ -347,9 +347,9 @@ export function Skills() {
     const result = await syncSkills();
     if (!result.success) {
       if (result.requiresAuth) {
-        toast.error(t('toast.syncAuthRequired'));
+        reportFailure(t('toast.syncAuthRequired'));
       } else {
-        toast.error(t('toast.syncFailed') + (result.error ? ': ' + result.error : ''));
+        reportFailure(t('toast.syncFailed') + (result.error ? ': ' + result.error : ''));
       }
       return;
     }
@@ -357,11 +357,11 @@ export function Skills() {
     const pulled = result.pulled ?? 0;
     const failed = result.failed ?? 0;
     if (failed > 0) {
-      toast.error(t('toast.syncPartial', { failed }));
+      reportFailure(t('toast.syncPartial', { failed }));
     } else if (pushed === 0 && pulled === 0) {
-      toast.success(t('toast.syncNoChanges'));
+      reportSuccess(t('toast.syncNoChanges'));
     } else {
-      toast.success(t('toast.syncSuccess', { pushed, pulled }));
+      reportSuccess(t('toast.syncSuccess', { pushed, pulled }));
     }
   }, [syncSkills, t]);
 
@@ -378,7 +378,7 @@ export function Skills() {
     try {
       const result = await hostApi.skills.upload(payload);
       if (result.success) {
-        toast.success(t('toast.uploadSuccess', { slug: result.slug ?? payload.fileName }));
+        reportSuccess(t('toast.uploadSuccess', { slug: result.slug ?? payload.fileName }));
         await fetchSkills();
         return;
       }
@@ -387,18 +387,18 @@ export function Skills() {
         return;
       }
       if (result.code === 'invalid_skill') {
-        toast.error(t('toast.uploadInvalidSkill'));
+        reportFailure(t('toast.uploadInvalidSkill'));
       } else if (result.code === 'too_large') {
-        toast.error(t('toast.uploadTooLarge'));
+        reportFailure(t('toast.uploadTooLarge'));
       } else if (result.code === 'unsupported_type') {
-        toast.error(t('toast.uploadUnsupportedType'));
+        reportFailure(t('toast.uploadUnsupportedType'));
       } else if (result.code === 'zip_unsafe') {
-        toast.error(t('toast.uploadZipUnsafe'));
+        reportFailure(t('toast.uploadZipUnsafe'));
       } else {
-        toast.error(t('toast.uploadFailed') + (result.error ? ': ' + result.error : ''));
+        reportFailure(t('toast.uploadFailed') + (result.error ? ': ' + result.error : ''));
       }
     } catch (err) {
-      toast.error(t('toast.uploadFailed') + ': ' + String(err));
+      reportFailure(t('toast.uploadFailed') + ': ' + String(err));
     } finally {
       setUploading(false);
     }
@@ -407,11 +407,11 @@ export function Skills() {
   const handleUploadFileSelected = useCallback((file: File) => {
     const lowerName = file.name.toLowerCase();
     if (!lowerName.endsWith('.md') && !lowerName.endsWith('.zip')) {
-      toast.error(t('toast.uploadUnsupportedType'));
+      reportFailure(t('toast.uploadUnsupportedType'));
       return;
     }
     if (file.size > MAX_UPLOAD_BYTES) {
-      toast.error(t('toast.uploadTooLarge'));
+      reportFailure(t('toast.uploadTooLarge'));
       return;
     }
     const reader = new FileReader();
@@ -419,13 +419,13 @@ export function Skills() {
       const dataUrl = typeof reader.result === 'string' ? reader.result : '';
       const contentBase64 = dataUrl.split(',')[1] ?? '';
       if (!contentBase64) {
-        toast.error(t('toast.uploadFailed'));
+        reportFailure(t('toast.uploadFailed'));
         return;
       }
       void performUpload({ fileName: file.name, contentBase64 });
     };
     reader.onerror = () => {
-      toast.error(t('toast.uploadFailed'));
+      reportFailure(t('toast.uploadFailed'));
     };
     reader.readAsDataURL(file);
   }, [performUpload, t]);
@@ -458,22 +458,22 @@ export function Skills() {
   const handleInstall = useCallback(async (slug: string) => {
     try {
       await installSkill(slug);
-      toast.success(t('toast.installed'));
+      reportSuccess(t('toast.installed'));
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       if (INSTALL_ERROR_CODES.has(errorMessage)) {
-        toast.error(t(`toast.${errorMessage}`, { path: skillsDirPath }), { duration: 10000 });
+        reportFailure(t(`toast.${errorMessage}`, { path: skillsDirPath }));
       } else {
-        toast.error(t('toast.failedInstall') + ': ' + errorMessage);
+        reportFailure(t('toast.failedInstall') + ': ' + errorMessage);
       }
     }
   }, [installSkill, t, skillsDirPath]);
   const handleUninstall = useCallback(async (slug: string) => {
     try {
       await uninstallSkill(slug);
-      toast.success(t('toast.uninstalled'));
+      reportSuccess(t('toast.uninstalled'));
     } catch (err) {
-      toast.error(t('toast.failedUninstall') + ': ' + String(err));
+      reportFailure(t('toast.failedUninstall') + ': ' + String(err));
     }
   }, [uninstallSkill, t]);
 

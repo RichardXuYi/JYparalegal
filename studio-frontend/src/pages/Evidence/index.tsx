@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { toast } from 'sonner';
+import { reportFailure, reportSuccess } from '@/lib/notice';
 import { LegalPageHeader } from '@/components/legal/LegalPageHeader';
 import { EntitlementGate } from '@/components/legal/EntitlementGate';
 import { platformGet, platformProbe, platformSend, notifyIfEntitlement } from '@/lib/platform-api';
@@ -52,11 +52,11 @@ export default function Evidence() {
     setBusyId(taskId);
     try {
       const d = (await platformSend<AntInfo>(`/platform/evidence/${taskId}/antchain/verify`, 'POST', {})) ?? { available: false, message: '核验失败' };
-      if (d.available === false) toast.error(String(d.message ?? '核验失败'));
-      else toast.success('核验已完成');
+      if (d.available === false) reportFailure(String(d.message ?? '核验失败'));
+      else reportSuccess('核验已完成');
       setOpen({ taskId, data: d });
     } catch (e) {
-      if (!notifyIfEntitlement(e)) toast.error(e instanceof Error ? e.message : '网络错误,核验失败');
+      if (!notifyIfEntitlement(e)) reportFailure(e instanceof Error ? e.message : '网络错误,核验失败');
     } finally {
       setBusyId(null);
     }

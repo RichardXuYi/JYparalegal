@@ -129,5 +129,10 @@
     "guest": "未登录",
     "workspace": "工作空间",
     "employeeView": "员工视角"
+  },
+  "notice": {
+    "errorTitle": "出了点问题",
+    "lockedTitle": "套餐未开通",
+    "acknowledge": "知道了"
   }
 }

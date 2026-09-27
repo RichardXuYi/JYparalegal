@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { toast } from 'sonner';
+import { reportFailure, reportSuccess } from '@/lib/notice';
 import { useSettingsStore } from '@/stores/settings';
 import { useShallow } from 'zustand/react/shallow';
 import { toUserMessage } from '@/lib/error-message';
@@ -76,13 +76,13 @@ export function DeveloperSection({ gradientClass }: DeveloperSectionProps) {
       const result = await hostApi.app.openClawDoctor(mode);
       setDoctorResult(result);
       if (result.success) {
-        toast.success(mode === 'fix' ? t('developer.doctorFixSucceeded') : t('developer.doctorSucceeded'));
+        reportSuccess(mode === 'fix' ? t('developer.doctorFixSucceeded') : t('developer.doctorSucceeded'));
       } else {
-        toast.error(result.error || (mode === 'fix' ? t('developer.doctorFixFailed') : t('developer.doctorFailed')));
+        reportFailure(result.error || (mode === 'fix' ? t('developer.doctorFixFailed') : t('developer.doctorFailed')));
       }
     } catch (error) {
       const message = toUserMessage(error) || (mode === 'fix' ? t('developer.doctorFixRunFailed') : t('developer.doctorRunFailed'));
-      toast.error(message);
+      reportFailure(message);
       setDoctorResult({
         mode,
         success: false,
@@ -116,9 +116,9 @@ export function DeveloperSection({ gradientClass }: DeveloperSectionProps) {
 
     try {
       await navigator.clipboard.writeText(payload);
-      toast.success(t('developer.doctorCopied'));
+      reportSuccess(t('developer.doctorCopied'));
     } catch (error) {
-      toast.error(`${t('developer.copyFailed')}: ${toUserMessage(error)}`);
+      reportFailure(`${t('developer.copyFailed')}: ${toUserMessage(error)}`);
     }
   };
 
@@ -137,9 +137,9 @@ export function DeveloperSection({ gradientClass }: DeveloperSectionProps) {
     if (!controlUiInfo?.token) return;
     try {
       await navigator.clipboard.writeText(controlUiInfo.token);
-      toast.success(t('developer.tokenCopied'));
+      reportSuccess(t('developer.tokenCopied'));
     } catch (error) {
-      toast.error(`${t('developer.copyFailed')}: ${toUserMessage(error)}`);
+      reportFailure(`${t('developer.copyFailed')}: ${toUserMessage(error)}`);
     }
   };
 
@@ -172,15 +172,15 @@ export function DeveloperSection({ gradientClass }: DeveloperSectionProps) {
     if (!openclawCliCommand) return;
     try {
       await navigator.clipboard.writeText(openclawCliCommand);
-      toast.success(t('developer.cmdCopied'));
+      reportSuccess(t('developer.cmdCopied'));
     } catch (error) {
-      toast.error(`${t('developer.copyFailed')}: ${toUserMessage(error)}`);
+      reportFailure(`${t('developer.copyFailed')}: ${toUserMessage(error)}`);
     }
   };
 
   useEffect(() => {
     const unsubscribe = hostEvents.onOpenClawCliInstalled((installedPath) => {
-      toast.success(t('developer.cliInstalled', { path: installedPath }));
+      reportSuccess(t('developer.cliInstalled', { path: installedPath }));
     });
     return () => { unsubscribe?.(); };
   }, [t]);
@@ -295,10 +295,10 @@ export function DeveloperSection({ gradientClass }: DeveloperSectionProps) {
       setProxyBypassRules(normalizedBypassRules);
       setProxyEnabled(proxyEnabledDraft);
 
-      toast.success(t('gateway.proxySaved'));
+      reportSuccess(t('gateway.proxySaved'));
       trackUiEvent('settings.proxy_saved', { enabled: proxyEnabledDraft });
     } catch (error) {
-      toast.error(`${t('gateway.proxySaveFailed')}: ${toUserMessage(error)}`);
+      reportFailure(`${t('gateway.proxySaveFailed')}: ${toUserMessage(error)}`);
     } finally {
       setSavingProxy(false);
     }
@@ -373,16 +373,16 @@ export function DeveloperSection({ gradientClass }: DeveloperSectionProps) {
     try {
       const serialized = telemetryEntries.map((entry) => JSON.stringify(entry)).join('\n');
       await navigator.clipboard.writeText(serialized);
-      toast.success(t('developer.telemetryCopied'));
+      reportSuccess(t('developer.telemetryCopied'));
     } catch (error) {
-      toast.error(`${t('common:status.error')}: ${String(error)}`);
+      reportFailure(`${t('common:status.error')}: ${String(error)}`);
     }
   };
 
   const handleClearTelemetry = () => {
     clearUiTelemetry();
     setTelemetryEntries([]);
-    toast.success(t('developer.telemetryCleared'));
+    reportSuccess(t('developer.telemetryCleared'));
   };
 
   return (

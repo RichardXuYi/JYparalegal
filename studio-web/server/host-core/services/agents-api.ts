@@ -1,4 +1,4 @@
-﻿import type { GatewayManager } from '../gateway/manager';
+import type { GatewayManager } from '../gateway/manager';
 import type { CompleteHostServiceRegistry } from '../main/ipc/host-contract';
 import {
   assignChannelToAgent,
@@ -10,6 +10,7 @@ import {
   resolveAccountIdForAgent,
   updateAgentModel,
   updateAgentName,
+  updateAgentSkills,
 } from '../utils/agent-config';
 import { deleteChannelAccountConfig } from '../utils/channel-config';
 import { ensureGrandPoemStudioContext } from '../utils/openclaw-workspace';
@@ -65,6 +66,15 @@ export function createAgentsApi(ctx: AgentsApiContext): CompleteHostServiceRegis
       const name = requireString(payload, 'name');
       const snapshot = await updateAgentName(agentId, name);
       scheduleGatewayReload(ctx, 'update-agent');
+      return { success: true, ...snapshot };
+    },
+    updateSkills: async (payload) => {
+      const agentId = requireString(payload, 'id');
+      const skillKeys = isRecord(payload) && Array.isArray(payload.skillKeys)
+        ? payload.skillKeys.filter((item): item is string => typeof item === 'string')
+        : [];
+      const snapshot = await updateAgentSkills(agentId, skillKeys);
+      scheduleGatewayReload(ctx, 'update-agent-skills');
       return { success: true, ...snapshot };
     },
     updateModel: async (payload) => {

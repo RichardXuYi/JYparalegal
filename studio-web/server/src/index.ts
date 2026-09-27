@@ -27,6 +27,7 @@ import jwt from 'jsonwebtoken';
 import { AUTH_DISABLED, FLEET_DISABLED, JWT_SECRET, PORT, PROJECT_ROOT, WS_ALLOWED_ORIGINS } from './env';
 import { registerAuthRoutes, verifySession } from './auth';
 import { registerPlatformProxy } from './platform-proxy';
+import { registerMootDriver } from './moot-driver';
 import { invokeLegacyChannel } from './legacy-router';
 import { createWebHost } from './host';
 import { FleetSupervisor } from './fleet/supervisor';
@@ -209,6 +210,9 @@ function registerWebSocket(app: FastifyInstance, backend: WsBackend): void {
 
 async function main(): Promise<void> {
   const app = Fastify({ logger: false, bodyLimit: 16 * 1024 * 1024 });
+  app.addContentTypeParser(/^multipart\/form-data/i, { parseAs: 'buffer', bodyLimit: 56 * 1024 * 1024 }, (_request, body, done) => {
+    done(null, body);
+  });
   await app.register(fastifyCookie);
   await app.register(fastifyWebsocket, { options: { maxPayload: 32 * 1024 * 1024 } });
 
@@ -256,6 +260,7 @@ async function main(): Promise<void> {
   }
 
   registerWebSocket(app, backend);
+  registerMootDriver(app, backend);
   registerPlatformProxy(app);
 
   // Built SPA (production). During development the SPA is served by Vite,

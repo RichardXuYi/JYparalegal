@@ -4,7 +4,7 @@
  */
 import { useMemo, useState } from 'react';
 import { RefreshCw, Bot, ListTree } from 'lucide-react';
-import { toast } from 'sonner';
+import { reportFailure, reportSuccess } from '@/lib/notice';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useChatStore } from '@/stores/chat';
@@ -44,12 +44,12 @@ export function ChatToolbar({
     try {
       await refresh();
       if (useChatStore.getState().error) {
-        toast.error(t('toolbar.refreshFailed'));
+        reportFailure(t('toolbar.refreshFailed'));
       } else {
-        toast.success(t('toolbar.refreshDone'));
+        reportSuccess(t('toolbar.refreshDone'));
       }
     } catch (error) {
-      toast.error(`${t('toolbar.refreshFailed')}: ${error instanceof Error ? error.message : String(error)}`);
+      reportFailure(`${t('toolbar.refreshFailed')}: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setRefreshing(false);
     }

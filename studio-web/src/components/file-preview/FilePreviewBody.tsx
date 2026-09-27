@@ -21,7 +21,7 @@
  */
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { Save, ShieldAlert, Undo2 } from 'lucide-react';
-import { toast } from 'sonner';
+import { reportFailure, reportSuccess } from '@/lib/notice';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -379,7 +379,7 @@ export function FilePreviewBody({
       const res = await writeTextFile(file.filePath, draft);
       if (!res.ok) throw new Error(res.error ?? 'unknown');
       setState({ status: 'ready', content: draft, size, readOnly: false });
-      toast.success(t('filePreview.toast.saved', 'Saved to disk'));
+      reportSuccess(t('filePreview.toast.saved', 'Saved to disk'));
     } catch (err) {
       const code = err instanceof Error ? err.message : String(err);
       const localized =
@@ -388,7 +388,7 @@ export function FilePreviewBody({
           : code === 'readOnlyRoot'
             ? t('filePreview.errors.readOnlyRoot', 'This file is in a read-only location (such as a built-in skill) and cannot be edited')
             : t('filePreview.toast.saveFailed', { defaultValue: 'Save failed: {{error}}', error: code });
-      toast.error(localized);
+      reportFailure(localized);
     } finally {
       setSaving(false);
     }
@@ -404,7 +404,7 @@ export function FilePreviewBody({
       await confirmAndOpenFile({ filePath: file.filePath, fileName: file.fileName, size, t });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      toast.error(t('filePreview.errors.openFailed', { defaultValue: 'Open failed: {{error}}', error: message }));
+      reportFailure(t('filePreview.errors.openFailed', { defaultValue: 'Open failed: {{error}}', error: message }));
     }
   }, [file, size, t]);
 

@@ -6,7 +6,7 @@
  * 402 会静默渲染成空数据。这里统一识别 402 并抛 EntitlementError，
  * 读路径用 platformProbe 渲染「未开通」态，写路径用 notifyIfEntitlement 提示。
  */
-import { toast } from 'sonner';
+import { reportFailure } from '@/lib/notice';
 
 export class EntitlementError extends Error {
   constructor(msg = '当前套餐未包含此功能，请升级后使用') {
@@ -65,17 +65,17 @@ export async function platformProbe<T>(path: string): Promise<ProbeResult<T>> {
 /** 动作类操作的 402 统一提示；返回 true 表示已处理（是 EntitlementError）。 */
 export function notifyIfEntitlement(e: unknown): boolean {
   if (e instanceof EntitlementError) {
-    toast.error(e.message);
+    reportFailure(e);
     return true;
   }
   return false;
 }
 
-// 全局兜底：任何被吞掉/冒泡到顶层的 402 都给出提示，避免静默失败。
+// 全局兜底：任何被吞掉/冒泡到顶层的 402 都弹出确认，避免静默失败。
 if (typeof window !== 'undefined') {
   window.addEventListener('unhandledrejection', (ev) => {
     if (ev.reason instanceof EntitlementError) {
-      toast.error(ev.reason.message);
+      reportFailure(ev.reason);
       ev.preventDefault();
     }
   });

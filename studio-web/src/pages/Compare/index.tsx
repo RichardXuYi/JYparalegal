@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { toast } from 'sonner';
+import { reportFailure } from '@/lib/notice';
 import { LegalPageHeader } from '@/components/legal/LegalPageHeader';
 import { EntitlementGate } from '@/components/legal/EntitlementGate';
 import { platformSend, notifyIfEntitlement, EntitlementError } from '@/lib/platform-api';
@@ -16,7 +16,7 @@ export default function Compare() {
   const [locked, setLocked] = useState(false);
 
   const run = async () => {
-    if (!a.trim() || !b.trim()) { toast.error('请先粘贴或上传两个版本的合同文本'); return; }
+    if (!a.trim() || !b.trim()) { reportFailure('请先粘贴或上传两个版本的合同文本'); return; }
     setBusy(true);
     try {
       const d = await platformSend<{ segments?: Seg[]; counts?: { added: number; deleted: number; sameCount: number } }>(
@@ -29,7 +29,7 @@ export default function Compare() {
       setSegs(null);
       setCounts(null);
       if (e instanceof EntitlementError) setLocked(true);
-      else if (!notifyIfEntitlement(e)) toast.error(`比对失败：${e instanceof Error ? e.message : '网络错误'}`);
+      else if (!notifyIfEntitlement(e)) reportFailure(`比对失败：${e instanceof Error ? e.message : '网络错误'}`);
     } finally {
       setBusy(false);
     }
