@@ -1,0 +1,23 @@
+# 对外服务：SPRING_PROFILES_ACTIVE=prod（或 --spring.profiles.active=prod）。
+# 此 profile 不加载 application-dev.yml。数据库口令、Redis 口令、JWT_SECRET
+# 必须由环境变量注入；缺失或仍为占位值时 ProductionConfigValidator 会拒绝启动。
+
+ADMIN_BOOTSTRAP_ENABLED: false
+ADMIN_BOOTSTRAP_FORCE: false
+ADMIN_BOOTSTRAP_PASSWORD: ${ADMIN_BOOTSTRAP_PASSWORD:}
+
+USER_BOOTSTRAP_ENABLED: false
+USER_BOOTSTRAP_FORCE: false
+USER_BOOTSTRAP_PASSWORD: ${USER_BOOTSTRAP_PASSWORD:}
+
+COMPANY_BOOTSTRAP_ENABLED: false
+COMPANY_BOOTSTRAP_EMPLOYEE_PASSWORD: ${COMPANY_BOOTSTRAP_EMPLOYEE_PASSWORD:}
+
+security:
+  login:
+    max-attempts-per-ip: 10
+    rate-limit-window: 15
+
+app:
+  cookie:
+    secure: true
