@@ -1,3 +1,0 @@
-﻿export const CLAWX_OPENAI_IMAGE_PROVIDER_KEY = 'grandpoem-studio-openai-image';
-export const CLAWX_OPENAI_IMAGE_DEFAULT_MODEL = 'gpt-image-2';
-export const CLAWX_OPENAI_IMAGE_DEFAULT_REF = `${CLAWX_OPENAI_IMAGE_PROVIDER_KEY}/${CLAWX_OPENAI_IMAGE_DEFAULT_MODEL}`;

@@ -1,0 +1,16 @@
+[submodule "studio-frontend"]
+	path = studio-frontend
+	url = https://github.com/RichardXuYi/JYparalegal.git
+	branch = sub/studio-frontend
+[submodule "backend"]
+	path = backend
+	url = https://github.com/RichardXuYi/JYparalegal.git
+	branch = sub/backend
+[submodule "control-plane"]
+	path = control-plane
+	url = https://github.com/RichardXuYi/JYparalegal.git
+	branch = sub/control-plane
+[submodule "studio-web"]
+	path = studio-web
+	url = https://github.com/RichardXuYi/JYparalegal.git
+	branch = sub/studio-web
