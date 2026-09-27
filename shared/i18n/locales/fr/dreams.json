@@ -1,0 +1,11 @@
+{
+    "title": "Rêves", "subtitle": "Consultez les signaux mémoire OpenClaw et la maintenance des rêves.",
+    "openFullUi": "Ouvrir les rêves complets", "gatewayNotReady": "La passerelle démarre encore. Les données se chargeront bientôt.",
+    "metrics": { "shortTerm": "Entrées court terme", "grounded": "Signaux ancrés", "signals": "Total signaux", "promotedToday": "Promus aujourd'hui" },
+    "diary": { "title": "Journal de rêves", "notFound": "DREAMS.md non créé.", "empty": "Aucune entrée.", "undated": "Non daté" },
+    "actions": { "title": "Maintenance", "enable": "Démarrer les rêves", "disable": "Arrêter les rêves", "backfill": "Remplir le journal", "dedupe": "Dédupliquer", "repair": "Réparer le cache", "resetGrounded": "Effacer les rejoués", "resetDiary": "Réinitialiser le journal", "enableSuccess": "Rêves démarrés.", "disableSuccess": "Rêves arrêtés.", "backfillSuccess": "{{count}} entrées ajoutées.", "dedupeSuccess": "{{removed}} doublons supprimés, {{kept}} conservés.", "repairSuccess": "Cache réparé.", "resetDiarySuccess": "{{count}} entrées supprimées.", "resetGroundedSuccess": "{{count}} entrées court terme effacées." },
+    "confirmations": { "dedupe": { "title": "Dédupliquer le journal ?", "message": "Réécrit DREAMS.md en supprimant les doublons." }, "repair": { "title": "Réparer le cache ?", "message": "Archive et reconstruit le cache. Le journal reste intact." }, "resetDiary": { "title": "Réinitialiser le journal ?", "message": "Supprime les entrées ajoutées de DREAMS.md." }, "resetGrounded": { "title": "Effacer les entrées rejouées ?", "message": "Efface les entrées court terme déjà converties." } },
+    "phases": { "title": "Phases de rêve", "light": "Léger", "rem": "REM", "deep": "Profond", "noSchedule": "Pas de programme" },
+    "signals": { "title": "Signaux récents", "storageMode": "Stockage : {{mode}}", "noStorageMode": "Mode indisponible", "empty": "Aucun signal récent.", "unknownSource": "Source inconnue", "noSnippet": "Aucun extrait." },
+    "errors": { "openFullUi": "Impossible d'ouvrir l'UI complète des rêves.", "configHashMissing": "Hash de configuration indisponible.", "memoryInitializing": "Mémoire en cours d'initialisation." }
+}

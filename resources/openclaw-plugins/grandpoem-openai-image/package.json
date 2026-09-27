@@ -1,0 +1,16 @@
+{
+  "name": "grandpoem-studio-openai-image-plugin",
+  "version": "1.4.66",
+  "description": "GrandPoem Studio independent OpenAI-compatible image generation provider for OpenClaw",
+  "private": true,
+  "type": "module",
+  "main": "index.mjs",
+  "openclaw": {
+    "extensions": [
+      "./index.mjs"
+    ]
+  },
+  "peerDependencies": {
+    "openclaw": "*"
+  }
+}
