@@ -49,7 +49,7 @@ public class WebConfig implements WebMvcConfigurer {
                 .addPathPatterns(
                         "/api/sign/**",
                         "/api/evidence/**", "/api/templates/**", "/api/review/**",
-                        "/api/knowledge/**", "/internal/tools/**")
+                        "/api/knowledge/**", "/api/moot/**", "/internal/tools/**")
                 .excludePathPatterns("/api/sign/callbacks/**");
     }
 }

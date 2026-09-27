@@ -25,7 +25,7 @@ import {
 } from '@/types/channel';
 import { usesPluginManagedQrAccounts } from '@/lib/channel-alias';
 import { useTranslation } from 'react-i18next';
-import { toast } from 'sonner';
+import { reportFailure, reportSuccess } from '@/lib/notice';
 
 import telegramIcon from '@/assets/channels/telegram.svg';
 import discordIcon from '@/assets/channels/discord.svg';
@@ -379,10 +379,10 @@ export function Channels() {
       }
       setDiagnosticsSnapshot(null);
       setShowDiagnostics(false);
-      toast.success(t('health.restartTriggered'));
+      reportSuccess(t('health.restartTriggered'));
       void fetchPageData({ probe: true });
     } catch (restartError) {
-      toast.error(t('health.restartFailed', { error: String(restartError) }));
+      reportFailure(t('health.restartFailed', { error: String(restartError) }));
     }
   };
 
@@ -391,9 +391,9 @@ export function Channels() {
     try {
       const snapshot = await fetchDiagnosticsSnapshot();
       await navigator.clipboard.writeText(JSON.stringify(snapshot, null, 2));
-      toast.success(t('health.diagnosticsCopied'));
+      reportSuccess(t('health.diagnosticsCopied'));
     } catch (copyError) {
-      toast.error(t('health.diagnosticsCopyFailed', { error: String(copyError) }));
+      reportFailure(t('health.diagnosticsCopyFailed', { error: String(copyError) }));
     } finally {
       setDiagnosticsLoading(false);
     }
@@ -408,7 +408,7 @@ export function Channels() {
     try {
       await fetchDiagnosticsSnapshot();
     } catch (diagnosticsError) {
-      toast.error(t('health.diagnosticsCopyFailed', { error: String(diagnosticsError) }));
+      reportFailure(t('health.diagnosticsCopyFailed', { error: String(diagnosticsError) }));
       setDiagnosticsLoading(false);
       return;
     } finally {
@@ -443,9 +443,9 @@ export function Channels() {
         await hostApi.channels.saveBinding({ channelType, accountId, agentId });
       }
       await fetchPageData();
-      toast.success(t('toast.bindingUpdated'));
+      reportSuccess(t('toast.bindingUpdated'));
     } catch (bindError) {
-      toast.error(t('toast.configFailed', { error: String(bindError) }));
+      reportFailure(t('toast.configFailed', { error: String(bindError) }));
     }
   };
 
@@ -454,14 +454,14 @@ export function Channels() {
     try {
       await hostApi.channels.deleteConfig(deleteTarget.channelType, deleteTarget.accountId);
       setChannelGroups((prev) => removeDeletedTarget(prev, deleteTarget));
-      toast.success(deleteTarget.accountId ? t('toast.accountDeleted') : t('toast.channelDeleted'));
+      reportSuccess(deleteTarget.accountId ? t('toast.accountDeleted') : t('toast.channelDeleted'));
       // Channel reload is debounced in main process; pull again shortly to
       // converge with runtime state without flashing deleted rows back in.
       window.setTimeout(() => {
         void fetchPageData();
       }, 1200);
     } catch (deleteError) {
-      toast.error(t('toast.configFailed', { error: String(deleteError) }));
+      reportFailure(t('toast.configFailed', { error: String(deleteError) }));
     } finally {
       setDeleteTarget(null);
     }

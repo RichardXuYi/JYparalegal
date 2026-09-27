@@ -17,6 +17,7 @@ export type SettingsSection =
   | 'gateway'
   | 'developer'
   | 'updates'
+  | 'archive'
   | 'about';
 
 /** Default section shown when the gear icon is clicked. */

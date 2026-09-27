@@ -73,7 +73,7 @@ const FEATURES: FeatureItem[] = [
   {
     route: '/moot',
     label: '模拟法庭',
-    description: '庭审演练（即将开发）',
+    description: '五个角色按槽发言',
     icon: Scale,
     color: 'from-fuchsia-500 to-purple-500',
   },

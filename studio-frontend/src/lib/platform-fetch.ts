@@ -21,6 +21,22 @@ window.fetch = (input: RequestInfo | URL, init?: RequestInit): Promise<Response>
 
   const method = init?.method
     ?? (typeof input !== 'string' && !(input instanceof URL) ? input.method : 'GET');
+  if (typeof FormData !== 'undefined' && init?.body instanceof FormData) {
+    const file = init.body.get('file');
+    if (file instanceof File) {
+      return file.arrayBuffer().then((buffer) => ipc.invoke('platform:fetch', {
+        path: url,
+        method,
+        multipartFile: { name: file.name, bytes: new Uint8Array(buffer) },
+      })).then((raw) => {
+        const result = raw as { status?: number; body?: string };
+        return new Response(result.body ?? 'null', {
+          status: typeof result.status === 'number' ? result.status : 502,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      });
+    }
+  }
   const body = typeof init?.body === 'string' ? init.body : null;
 
   return ipc.invoke('platform:fetch', { path: url, method, body }).then((raw) => {

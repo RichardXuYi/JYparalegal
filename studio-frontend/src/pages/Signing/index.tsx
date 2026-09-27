@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { toast } from 'sonner';
+import { reportFailure, reportSuccess } from '@/lib/notice';
 import { fmtDateTime, signStatusChipClass, signStatusLabel } from '@/lib/legal-enums';
 import { platformGet, platformProbe, platformSend, notifyIfEntitlement } from '@/lib/platform-api';
 import { LegalPageHeader } from '@/components/legal/LegalPageHeader';
@@ -99,12 +99,12 @@ export default function Signing() {
     t.expireAt ? fmtDateTime(t.expireAt) : '', t.createdAt ? fmtDateTime(t.createdAt) : '', t.completedAt ? fmtDateTime(t.completedAt) : '',
   ]);
   const exportCsv = () => {
-    if (filtered.length === 0) { toast.error('当前筛选没有可导出的任务'); return; }
+    if (filtered.length === 0) { reportFailure('当前筛选没有可导出的任务'); return; }
     downloadCsv(csvRows(filtered), `签署任务-${fmtDateTime(new Date().toISOString()).slice(0, 10)}`);
   };
   const exportSelected = () => {
     const list = filtered.filter((t) => selected.has(t.id));
-    if (list.length === 0) { toast.error('未选择任何任务'); return; }
+    if (list.length === 0) { reportFailure('未选择任何任务'); return; }
     downloadCsv(csvRows(list), `签署任务-所选${list.length}条`);
   };
 
@@ -112,19 +112,19 @@ export default function Signing() {
     try {
       const d = await platformGet<Record<string, string | undefined>>(`/platform/sign/tasks/${id}/download`);
       const url = d?.fileUrl ?? d?.url ?? d?.downloadUrl;
-      if (url) { window.open(url, '_blank', 'noopener'); toast.success('已开始下载'); }
-      else toast.error('下载失败');
+      if (url) { window.open(url, '_blank', 'noopener'); reportSuccess('已开始下载'); }
+      else reportFailure('下载失败');
     } catch (e) {
-      if (!notifyIfEntitlement(e)) toast.error(e instanceof Error ? e.message : '网络错误,下载失败');
+      if (!notifyIfEntitlement(e)) reportFailure(e instanceof Error ? e.message : '网络错误,下载失败');
     }
   };
 
   const requestCertificate = async (id: number) => {
     try {
       await platformSend(`/platform/sign/tasks/${id}/certificate`, 'POST', {});
-      toast.success('出证申请已提交');
+      reportSuccess('出证申请已提交');
     } catch (e) {
-      if (!notifyIfEntitlement(e)) toast.error(e instanceof Error ? e.message : '网络错误,出证失败');
+      if (!notifyIfEntitlement(e)) reportFailure(e instanceof Error ? e.message : '网络错误,出证失败');
     }
   };
 

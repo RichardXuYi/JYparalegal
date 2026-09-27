@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
+import { reportFailure } from '@/lib/notice';
 import { Scale, GraduationCap, FileText, FileUp, LayoutTemplate, Lock, Sparkles } from 'lucide-react';
 import { billingRuleLabel, planLabel, signStatusLabel } from '@/lib/legal-enums';
 import { platformGet, platformProbe, platformSend, notifyIfEntitlement } from '@/lib/platform-api';
@@ -40,14 +40,14 @@ export default function Overview() {
 
   const uploadFile = async (file: File) => {
     if (file.size > MAX_UPLOAD_BYTES) {
-      toast.error(`文件超过 50MB，无法上传：${file.name}`);
+      reportFailure(`文件超过 50MB，无法上传：${file.name}`);
       return;
     }
     let b64: string;
     try {
       b64 = await fileToBase64(file);
     } catch (e) {
-      toast.error(`读取文件失败：${e instanceof Error ? e.message : file.name}`);
+      reportFailure(`读取文件失败：${e instanceof Error ? e.message : file.name}`);
       return;
     }
     try {
@@ -56,9 +56,9 @@ export default function Overview() {
       });
       const newId = d?.taskId ?? d?.id;
       if (newId) nav(`/signing/${newId}`);
-      else toast.error('发起失败');
+      else reportFailure('发起失败');
     } catch (e) {
-      if (!notifyIfEntitlement(e)) toast.error(`发起失败：${e instanceof Error ? e.message : '网络错误'}`);
+      if (!notifyIfEntitlement(e)) reportFailure(`发起失败：${e instanceof Error ? e.message : '网络错误'}`);
     }
   };
 
@@ -152,7 +152,7 @@ export default function Overview() {
               <button className="rounded-lg border border-border p-3 text-left text-meta hover:border-primary" onClick={() => nav('/moot')}>
                 <GraduationCap className="h-5 w-5 text-primary" />
                 <div className="mt-1 font-medium">模拟法庭</div>
-                <div className="mt-0.5 text-tiny text-muted-foreground">多角色庭审演练 · 即将开发</div>
+                <div className="mt-0.5 text-tiny text-muted-foreground">五个角色按槽发言</div>
               </button>
               <button className="rounded-lg border border-border p-3 text-left text-meta hover:border-primary" onClick={() => nav('/compare')}>
                 <FileText className="h-5 w-5 text-primary" />

@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>模拟法庭 Demo · 二期（案卷 / 档案 / 庭审）</title>
+<style>
+  :root[data-theme="light"] {
+    --bg: hsl(210 40% 98%); --fg: hsl(222 47% 11%);
+    --card: hsl(0 0% 100%); --card-hover: hsl(210 40% 97%);
+    --muted: hsl(210 40% 96%); --muted-fg: hsl(215 14% 47%);
+    --primary: hsl(243 75% 59%); --primary-soft: hsl(243 75% 59% / .10);
+    --accent-fg: hsl(243 55% 48%); --border: hsl(214 32% 91%);
+    --gold: hsl(38 92% 42%); --gold-soft: hsl(43 90% 50% / .14);
+    --red: hsl(0 72% 45%); --red-soft: hsl(0 72% 45% / .10);
+    --green: hsl(142 60% 34%); --green-soft: hsl(142 60% 34% / .10);
+    --blue: hsl(217 85% 50%); --blue-soft: hsl(210 90% 50% / .10);
+  }
+  :root[data-theme="dark"] {
+    --bg: hsl(20 22% 5%); --fg: hsl(30 60% 96%);
+    --card: hsl(18 20% 9%); --card-hover: hsl(18 20% 12%);
+    --muted: hsl(18 16% 14%); --muted-fg: hsl(24 12% 60%);
+    --primary: hsl(16 84% 56%); --primary-soft: hsl(16 84% 56% / .16);
+    --accent-fg: hsl(24 95% 82%); --border: hsl(18 14% 18%);
+    --gold: hsl(36 95% 60%); --gold-soft: hsl(36 95% 60% / .15);
+    --red: hsl(0 80% 64%); --red-soft: hsl(0 80% 64% / .15);
+    --green: hsl(142 55% 52%); --green-soft: hsl(142 55% 52% / .14);
+    --blue: hsl(205 90% 66%); --blue-soft: hsl(205 90% 66% / .14);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--fg); font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif; font-size:14px; line-height:1.6; height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+  .page { flex:1; display:flex; flex-direction:column; gap:12px; padding:16px 22px; overflow:hidden; max-width:1440px; width:100%; margin:0 auto; }
+  .page-header { display:flex; align-items:center; gap:12px; flex-shrink:0; }
+  .page-header h1 { font-size:18px; font-weight:600; letter-spacing:-.2px; }
+  .badge { display:inline-flex; align-items:center; gap:4px; padding:2px 10px; border-radius:999px; font-size:12px; border:1px solid var(--border); color:var(--muted-fg); background:var(--card); }
+  .badge.primary { color:var(--accent-fg); background:var(--primary-soft); border-color:transparent; }
+  .badge.live { color:var(--green); background:var(--green-soft); border-color:transparent; }
+  .badge.live::before { content:""; width:6px; height:6px; border-radius:50%; background:var(--green); animation:pulse 1.6s infinite; }
+  @keyframes pulse { 50% { opacity:.35; } }
+  .spacer { margin-left:auto; }
+  .icon-btn { background:var(--card); border:1px solid var(--border); color:var(--muted-fg); border-radius:8px; padding:5px 12px; cursor:pointer; font-size:12px; }
+  .icon-btn:hover { color:var(--fg); }
+  .view { display:none; flex:1; flex-direction:column; gap:12px; min-height:0; }
+  .view.active { display:flex; }
+  .panel { background:var(--card); border:1px solid var(--border); border-radius:14px; display:flex; flex-direction:column; min-height:0; }
+  .panel-head { padding:10px 16px; border-bottom:1px solid var(--border); font-size:13px; font-weight:600; display:flex; align-items:center; gap:8px; flex-shrink:0; }
+  .panel-body { flex:1; overflow-y:auto; padding:12px 16px; }
+  .panel-body::-webkit-scrollbar { width:8px; } .panel-body::-webkit-scrollbar-thumb { background:var(--border); border-radius:4px; }
+  .btn { border:none; border-radius:10px; padding:8px 18px; font-size:13px; cursor:pointer; font-weight:600; }
+  .btn:disabled { opacity:.4; cursor:not-allowed; }
+  .btn.gold { background:var(--gold); color:hsl(20 60% 10%); }
+  .btn.primary { background:var(--primary); color:#fff; }
+  .btn.ghost { background:var(--muted); color:var(--muted-fg); font-weight:500; }
+  .tag { font-size:11px; padding:1px 8px; border-radius:5px; }
+  .tag.ok { background:var(--green-soft); color:var(--green); }
+  .tag.run { background:var(--gold-soft); color:var(--gold); }
+  .tag.err { background:var(--red-soft); color:var(--red); }
+  .tag.ai { background:var(--muted); color:var(--muted-fg); }
+  .tag.human { background:var(--green-soft); color:var(--green); }
+  .tag.warn { background:var(--red-soft); color:var(--red); }
+
+  /* ===== 视图一：案卷 ===== */
+  .case-row { display:flex; align-items:center; gap:12px; padding:10px 14px; border:1px solid var(--border); border-radius:10px; margin-bottom:8px; cursor:pointer; background:var(--bg); }
+  .case-row:hover { border-color:var(--primary); }
+  .case-row .c-ico { width:34px; height:34px; border-radius:8px; background:var(--muted); display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0; }
+  .case-row .c-name { font-size:13.5px; font-weight:600; }
+  .case-row .c-sub { font-size:11.5px; color:var(--muted-fg); }
+  .case-row .c-meta { margin-left:auto; display:flex; gap:8px; align-items:center; }
+
+  /* ===== 视图二：档案 ===== */
+  .files-grid { flex:1; display:grid; grid-template-columns:220px 1fr; gap:12px; min-height:0; }
+  .tree-item { display:flex; align-items:center; gap:8px; padding:7px 10px; border-radius:8px; cursor:pointer; font-size:12.5px; color:var(--muted-fg); }
+  .tree-item:hover { background:var(--card-hover); color:var(--fg); }
+  .tree-item.on { background:var(--primary-soft); color:var(--accent-fg); font-weight:600; }
+  .tree-item .cnt { margin-left:auto; font-size:10.5px; background:var(--muted); border-radius:999px; padding:0 7px; }
+  .fsearch { background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:5px 10px; color:var(--fg); font-size:12px; outline:none; width:140px; }
+  .ftbl { width:100%; border-collapse:collapse; font-size:12.5px; }
+  .ftbl th { text-align:left; padding:8px 12px; color:var(--muted-fg); font-weight:500; border-bottom:1px solid var(--border); background:var(--card); position:sticky; top:0; font-size:11.5px; }
+  .ftbl td { padding:8px 12px; border-bottom:1px solid var(--border); vertical-align:middle; }
+  .ftbl tr.frow { cursor:pointer; }
+  .ftbl tr.frow:hover td { background:var(--card-hover); }
+  .fname { display:flex; align-items:center; gap:8px; font-weight:500; }
+  .fico { width:26px; height:26px; border-radius:6px; background:var(--muted); display:flex; align-items:center; justify-content:center; font-size:13px; flex-shrink:0; }
+  .fhash { font-family:ui-monospace,Consolas,monospace; font-size:10.5px; color:var(--muted-fg); }
+  .fpeek { color:var(--accent-fg); font-size:11.5px; white-space:nowrap; }
+
+  /* ===== 视图三：庭审 ===== */
+  .slots-bar { flex-shrink:0; display:flex; align-items:center; gap:8px; background:var(--card); border:1px solid var(--border); border-radius:12px; padding:8px 14px; font-size:12px; overflow-x:auto; }
+  .slot-chip { display:flex; align-items:center; gap:5px; padding:4px 10px; border-radius:8px; background:var(--muted); color:var(--muted-fg); white-space:nowrap; font-size:11.5px; }
+  .slot-chip.done { background:var(--primary-soft); color:var(--accent-fg); }
+  .slot-chip.now { background:var(--gold-soft); color:var(--gold); font-weight:600; }
+  .slot-chip.human { background:var(--green-soft); color:var(--green); }
+  .floor-bar { flex-shrink:0; display:flex; align-items:center; gap:10px; background:var(--card); border:1px solid var(--border); border-radius:12px; padding:7px 14px; font-size:12px; }
+  .floor-holder { font-weight:600; color:var(--gold); }
+  .muted-list { color:var(--muted-fg); }
+  .role-row { flex-shrink:0; display:grid; grid-template-columns:1fr 1.4fr 1fr; gap:12px; }
+  .side-card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:12px 14px; display:flex; flex-direction:column; gap:8px; }
+  .side-card.ours { border-color:var(--primary); }
+  .side-card .sc-head { display:flex; align-items:center; gap:10px; }
+  .side-card .sc-av { width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
+  .side-card .sc-name { font-size:14px; font-weight:600; }
+  .side-card .sc-sub { font-size:11px; color:var(--muted-fg); }
+  .side-card .sc-tags { display:flex; gap:6px; flex-wrap:wrap; margin-top:2px; }
+  .side-card .sc-info { font-size:11.5px; color:var(--muted-fg); border-top:1px dashed var(--border); padding-top:6px; }
+  .side-card.floor { border-color:var(--gold); box-shadow:0 0 0 3px var(--gold-soft); }
+  .bench-card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:12px 14px; }
+  .bench-card h3 { font-size:11.5px; color:var(--muted-fg); font-weight:500; margin-bottom:8px; text-align:center; }
+  .bench-row { display:grid; grid-template-columns:1fr 1.3fr 1fr; gap:8px; }
+  .role-chip { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:8px 10px; display:flex; align-items:center; gap:8px; }
+  .role-chip.floor { border-color:var(--gold); background:var(--gold-soft); }
+  .role-chip .av { width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:15px; flex-shrink:0; }
+  .role-chip .rn { font-size:12px; font-weight:600; }
+  .role-chip .rs { font-size:10px; color:var(--muted-fg); }
+  .av-gold { background:linear-gradient(135deg,hsl(36 90% 52%),hsl(16 84% 50%)); }
+  .av-purple { background:linear-gradient(135deg,hsl(243 70% 62%),hsl(280 60% 55%)); }
+  .av-blue { background:linear-gradient(135deg,hsl(210 85% 58%),hsl(195 80% 48%)); }
+  .av-red { background:linear-gradient(135deg,hsl(0 70% 55%),hsl(350 70% 45%)); }
+  .av-teal { background:linear-gradient(135deg,hsl(160 55% 42%),hsl(180 55% 38%)); }
+  .main-row { flex:1; display:grid; grid-template-columns:1fr 260px; gap:12px; min-height:0; }
+  .stream-panel { background:var(--card); border:1px solid var(--border); border-radius:14px; display:flex; flex-direction:column; min-height:0; }
+  .stream-head { padding:8px 14px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:10px; font-size:13px; flex-shrink:0; }
+  .stream { flex:1; overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:12px; }
+  .utterance { border:1px solid var(--border); border-radius:12px; background:var(--bg); overflow:hidden; animation:fadeUp .3s ease; }
+  @keyframes fadeUp { from { opacity:0; transform:translateY(8px); } }
+  .utterance.floor-now { border-color:var(--gold); box-shadow:0 0 0 2px var(--gold-soft); }
+  .utterance.human { border-color:var(--primary); }
+  .utt-head { display:flex; align-items:center; gap:8px; padding:8px 12px; border-bottom:1px dashed var(--border); background:var(--card); }
+  .utt-head .who { font-size:12.5px; font-weight:600; }
+  .utt-head .meta { margin-left:auto; font-size:10.5px; color:var(--muted-fg); display:flex; gap:8px; }
+  .utt-body { padding:10px 14px; font-size:13px; }
+  .utt-body b { color:var(--gold); }
+  .utt-warn { margin-top:6px; font-size:11px; color:var(--red); background:var(--red-soft); padding:3px 8px; border-radius:6px; display:inline-block; }
+  .cursor { display:inline-block; width:7px; height:13px; background:var(--gold); vertical-align:-2px; animation:blink .8s infinite; }
+  @keyframes blink { 50% { opacity:0; } }
+  .stream-input { border-top:1px solid var(--border); padding:10px 14px; display:flex; gap:10px; align-items:center; flex-shrink:0; }
+  .stream-input input { flex:1; background:var(--bg); border:1px solid var(--border); border-radius:10px; padding:8px 12px; color:var(--fg); font-size:13px; outline:none; }
+  .stream-input input:focus { border-color:var(--primary); }
+  .side-body { flex:1; overflow-y:auto; padding:12px 14px; display:flex; flex-direction:column; gap:10px; }
+  .side-sec h4 { font-size:11.5px; color:var(--muted-fg); font-weight:500; margin-bottom:4px; }
+  .side-sec li { font-size:11.5px; margin-left:14px; margin-bottom:2px; }
+  .disclaimer { margin:6px 14px 12px; font-size:11px; color:var(--muted-fg); border-left:2px solid var(--gold); padding-left:8px; }
+
+  /* ===== 模态 ===== */
+  .modal-mask { position:fixed; inset:0; background:hsl(0 0% 0% / .6); backdrop-filter:blur(3px); display:none; align-items:center; justify-content:center; z-index:50; }
+  .modal-mask.on { display:flex; }
+  .modal { width:min(720px,92vw); max-height:86vh; background:var(--card); border:1px solid var(--border); border-radius:16px; display:flex; flex-direction:column; animation:fadeUp .25s ease; }
+  .modal-head { padding:11px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:10px; flex-shrink:0; }
+  .modal-head .t { font-size:14px; font-weight:600; }
+  .modal-head .hash { font-size:10.5px; color:var(--muted-fg); font-family:ui-monospace,Consolas,monospace; }
+  .modal-close { margin-left:auto; background:var(--muted); border:none; color:var(--muted-fg); border-radius:8px; width:28px; height:28px; cursor:pointer; font-size:14px; }
+  .modal-close:hover { color:var(--fg); }
+  .modal-body { flex:1; overflow-y:auto; padding:16px 20px; }
+  .modal-body::-webkit-scrollbar { width:8px; } .modal-body::-webkit-scrollbar-thumb { background:var(--border); border-radius:4px; }
+  .paper { background:var(--bg); border:1px solid var(--border); border-radius:10px; padding:18px 24px; font-size:13px; }
+  .paper h2 { font-size:15px; text-align:center; margin-bottom:4px; letter-spacing:2px; }
+  .paper .pno { text-align:center; font-size:10.5px; color:var(--muted-fg); margin-bottom:12px; }
+  .paper p { margin-bottom:7px; text-indent:2em; }
+  .paper .clause { text-indent:0; }
+  .paper .sign { margin-top:14px; display:flex; justify-content:space-between; font-size:12px; color:var(--muted-fg); }
+  .scan { border:1px dashed var(--border); border-radius:10px; padding:20px; text-align:center; color:var(--muted-fg); font-size:12px; background:repeating-linear-gradient(45deg,transparent,transparent 12px,var(--muted) 12px,var(--muted) 13px); margin-bottom:8px; }
+  .scan b { display:block; font-size:13.5px; color:var(--fg); margin-bottom:3px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="page-header">
+    <h1>⚖️ 模拟法庭</h1>
+    <span class="badge primary">案卷 MOOT-2026-0031</span>
+    <span class="badge">合同号 HT-2025-1188</span>
+    <span class="badge">买卖合同纠纷 · 我方=原告</span>
+    <span class="badge" id="stageBadge">视图：案卷</span>
+    <div class="spacer"></div>
+    <button class="icon-btn" onclick="toggleTheme()">🌓 主题</button>
+    <button class="icon-btn" onclick="location.reload()">↺ 重置</button>
+  </div>
+
+  <!-- ===== 视图一：案卷 ===== -->
+  <div class="view active" id="view-cases">
+    <div class="panel" style="flex:1">
+      <div class="panel-head"> 案卷列表 <span class="badge" style="margin-left:auto">本机文件夹 · 平台库不存正文</span>
+        <div class="spacer"></div>
+        <button class="btn gold" onclick="goFiles()">＋ 新建案卷</button>
+      </div>
+      <div class="panel-body">
+        <div class="case-row" onclick="goFiles()">
+          <div class="c-ico">📁</div>
+          <div><div class="c-name">MOOT-2026-0031 · 设备采购合同欠款</div><div class="c-sub">合同号 HT-2025-1188 · 立场：原告 · 状态：READY · 14 份文件</div></div>
+          <div class="c-meta"><span class="tag ok">可开庭</span><span class="btn primary" style="padding:5px 12px;font-size:12px">进入 →</span></div>
+        </div>
+        <div class="case-row">
+          <div class="c-ico"></div>
+          <div><div class="c-name">MOOT-2026-0028 · 技术服务合同纠纷</div><div class="c-sub">合同号 HT-2025-0942 · 立场：被告 · 状态：DRAFT · 3 份文件</div></div>
+          <div class="c-meta"><span class="tag run">待补摘要</span></div>
+        </div>
+        <div class="case-row">
+          <div class="c-ico"></div>
+          <div><div class="c-name">MOOT-2026-0019 · 房屋租赁押金退还</div><div class="c-sub">无关联合同 · 立场：原告 · 状态：CLOSED · 8 份文件 · 已结案</div></div>
+          <div class="c-meta"><span class="tag">已结案</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 视图二：档案 ===== -->
+  <div class="view" id="view-files">
+    <div class="slots-bar">
+      <span class="slot-chip done">① 案卷</span><span class="slot-chip now">② 档案</span><span class="slot-chip">③ 庭审</span>
+      <div class="spacer"></div>
+      <button class="btn ghost" onclick="goCases()">← 案卷</button>
+      <button class="btn gold" id="toHearingBtn" onclick="goHearing()">⚖️ 开始庭审 →</button>
+    </div>
+    <div class="files-grid">
+      <div class="panel">
+        <div class="panel-head">🗂️ 目录</div>
+        <div class="panel-body" id="folderTree" style="padding:8px"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">📥 文件明细 <span class="badge" id="fileCount"></span>
+          <div class="spacer"></div>
+          <input class="fsearch" id="fsearch" placeholder="搜索…" oninput="renderFiles()">
+          <button class="btn ghost" onclick="alert('Demo 占位：正式版接 multipart 上传，入库固化 sha256')">＋ 上传</button>
+        </div>
+        <div class="panel-body" style="padding:0;overflow:auto">
+          <table class="ftbl">
+            <thead><tr><th>名称</th><th>类型</th><th>大小</th><th>时间</th><th>sha256</th><th>解析</th><th></th></tr></thead>
+            <tbody id="fileRows"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 视图三：庭审 ===== -->
+  <div class="view" id="view-hearing">
+    <div class="slots-bar">
+      <span class="slot-chip done">① 案卷</span><span class="slot-chip done">② 档案</span><span class="slot-chip now">③ 庭审</span>
+      <div class="spacer"></div>
+      <button class="btn ghost" onclick="goFiles()">← 档案</button>
+      <button class="btn gold" id="nextBtn" onclick="nextSlot()">下一发言槽 →</button>
+      <button class="btn ghost" id="autoBtn" onclick="toggleAuto()">▶ 自动播放</button>
+    </div>
+    <div class="slots-bar" id="slotsBar"></div>
+    <div class="floor-bar">
+      <span class="floor-holder" id="floorHolder">🎤 发言权：—（未开庭）</span>
+      <span class="muted-list" id="mutedList">🔇 全员静音</span>
+      <div class="spacer"></div>
+      <span class="badge" style="color:var(--gold)">约束：单发言权锁 · 点对点调用 · 无群聊</span>
+    </div>
+    <div class="role-row" id="roleRow"></div>
+    <div class="main-row">
+      <div class="stream-panel">
+        <div class="stream-head"><b>庭审笔录</b><span class="badge" id="msgCount">0 条发言</span>
+          <div class="spacer"></div>
+          <span class="tag warn" id="warnTag" style="display:none">⚠ 条号未在本槽片段中出现</span>
+        </div>
+        <div class="stream" id="stream"></div>
+        <div class="stream-input" id="humanInput" style="display:none">
+          <span class="tag human">我方发言</span>
+          <input id="humanText" placeholder="以我方身份发言，提交后作为 HUMAN 笔录…" onkeydown="if(event.key==='Enter')humanSpeak()">
+          <button class="btn primary" onclick="humanSpeak()">提交</button>
+        </div>
+        <div class="disclaimer">⚠️ 模拟发言，不是裁判文书，不替代执业律师意见。</div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">📋 案情摘要 <span class="tag ok" id="summaryTag">已冻结</span></div>
+        <div class="side-body">
+          <div class="side-sec"><h4>案情</h4><p style="font-size:11.5px">双方 2025-03 签订《设备采购合同》，我方已交付并验收合格，被告仅付 310,000 元，余款 860,000 元经三次催告未付。被告于收货后 78 天首次提质量异议。</p></div>
+          <div class="side-sec"><h4>立场</h4><p style="font-size:11.5px">我方 = 原告</p></div>
+          <div class="side-sec"><h4>本槽档案片段</h4><ul id="chunkList"><li style="color:var(--muted-fg)">待开庭…</li></ul></div>
+          <div class="side-sec"><h4>token / 字数</h4><div style="font-size:11.5px"><b id="charUsed">0</b> 字</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 原件预览模态 ===== -->
+<div class="modal-mask" id="modalMask" onclick="if(event.target===this)closePreview()">
+  <div class="modal">
+    <div class="modal-head"><span id="pvIco">📄</span><span class="t" id="pvTitle">原件预览</span><span class="hash" id="pvHash"></span>
+      <button class="modal-close" onclick="closePreview()">✕</button></div>
+    <div class="modal-body" id="pvBody"></div>
+  </div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+function toggleTheme(){const r=document.documentElement;r.dataset.theme=r.dataset.theme==="dark"?"light":"dark";}
+
+/* ===== 导航 ===== */
+function showView(id,label){ ["view-cases","view-files","view-hearing"].forEach(v=>$(v).classList.remove("active")); $(id).classList.add("active"); $("stageBadge").textContent="视图："+label; }
+function goCases(){ showView("view-cases","案卷"); }
+function goFiles(){ showView("view-files","档案"); renderTree(); renderFiles(); }
+function goHearing(){ showView("view-hearing","庭审"); renderSlots(); renderRoles(); updateBtns(); }
+
+/* ===== 档案 ===== */
+const FOLDERS=["全部","合同","证据","说明与诉请","公司画像","证人名单"];
+const FICO={pdf:"📄",xlsx:"📊",docx:"✍️",md:"📝",json:""};
+const FILES=[
+ {id:"c1",folder:"合同",name:"设备采购合同（签署原件）.pdf",type:"pdf",size:"4.2 MB",time:"09-24 10:12",hash:"9f2c…a1",st:"PARSED"},
+ {id:"c2",folder:"合同",name:"补充协议一.pdf",type:"pdf",size:"0.8 MB",time:"09-24 10:12",hash:"b7e1…3d",st:"PARSED"},
+ {id:"e1",folder:"证据",name:"E-01 设备采购合同.pdf",type:"pdf",size:"4.2 MB",time:"09-24 11:03",hash:"9f2c…a1",st:"PARSED"},
+ {id:"e2",folder:"证据",name:"E-02 送货单（5张）.pdf",type:"pdf",size:"2.1 MB",time:"09-24 11:05",hash:"41aa…7e",st:"PARSED"},
+ {id:"e3",folder:"证据",name:"E-03 验收单.pdf",type:"pdf",size:"0.6 MB",time:"09-24 11:06",hash:"c03d…92",st:"PARSED"},
+ {id:"e4",folder:"证据",name:"E-04 对账函（原件已核验）.pdf",type:"pdf",size:"0.9 MB",time:"09-25 09:40",hash:"77b2…05",st:"PARSED"},
+ {id:"e5",folder:"证据",name:"E-05 催款函一+公证送达回执.pdf",type:"pdf",size:"1.3 MB",time:"09-24 11:09",hash:"e58f…44",st:"PARSED"},
+ {id:"e6",folder:"证据",name:"E-06 催款函二、三+回执.pdf",type:"pdf",size:"1.8 MB",time:"09-24 11:10",hash:"90d4…17",st:"PARSED"},
+ {id:"e7",folder:"证据",name:"E-07 损失计算表.xlsx",type:"xlsx",size:"86 KB",time:"09-24 11:12",hash:"2c6a…8b",st:"PARSED"},
+ {id:"st",folder:"说明与诉请",name:"违约事实说明与拟诉请.docx",type:"docx",size:"42 KB",time:"09-24 15:26",hash:"5d19…c0",st:"PARSED"},
+ {id:"co",folder:"公司画像",name:"对方征信报告与涉诉快照.pdf",type:"pdf",size:"1.1 MB",time:"09-20 08:00",hash:"a3f7…22",st:"PARSED"},
+ {id:"wit",folder:"证人名单",name:"证人名单与质证预案.md",type:"md",size:"6 KB",time:"09-25 17:44",hash:"8e02…5f",st:"PARSED"},
+ {id:"scan1",folder:"证据",name:"监理会议纪要（扫描件）.pdf",type:"pdf",size:"3.4 MB",time:"09-25 14:00",hash:"—",st:"NO_TEXT"},
+ {id:"fail1",folder:"证据",name:"损坏文件.pdf",type:"pdf",size:"1.2 MB",time:"09-25 16:30",hash:"—",st:"FAILED"}
+];
+let curFolder="全部";
+function renderTree(){
+  $("folderTree").innerHTML=FOLDERS.map(f=>{const n=f==="全部"?FILES.length:FILES.filter(x=>x.folder===f).length;
+    return `<div class="tree-item ${f===curFolder?'on':''}" onclick="setFolder('${f}')">${f==="全部"?"️":"📁"} ${f}<span class="cnt">${n}</span></div>`;}).join("");
+}
+function setFolder(f){ curFolder=f; renderTree(); renderFiles(); }
+function renderFiles(){
+  const q=($("fsearch")?.value||"").trim();
+  const list=FILES.filter(f=>(curFolder==="全部"||f.folder===curFolder)&&(!q||f.name.includes(q)));
+  $("fileCount").textContent=list.length+" 个文件";
+  $("fileRows").innerHTML=list.map(f=>{
+    const stClass=f.st==="PARSED"?"ok":f.st==="NO_TEXT"?"run":"err";
+    const stLabel=f.st==="PARSED"?"✓ 已解析":f.st==="NO_TEXT"?"无文字层":"解析失败";
+    return `<tr class="frow" onclick="openPreview('${f.id}')">
+    <td><div class="fname"><span class="fico">${FICO[f.type]}</span>${f.name}</div></td>
+    <td>${f.type.toUpperCase()}</td><td>${f.size}</td><td>${f.time}</td>
+    <td class="fhash">${f.hash}</td>
+    <td><span class="tag ${stClass}">${stLabel}</span></td>
+    <td class="fpeek">查看原件 →</td></tr>`;}).join("");
+}
+
+/* ===== 预览 ===== */
+const PREVIEW={
+c1:{ico:"📄",title:"设备采购合同（签署原件扫描）",hash:"sha256:9f2c…a1 · 来源:签署模块 sign_doc#1188",body:`
+<div class="paper"><h2>设备采购合同</h2><div class="pno">合同编号 HT-2025-1188 · 共 12 页 · 第 1 页</div>
+<p class="clause">甲方（买方）：某某建设集团有限公司　　乙方（卖方）：某某智能科技有限公司</p>
+<p class="clause">第一条　标的：智能配电设备一批，总价款人民币 1,170,000 元（含税）。</p>
+<p class="clause">第九条 9.2　质量异议程序：甲方应于发现质量问题后 7 日内向乙方发出书面异议通知，逾期未通知的视为质量符合约定。</p>
+<p class="clause">第九条 9.3　质保期：自验收合格之日起 12 个月。</p>
+<p class="clause">第十二条　争议解决：因本合同发生争议，由被告住所地人民法院管辖。</p>
+<div class="sign"><span>甲方（盖章）：✓ 已验印</span><span>乙方（盖章）：✓ 已验印</span><span>签订日期：2025-03-14</span></div></div>`},
+e4:{ico:"🧾",title:"E-04 对账函（原件已核验）",hash:"sha256:77b2…05 · 证明目的 F-04 欠款 860,000 元",body:`
+<div class="scan" style="border-color:var(--gold)"><b>E-04 对账函</b><span style="color:var(--gold)">原件已于庭前证据交换出示 · 印鉴比对一致 · 交换笔录在卷</span></div>
+<div class="paper"><p class="clause">正文逐页核验：无任何质量异议记载（回应被告"对账时已提异议"主张）。</p></div>`},
+st:{ico:"✍️",title:"违约事实说明与拟诉请（我方提交稿）",hash:"提交人:法务部 · 2026-09-24",body:`
+<div class="paper"><h2>违约事实说明</h2><div class="pno">内部文件 · 提交于资料提交页</div>
+<p>被告于 2025 年 5 月 10 日验收全部设备后，仅于 2025-06-02 支付首期款 310,000 元，余款 860,000 元经 2025-08、2025-10、2026-01 三次催告均未支付。</p>
+<p>被告于 2025-07-27（收货后 78 天）首次提出书面质量异议，此前无任何口头或书面记录。</p>
+<p class="clause"><b>拟诉请</b>：① 支付货款 860,000 元；② 逾期违约金（主张锚定 LPR1.5 倍）；③ 诉讼费由被告承担。</p></div>`},
+scan1:{ico:"📄",title:"监理会议纪要（扫描件）",hash:"sha256:— · 解析状态: NO_TEXT",body:`
+<div class="scan"><b>监理会议纪要（2025-06）</b><span style="color:var(--gold)">扫描件 · 无文字层 · 本期不做 OCR</span></div>
+<div class="paper"><p class="clause" style="color:var(--muted-fg)">该文件可预览，但不参与检索。如确需引用，请先提供带文字层的版本或人工录入关键段落。</p></div>`}
+};
+function openPreview(k){const p=PREVIEW[k]||{ico:"📄",title:"文件预览",hash:"—",body:`<div class="paper"><p class="clause">Demo 占位预览：${k}</p></div>`};$("pvIco").textContent=p.ico;$("pvTitle").textContent=p.title;$("pvHash").textContent=p.hash;$("pvBody").innerHTML=p.body;$("modalMask").classList.add("on");}
+function closePreview(){$("modalMask").classList.remove("on");}
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closePreview();});
+
+/* ===== 庭审 ===== */
+const SLOTS=[
+ {seq:1,phase:"陈述",role:"ours",roleName:"原告（我方）",plan:"陈述诉讼请求与事实理由",human:true},
+ {seq:2,phase:"陈述",role:"opponent",roleName:"被告（对方）",plan:"逐项答辩",human:false},
+ {seq:3,phase:"询问",role:"judge",roleName:"审判长",plan:"归纳争议焦点并询问",human:false},
+ {seq:4,phase:"陈述",role:"ours",roleName:"我方",plan:"补充陈述",human:false},
+ {seq:5,phase:"收束",role:"clerk",roleName:"书记员",plan:"归纳无争议点、争议点、档案未检索到的点",human:false}
+];
+const ROLES=[
+ {id:"judge",name:"审判长",av:"av-gold",emoji:"⚖️",agent:"moot-judge"},
+ {id:"juror",name:"陪审员",av:"av-purple",emoji:"🧑‍💼",agent:"moot-juror-a"},
+ {id:"clerk",name:"书记员",av:"av-teal",emoji:"📋",agent:"moot-clerk"},
+ {id:"ours",name:"我方",av:"av-blue",emoji:"️",agent:"moot-ours"},
+ {id:"opponent",name:"对方",av:"av-red",emoji:"⚔️",agent:"moot-opponent"}
+];
+const SCRIPT=[
+ {slot:0,text:`诉讼请求：一、判令被告支付拖欠货款 <b>860,000 元</b>；二、支付逾期违约金（锚定 LPR1.5 倍）；三、诉讼费由被告承担。事实与理由：双方 2025 年 3 月签订《设备采购合同》，我方已交付全部设备并经验收合格，被告仅付 310,000 元，余款经三次催告拒不支付。被告于收货后 78 天才首次提质量异议，此前无任何书面记录。`,warn:false},
+ {slot:1,text:`答辩意见：一、2 批次设备存在质量瑕疵，我方已提异议；二、已付 310,000 元并垫付安装费 45,000 元应抵扣；三、违约金年化 18.25% 过高请求调减。请求驳回全部诉请。`,warn:true,warnText:"⚠ \"质量异议\"条号未在本槽片段中出现"},
+ {slot:2,text:`法庭归纳三项争议焦点：<b>① 欠付货款数额；② 质量异议是否成立；③ 违约金是否过高</b>。请双方围绕焦点举证与辩论。`,warn:false},
+ {slot:3,text:`补充：E-04 对账函原件已于庭前证据交换出示，印鉴比对一致，正文无任何质量异议记载。被告所称"对账时已提异议"无书面痕迹。`,warn:false},
+ {slot:4,text:`书记员归纳：无争议点——合同关系成立、设备已交付验收、已付 310,000 元。争议点——欠款数额（E-04 证明力）、质量异议期限、违约金调减。档案未检索到的点——被告主张的"监理会议纪要"无文字层，未入检索。`,warn:false}
+];
+let step=0,busy=false,autoTimer=null,charTotal=0;
+
+function renderSlots(){
+  $("slotsBar").innerHTML=SLOTS.map((s,i)=>{
+    const cls=i<step?"done":i===step?"now":"";
+    const humanTag=s.human?'<span class="tag human">真人</span>':'';
+    return `<span class="slot-chip ${cls}">①${s.seq} ${s.phase}·${s.roleName} ${humanTag}</span>`;}).join("");
+}
+function renderRoles(){
+  const bench=ROLES.filter(r=>["judge","juror","clerk"].includes(r.id));
+  const ours=ROLES.find(r=>r.id==="ours");
+  const opp=ROLES.find(r=>r.id==="opponent");
+  $("roleRow").innerHTML=`
+    <div class="side-card ours" id="role-${ours.id}">
+      <div class="sc-head"><div class="sc-av ${ours.av}">${ours.emoji}</div><div><div class="sc-name">原告 · 我方</div><div class="sc-sub">${ours.agent}</div></div></div>
+      <div class="sc-tags"><span class="tag human">真人可插话</span><span class="tag ai">qwen3-max</span></div>
+      <div class="sc-info">诉请：支付货款 ¥860,000 + 违约金 · 证据 7 份</div>
+    </div>
+    <div class="bench-card">
+      <h3>🏛️ 合议庭</h3>
+      <div class="bench-row">
+        ${bench.map(r=>`<div class="role-chip" id="role-${r.id}"><div class="av ${r.av}">${r.emoji}</div><div><div class="rn">${r.name}</div><div class="rs">${r.agent}</div></div></div>`).join("")}
+      </div>
+    </div>
+    <div class="side-card" id="role-${opp.id}">
+      <div class="sc-head"><div class="sc-av ${opp.av}">${opp.emoji}</div><div><div class="sc-name">被告 · 对方</div><div class="sc-sub">${opp.agent}</div></div></div>
+      <div class="sc-tags"><span class="tag ai">全 AI 代理</span><span class="tag warn">风险：被执行 2 条</span></div>
+      <div class="sc-info">答辩要点：质量异议 · 已付 ¥310,000 · 违约金过高</div>
+    </div>
+  `;
+}
+function setFloor(roleId){
+  ROLES.forEach(r=>{$("role-"+r.id).classList.toggle("floor",r.id===roleId);});
+  const name=roleId?ROLES.find(r=>r.id===roleId).name:"—";
+  $("floorHolder").innerHTML=roleId?`🎤 发言权：<b>${name}</b>（已锁定）`:" 发言权：—（空闲）";
+  $("mutedList").textContent=roleId?" 静音："+ROLES.filter(r=>r.id!==roleId).map(r=>r.name).join("、"):"🔇 全员静音";
+}
+function addUtterance(s,human=false){
+  const slot=SLOTS[s.slot];
+  const el=document.createElement("div");
+  el.className="utterance floor-now"+(human?" human":"");
+  el.innerHTML=`<div class="utt-head"><span class="who">${human?slot.roleName+"（真人）":slot.roleName}</span><span class="tag ${human?'human':'ai'}">${human?'HUMAN':'AGENT'}</span><span class="badge">${slot.phase}·${slot.plan}</span><span class="meta"><span>${new Date().toLocaleTimeString("zh-CN",{hour:"2-digit",minute:"2-digit"})}</span><span class="dur"></span></span></div><div class="utt-body"><span class="typing"></span><span class="cursor"></span></div>${s.warn?`<div class="utt-warn">${s.warnText}</div>`:""}`;
+  $("stream").appendChild(el);$("stream").scrollTop=$("stream").scrollHeight;
+  return el;
+}
+function typeText(el,html){return new Promise(res=>{
+  const t=el.querySelector(".typing"),cu=el.querySelector(".cursor");
+  const parts=html.match(/<[^>]+>|[^<]/g)||[];let i=0,buf="",ch=0;const t0=Date.now();
+  const iv=setInterval(()=>{let n=2;while(n--&&i<parts.length){buf+=parts[i++];if(!parts[i-1].startsWith("<"))ch++;}
+    t.innerHTML=buf;$("stream").scrollTop=$("stream").scrollHeight;
+    el.querySelector(".dur").textContent=Math.round((Date.now()-t0)/1000)+"s·"+ch+"字";
+    if(i>=parts.length){clearInterval(iv);cu.remove();res();}},45);
+});}
+async function runSlot(s){
+  busy=true;updateBtns();
+  const slot=SLOTS[s.slot];
+  if(slot.human && step===0){ // 第一槽是真人
+    $("humanInput").style.display="flex";
+    $("floorHolder").innerHTML=`🎤 发言权：<b>${slot.roleName}（真人）</b>（等待输入）`;
+    $("mutedList").textContent="🔇 静音："+ROLES.filter(r=>r.id!==slot.role).map(r=>r.name).join("、");
+    ROLES.forEach(r=>{$("role-"+r.id).classList.toggle("floor",r.id===slot.role);});
+    return; // 等用户输入
+  }
+  setFloor(slot.role);
+  const el=addUtterance(s);
+  await typeText(el,s.text);
+  charTotal+=s.text.replace(/<[^>]+>/g,"").length;
+  $("charUsed").textContent=charTotal.toLocaleString();
+  $("msgCount").textContent=(++step)+" 条发言";
+  el.classList.remove("floor-now");
+  setFloor(null);
+  renderSlots();
+  busy=false;updateBtns();
+  if(step>=SLOTS.length){
+    $("stageBadge").textContent="视图：庭审（已结案）";$("stageBadge").className="badge";
+    if(autoTimer){clearInterval(autoTimer);autoTimer=null;$("autoBtn").textContent="▶ 自动播放";}
+  }
+}
+function nextSlot(){
+  if(busy||step>=SLOTS.length)return;
+  runSlot(SCRIPT[step]);
+}
+function toggleAuto(){
+  if(autoTimer){clearInterval(autoTimer);autoTimer=null;$("autoBtn").textContent="▶ 自动播放";return;}
+  $("autoBtn").textContent="⏸ 暂停";
+  const tick=async()=>{if(step>=SLOTS.length){toggleAuto();return;}if(!busy){await runSlot(SCRIPT[step]);await sleep(2000);}};
+  tick();autoTimer=setInterval(tick,800);
+}
+function humanSpeak(){
+  const v=$("humanText").value.trim();if(!v)return;$("humanText").value="";
+  $("humanInput").style.display="none";
+  const el=addUtterance({slot:0,text:v.replace(/</g,"&lt;"),warn:false},true);
+  typeText(el,v.replace(/</g,"&lt;")).then(()=>{
+    charTotal+=v.length;$("charUsed").textContent=charTotal.toLocaleString();
+    $("msgCount").textContent=(++step)+" 条发言";
+    el.classList.remove("floor-now");setFloor(null);renderSlots();updateBtns();
+  });
+}
+function updateBtns(){
+  $("nextBtn").disabled=busy||step>=SLOTS.length;
+  $("autoBtn").disabled=step>=SLOTS.length;
+}
+
+/* 初始化 */
+renderTree();renderFiles();
+</script>
+</body>
+</html>

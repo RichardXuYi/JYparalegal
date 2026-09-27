@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { toast } from 'sonner';
+import { reportFailure, reportSuccess } from '@/lib/notice';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
@@ -104,11 +104,11 @@ export default function TaskDetail() {
   const post = async (path: string, body?: unknown, okMsg?: string): Promise<boolean> => {
     try {
       await platformSend(path, 'POST', body ?? {});
-      if (okMsg) toast.success(okMsg);
+      if (okMsg) reportSuccess(okMsg);
       load();
       return true;
     } catch (e) {
-      if (!notifyIfEntitlement(e)) toast.error(e instanceof Error ? e.message : '网络错误,操作失败');
+      if (!notifyIfEntitlement(e)) reportFailure(e instanceof Error ? e.message : '网络错误,操作失败');
       return false;
     }
   };
@@ -119,30 +119,30 @@ export default function TaskDetail() {
       const url = d?.fileUrl ?? d?.url ?? d?.downloadUrl;
       if (url) {
         window.open(url, '_blank', 'noopener');
-        toast.success('已开始下载合同文件');
+        reportSuccess('已开始下载合同文件');
       } else {
-        toast.error('下载失败,请稍后重试');
+        reportFailure('下载失败,请稍后重试');
       }
     } catch (e) {
-      if (!notifyIfEntitlement(e)) toast.error(e instanceof Error ? e.message : '网络错误,下载失败');
+      if (!notifyIfEntitlement(e)) reportFailure(e instanceof Error ? e.message : '网络错误,下载失败');
     }
   };
 
   const requestCertificate = async () => {
     try {
       await platformSend(`/platform/sign/tasks/${id}/certificate`, 'POST', {});
-      toast.success('出证申请已提交');
+      reportSuccess('出证申请已提交');
     } catch (e) {
-      if (!notifyIfEntitlement(e)) toast.error(e instanceof Error ? e.message : '网络错误,出证失败');
+      if (!notifyIfEntitlement(e)) reportFailure(e instanceof Error ? e.message : '网络错误,出证失败');
     }
   };
 
   const copyHash = async (sha: string) => {
     try {
       await navigator.clipboard.writeText(sha);
-      toast.success('完整哈希已复制');
+      reportSuccess('完整哈希已复制');
     } catch {
-      toast.error('复制失败,请手动选择');
+      reportFailure('复制失败,请手动选择');
     }
   };
 
@@ -189,12 +189,12 @@ export default function TaskDetail() {
       const url = d?.signUrl;
       if (url) {
         window.open(url, '_blank', 'noopener');
-        toast.success('已打开 e签宝签署页。签完后回到本页刷新状态');
+        reportSuccess('已打开 e签宝签署页。签完后回到本页刷新状态');
       } else {
-        toast.message(d?.message ?? '尚未配置 e签宝应用，不能完成具有法律效力的签署');
+        reportFailure(d?.message ?? '尚未配置 e签宝应用，不能完成具有法律效力的签署');
       }
     } catch (e) {
-      if (!notifyIfEntitlement(e)) toast.error(e instanceof Error ? e.message : '网络错误,无法打开签署页');
+      if (!notifyIfEntitlement(e)) reportFailure(e instanceof Error ? e.message : '网络错误,无法打开签署页');
     }
   };
 

@@ -14,7 +14,7 @@ import {
   Wrench,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { toast } from 'sonner';
+import { reportFailure, reportSuccess } from '@/lib/notice';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -329,12 +329,12 @@ export function Dreams() {
       const result = await rpc<unknown>(DREAM_ACTION_METHODS[action], {}, 120_000);
       const message = buildActionMessage(action, result);
       setLastActionMessage(message);
-      toast.success(message);
+      reportSuccess(message);
       await refreshAll();
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setError(message);
-      toast.error(message);
+      reportFailure(message);
     } finally {
       setRunningAction(null);
       setPendingConfirmation(null);
@@ -359,11 +359,11 @@ export function Dreams() {
       const message = enabled ? t('actions.enableSuccess') : t('actions.disableSuccess');
       setDreaming((current) => ({ ...(current ?? {}), enabled }));
       setLastActionMessage(message);
-      toast.success(message);
+      reportSuccess(message);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setError(message);
-      toast.error(message);
+      reportFailure(message);
     } finally {
       setRunningToggle(null);
     }
@@ -391,7 +391,7 @@ export function Dreams() {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setError(message);
-      toast.error(message);
+      reportFailure(message);
     } finally {
       setOpeningFullUi(false);
     }

@@ -65,6 +65,7 @@ import { Switch } from '@/components/ui/switch';
 import { resolveRuntimeProviderKey, stripAccountModelPrefixes } from '@/lib/model-options';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { reportFailure, reportSuccess } from '@/lib/notice';
 import { useTranslation } from 'react-i18next';
 import { useSettingsStore } from '@/stores/settings';
 import { hostApi } from '@/lib/host-api';
@@ -273,28 +274,28 @@ export function ProvidersSettings() {
 
       setShowAddDialog(false);
       toast.dismiss(toastId);
-      toast.success(t('aiProviders.toast.added'));
+      reportSuccess(t('aiProviders.toast.added'));
     } catch (error) {
       toast.dismiss(toastId);
-      toast.error(`${t('aiProviders.toast.failedAdd')}: ${error}`);
+      reportFailure(`${t('aiProviders.toast.failedAdd')}: ${error}`);
     }
   };
 
   const handleDeleteProvider = async (providerId: string) => {
     try {
       await removeAccount(providerId);
-      toast.success(t('aiProviders.toast.deleted'));
+      reportSuccess(t('aiProviders.toast.deleted'));
     } catch (error) {
-      toast.error(`${t('aiProviders.toast.failedDelete')}: ${error}`);
+      reportFailure(`${t('aiProviders.toast.failedDelete')}: ${error}`);
     }
   };
 
   const handleSetDefault = async (providerId: string) => {
     try {
       await setDefaultAccount(providerId);
-      toast.success(t('aiProviders.toast.defaultUpdated'));
+      reportSuccess(t('aiProviders.toast.defaultUpdated'));
     } catch (error) {
-      toast.error(`${t('aiProviders.toast.failedDefault')}: ${error}`);
+      reportFailure(`${t('aiProviders.toast.failedDefault')}: ${error}`);
     }
   };
 
@@ -717,7 +718,7 @@ function ProviderCard({
           }
           const rawEditModelCount = (modelId || '').split(/[，,\n]/).map((token) => token.trim()).filter(Boolean).length;
           if (rawEditModelCount > parsedEditModels.length) {
-            toast.info(t('aiProviders.toast.duplicateModelsSkipped', '已跳过重复模型'));
+            reportSuccess(t('aiProviders.toast.duplicateModelsSkipped', '已跳过重复模型'));
           }
         }
         const normalizedModelValue = parsedEditModels.join(',') || undefined;
@@ -793,13 +794,13 @@ function ProviderCard({
           }),
         );
         if (results.some((ok) => !ok)) {
-          toast.warning(t('aiProviders.toast.modelMetaSavePartial', '部分模型参数保存失败'));
+          reportFailure(t('aiProviders.toast.modelMetaSavePartial', '部分模型参数保存失败'));
         }
       }
 
-      toast.success(t('aiProviders.toast.updated'));
+      reportSuccess(t('aiProviders.toast.updated'));
     } catch (error) {
-      toast.error(`${t('aiProviders.toast.failedUpdate')}: ${error}`);
+      reportFailure(`${t('aiProviders.toast.failedUpdate')}: ${error}`);
     } finally {
       setSaving(false);
       setValidating(false);
@@ -1566,7 +1567,7 @@ function AddProviderDialog({
 
       pendingOAuthRef.current = null;
       close();
-      toast.success(translate('aiProviders.toast.added'));
+      reportSuccess(translate('aiProviders.toast.added'));
     };
 
     const handleError = (data: OAuthErrorEvent) => {
@@ -1591,7 +1592,7 @@ function AddProviderDialog({
 
     const hasMinimax = existingVendorIds.has('minimax-portal') || existingVendorIds.has('minimax-portal-cn');
     if ((selectedType === 'minimax-portal' || selectedType === 'minimax-portal-cn') && hasMinimax) {
-      toast.error(t('aiProviders.toast.minimaxConflict'));
+      reportFailure(t('aiProviders.toast.minimaxConflict'));
       return;
     }
 
@@ -1669,7 +1670,7 @@ function AddProviderDialog({
 
     const hasMinimax = existingVendorIds.has('minimax-portal') || existingVendorIds.has('minimax-portal-cn');
     if ((selectedType === 'minimax-portal' || selectedType === 'minimax-portal-cn') && hasMinimax) {
-      toast.error(t('aiProviders.toast.minimaxConflict'));
+      reportFailure(t('aiProviders.toast.minimaxConflict'));
       return;
     }
 
@@ -1678,7 +1679,7 @@ function AddProviderDialog({
     if (planBasedVendors.includes(selectedType)) {
       const hasExisting = accounts.some((a) => a.vendorId === selectedType);
       if (hasExisting) {
-        toast.error(t('aiProviders.toast.vendorConflict', '该厂商已存在，请先删除已有账户'));
+        reportFailure(t('aiProviders.toast.vendorConflict', '该厂商已存在，请先删除已有账户'));
         return;
       }
     }
@@ -1724,7 +1725,7 @@ function AddProviderDialog({
         }
         const rawModelCount = (modelId || '').split(/[，,\n]/).map((token) => token.trim()).filter(Boolean).length;
         if (rawModelCount > parsedModels.length) {
-          toast.info(t('aiProviders.toast.duplicateModelsSkipped', '已跳过重复模型'));
+          reportSuccess(t('aiProviders.toast.duplicateModelsSkipped', '已跳过重复模型'));
         }
       }
 
@@ -2214,7 +2215,7 @@ function AddProviderDialog({
                                   className="h-10 w-10 rounded-full hover:bg-black/5 dark:hover:bg-white/10"
                                   onClick={() => {
                                     navigator.clipboard.writeText(oauthData.userCode);
-                                    toast.success(t('aiProviders.oauth.codeCopied'));
+                                    reportSuccess(t('aiProviders.oauth.codeCopied'));
                                   }}
                                 >
                                   <Copy className="h-5 w-5" />

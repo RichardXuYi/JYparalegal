@@ -14,6 +14,7 @@ import { BottomTabBar } from '@/mobile/layout/BottomTabBar';
 import { SessionDrawer } from '@/mobile/layout/SessionDrawer';
 import { SettingsModal } from '@/components/settings/SettingsModal';
 import { GatewayStatusBanner } from '@/components/common/GatewayStatusBanner';
+import { NoticeHost } from '@/components/common/NoticeHost';
 import { ChatInput } from '@/pages/Chat/ChatInput';
 import { useChatStore } from '@/stores/chat';
 import { useGatewayStore } from '@/stores/gateway';
@@ -119,6 +120,7 @@ export function MobileLayout() {
 
       {/* 1b. Non-blocking gateway status banner (reconnect/degraded/failed) */}
       <GatewayStatusBanner />
+      <NoticeHost />
 
       {/* 2. Main content: single full-width column */}
       <main

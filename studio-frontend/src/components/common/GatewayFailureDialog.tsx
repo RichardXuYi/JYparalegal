@@ -8,7 +8,7 @@
 import { useEffect, useState } from 'react';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { toast } from 'sonner';
+import { reportFailure, reportSuccess } from '@/lib/notice';
 import { hostApi } from '@/lib/host-api';
 import { useGatewayStore } from '@/stores/gateway';
 import { useGatewayUiStore } from '@/stores/gateway-ui';
@@ -79,28 +79,28 @@ export function GatewayFailureDialog() {
     try {
       const report = await hostApi.diagnostics.startupReport();
       if (!report) {
-        toast.error(t('gateway.failure.reportFailed'));
+        reportFailure(t('gateway.failure.reportFailed'));
         return;
       }
       await navigator.clipboard.writeText(JSON.stringify(report, null, 2));
-      toast.success(t('gateway.failure.reportCopied'));
+      reportSuccess(t('gateway.failure.reportCopied'));
     } catch {
-      toast.error(t('gateway.failure.reportFailed'));
+      reportFailure(t('gateway.failure.reportFailed'));
     }
   };
 
   const handleRunDoctor = async () => {
     setDoctorBusy(true);
-    toast.info(t('gateway.failure.doctorRunning'));
+    reportSuccess(t('gateway.failure.doctorRunning'));
     try {
       const result = await hostApi.app.openClawDoctor('fix');
       if (result.success) {
-        toast.success(t('gateway.failure.doctorDone'));
+        reportSuccess(t('gateway.failure.doctorDone'));
       } else {
-        toast.error(`${t('gateway.failure.doctorFailed')}: ${result.error ?? ''}`.trim());
+        reportFailure(`${t('gateway.failure.doctorFailed')}: ${result.error ?? ''}`.trim());
       }
     } catch (error) {
-      toast.error(`${t('gateway.failure.doctorFailed')}: ${String(error)}`);
+      reportFailure(`${t('gateway.failure.doctorFailed')}: ${String(error)}`);
     } finally {
       setDoctorBusy(false);
     }

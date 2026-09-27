@@ -268,6 +268,8 @@ export async function proxyPlatformRequest(input: {
   path: string;
   method?: string;
   body?: string | null;
+  rawBody?: Uint8Array;
+  contentType?: string;
 }): Promise<{ status: number; body: string }> {
   const unauthenticated = JSON.stringify({ code: 401, msg: 'unauthenticated', data: null });
   if (!input.path.startsWith('/platform')) {
@@ -285,11 +287,18 @@ export async function proxyPlatformRequest(input: {
 
   const run = async (token: string) => {
     const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
-    if (hasBody) headers['Content-Type'] = 'application/json';
+    let body: string | Uint8Array | undefined;
+    if (input.rawBody) {
+      headers['Content-Type'] = input.contentType || 'application/octet-stream';
+      body = input.rawBody;
+    } else if (hasBody) {
+      headers['Content-Type'] = 'application/json';
+      body = input.body && input.body.length > 0 ? input.body : '{}';
+    }
     const response = await fetch(`${getBaseUrl()}${backendPath}`, {
       method,
       headers,
-      body: hasBody ? (input.body && input.body.length > 0 ? input.body : '{}') : undefined,
+      body,
     });
     const text = await response.text();
     return { status: response.status, body: text.length > 0 ? text : 'null' };

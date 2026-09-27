@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { toast } from 'sonner';
+import { reportFailure, reportSuccess } from '@/lib/notice';
 import { LegalPageHeader } from '@/components/legal/LegalPageHeader';
 import { platformGet, platformSend, notifyIfEntitlement } from '@/lib/platform-api';
 
@@ -58,10 +58,10 @@ export default function CompanyManage() {
     setSaving(true);
     try {
       await platformSend(`/platform/companies/${sel}/esign-org-id`, 'PUT', { esignOrgId: orgInput.trim() });
-      toast.success('企业机构号已更新');
+      reportSuccess('企业机构号已更新');
       load();
     } catch (e) {
-      if (!notifyIfEntitlement(e)) toast.error(e instanceof Error ? e.message : '网络错误,更新失败');
+      if (!notifyIfEntitlement(e)) reportFailure(e instanceof Error ? e.message : '网络错误,更新失败');
     } finally {
       setSaving(false);
     }

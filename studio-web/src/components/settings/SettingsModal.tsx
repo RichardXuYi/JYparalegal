@@ -22,6 +22,7 @@ import {
   Server,
   Terminal,
   Info,
+  Database,
   X,
   ArrowLeft,
 } from 'lucide-react';
@@ -50,6 +51,7 @@ import { GatewaySection } from './sections/GatewaySection';
 import { DeveloperSection } from './sections/DeveloperSection';
 
 import { AboutSection } from './sections/AboutSection';
+import { ArchiveSection } from './sections/ArchiveSection';
 import { SettingsPageHeader } from './primitives';
 
 interface NavItem {
@@ -88,6 +90,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { id: 'general', icon: SlidersHorizontal, labelKey: 'nav.general', gradientClass: 'gradient-general' },
       { id: 'gateway', icon: Server, labelKey: 'gateway.title', gradientClass: 'gradient-gateway' },
+      { id: 'archive', icon: Database, labelKey: 'nav.archive', gradientClass: 'gradient-general' },
       { id: 'developer', icon: Terminal, labelKey: 'developer.title', devOnly: true, gradientClass: 'gradient-developer' },
 
       { id: 'about', icon: Info, labelKey: 'about.title', gradientClass: 'gradient-about' },
@@ -147,6 +150,8 @@ function SectionContent({ section, t }: { section: SettingsSection; t: TFunction
           <DeveloperSection gradientClass="gradient-developer" />
         </PreferencesColumn>
       );
+    case 'archive':
+      return <ArchiveSection />;
     case 'about':
       return (
         <PreferencesColumn

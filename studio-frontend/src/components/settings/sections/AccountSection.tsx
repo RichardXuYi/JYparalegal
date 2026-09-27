@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { toast } from 'sonner';
+import { reportFailure, reportSuccess } from '@/lib/notice';
 import { hostApi } from '@/lib/host-api';
 import type { SyncScope, SyncScopeStatus } from '@/lib/host-api';
 import type { AuthDevice } from '@shared/host-api/contract';
@@ -86,13 +86,13 @@ export function AccountSection({ gradientClass }: AccountSectionProps) {
     try {
       const result = await hostApi.auth.revokeDevice(deviceId);
       if (result.success) {
-        toast.success(t('account.devices.disconnected', '已断开该设备的连接'));
+        reportSuccess(t('account.devices.disconnected', '已断开该设备的连接'));
         void fetchDevices();
       } else {
-        toast.error(t('account.devices.failed', '断开连接失败'));
+        reportFailure(t('account.devices.failed', '断开连接失败'));
       }
     } catch {
-      toast.error(t('account.devices.failed', '断开连接失败'));
+      reportFailure(t('account.devices.failed', '断开连接失败'));
     }
   };
 
@@ -161,7 +161,7 @@ export function AccountSection({ gradientClass }: AccountSectionProps) {
 
   const openConfirm = async (direction: SyncDirection) => {
     if (selectedScopes.length === 0) {
-      toast.error(t('account.cloudSync.selectAtLeastOne', '请至少选择一项同步范围'));
+      reportFailure(t('account.cloudSync.selectAtLeastOne', '请至少选择一项同步范围'));
       return;
     }
     setCloudBusy(direction);
@@ -169,9 +169,9 @@ export function AccountSection({ gradientClass }: AccountSectionProps) {
       const status = await hostApi.sync.status({ scopes: selectedScopes });
       if (!status.success) {
         if (status.requiresAuth) {
-          toast.error(t('account.cloudSync.authRequired', '请先登录后再同步'));
+          reportFailure(t('account.cloudSync.authRequired', '请先登录后再同步'));
         } else {
-          toast.error(t('account.cloudSync.statusFailed', '获取同步状态失败') + (status.error ? `: ${status.error}` : ''));
+          reportFailure(t('account.cloudSync.statusFailed', '获取同步状态失败') + (status.error ? `: ${status.error}` : ''));
         }
         return;
       }
@@ -182,7 +182,7 @@ export function AccountSection({ gradientClass }: AccountSectionProps) {
           : t('account.cloudSync.downloadNotice', '将用云端配置覆盖本机（覆盖前已自动备份到本地）。');
       setConfirm({ open: true, direction, message: `${notice}  ${preview}` });
     } catch (error) {
-      toast.error(t('account.cloudSync.statusFailed', '获取同步状态失败') + `: ${error instanceof Error ? error.message : String(error)}`);
+      reportFailure(t('account.cloudSync.statusFailed', '获取同步状态失败') + `: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setCloudBusy(null);
     }
@@ -199,11 +199,11 @@ export function AccountSection({ gradientClass }: AccountSectionProps) {
         : await hostApi.sync.download(payload);
       if (!result.success) {
         if (result.requiresAuth) {
-          toast.error(t('account.cloudSync.authRequired', '请先登录后再同步'));
+          reportFailure(t('account.cloudSync.authRequired', '请先登录后再同步'));
         } else {
           const failed = (result.results ?? []).filter((item) => !item.ok);
           const detail = failed.map((item) => `${scopeLabel(item.scope)}${item.error ? `: ${item.error}` : ''}`).join('; ');
-          toast.error(t('account.cloudSync.failed', '同步失败') + (detail ? `: ${detail}` : ''));
+          reportFailure(t('account.cloudSync.failed', '同步失败') + (detail ? `: ${detail}` : ''));
         }
         return;
       }
@@ -212,14 +212,14 @@ export function AccountSection({ gradientClass }: AccountSectionProps) {
         { pushed: 0, pulled: 0 },
       );
       if (direction === 'upload') {
-        toast.success(t('account.cloudSync.uploadDone', '已上传到云端（{{count}} 项）', { count: totals.pushed }));
+        reportSuccess(t('account.cloudSync.uploadDone', '已上传到云端（{{count}} 项）', { count: totals.pushed }));
       } else {
-        toast.success(t('account.cloudSync.downloadDone', '已从云端下载（{{count}} 项）', { count: totals.pulled }));
+        reportSuccess(t('account.cloudSync.downloadDone', '已从云端下载（{{count}} 项）', { count: totals.pulled }));
         // Pulled skills/agents may have changed local disk — refresh skills list.
         void useSkillsStore.getState().fetchSkills();
       }
     } catch (error) {
-      toast.error(t('account.cloudSync.failed', '同步失败') + `: ${error instanceof Error ? error.message : String(error)}`);
+      reportFailure(t('account.cloudSync.failed', '同步失败') + `: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setCloudBusy(null);
     }

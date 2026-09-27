@@ -9,7 +9,7 @@ import { X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { parseModelIdList } from '@/lib/providers';
 import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
+import { reportSuccess } from '@/lib/notice';
 import { useTranslation } from 'react-i18next';
 
 interface ModelChipsEditorProps {
@@ -40,7 +40,7 @@ export function ModelChipsEditor({ value, onChange, placeholder, className }: Mo
       merged.push(model);
     }
     if (skipped) {
-      toast.info(t('aiProviders.toast.duplicateModelsSkipped', '已跳过重复模型'));
+      reportSuccess(t('aiProviders.toast.duplicateModelsSkipped', '已跳过重复模型'));
     }
     onChange(merged.join(','));
     setDraft('');

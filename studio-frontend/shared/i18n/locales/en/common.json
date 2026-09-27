@@ -129,5 +129,10 @@
     "guest": "Not signed in",
     "workspace": "Workspace",
     "employeeView": "Employee view"
+  },
+  "notice": {
+    "errorTitle": "Not completed",
+    "lockedTitle": "Plan required",
+    "acknowledge": "OK"
   }
 }

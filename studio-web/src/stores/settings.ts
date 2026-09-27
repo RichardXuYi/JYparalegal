@@ -4,10 +4,9 @@
  */
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { toast } from 'sonner';
+import { reportFailure } from '@/lib/notice';
 import i18n from '@/i18n';
 import { hostApi } from '@/lib/host-api';
-import { toUserMessage } from '@/lib/error-message';
 import { resolveSupportedLanguage } from '@shared/language';
 
 type Theme = 'light' | 'dark' | 'system';
@@ -159,31 +158,31 @@ export const useSettingsStore = create<SettingsState>()(
 
       setTheme: (theme) => {
         set({ theme });
-        void hostApi.settings.set('theme', theme).catch((e) => toast.error(`Failed to save theme: ${toUserMessage(e)}`));
+        void hostApi.settings.set('theme', theme).catch(() => reportFailure('主题没有保存成功，请稍后再试。'));
       },
       setLanguage: (language) => {
         const resolvedLanguage = resolveSupportedLanguage(language);
         i18n.changeLanguage(resolvedLanguage);
         set({ language: resolvedLanguage });
         void markLanguageExplicit(resolvedLanguage);
-        void hostApi.settings.set('language', resolvedLanguage).catch((e) => toast.error(`Failed to save language: ${toUserMessage(e)}`));
+        void hostApi.settings.set('language', resolvedLanguage).catch(() => reportFailure('语言没有保存成功，请稍后再试。'));
       },
       setStartMinimized: (startMinimized) => set({ startMinimized }),
       setShellAnimation: (shellAnimation) => {
         set({ shellAnimation });
-        void hostApi.settings.set('shellAnimation', shellAnimation).catch((e) => toast.error(`Failed to save shell animation: ${toUserMessage(e)}`));
+        void hostApi.settings.set('shellAnimation', shellAnimation).catch(() => reportFailure('界面动画没有保存成功，请稍后再试。'));
       },
       setTelemetryEnabled: (telemetryEnabled) => {
         set({ telemetryEnabled });
-        void hostApi.settings.set('telemetryEnabled', telemetryEnabled).catch((e) => toast.error(`Failed to save telemetry setting: ${toUserMessage(e)}`));
+        void hostApi.settings.set('telemetryEnabled', telemetryEnabled).catch(() => reportFailure('这项设置没有保存成功，请稍后再试。'));
       },
       setGatewayAutoStart: (gatewayAutoStart) => {
         set({ gatewayAutoStart });
-        void hostApi.settings.set('gatewayAutoStart', gatewayAutoStart).catch((e) => toast.error(`Failed to save gateway auto-start: ${toUserMessage(e)}`));
+        void hostApi.settings.set('gatewayAutoStart', gatewayAutoStart).catch(() => reportFailure('助手自动启动没有保存成功，请稍后再试。'));
       },
       setGatewayPort: (gatewayPort) => {
         set({ gatewayPort });
-        void hostApi.settings.set('gatewayPort', gatewayPort).catch((e) => toast.error(`Failed to save gateway port: ${toUserMessage(e)}`));
+        void hostApi.settings.set('gatewayPort', gatewayPort).catch(() => reportFailure('端口没有保存成功，请稍后再试。'));
       },
       setProxyEnabled: (proxyEnabled) => set({ proxyEnabled }),
       setProxyServer: (proxyServer) => set({ proxyServer }),
@@ -193,20 +192,20 @@ export const useSettingsStore = create<SettingsState>()(
       setProxyBypassRules: (proxyBypassRules) => set({ proxyBypassRules }),
       setAutoSyncSkills: (autoSyncSkills) => {
         set({ autoSyncSkills });
-        void hostApi.settings.set('autoSyncSkills', autoSyncSkills).catch((e) => toast.error(`Failed to save auto-sync skills: ${toUserMessage(e)}`));
+        void hostApi.settings.set('autoSyncSkills', autoSyncSkills).catch(() => reportFailure('技能同步没有保存成功，请稍后再试。'));
       },
 
       setSidebarCollapsed: (sidebarCollapsed) => set({ sidebarCollapsed }),
       setSidebarWidth: (sidebarWidth) => set({ sidebarWidth: clampSidebarWidth(sidebarWidth) }),
       setDevModeUnlocked: (devModeUnlocked) => {
         set({ devModeUnlocked });
-        void hostApi.settings.set('devModeUnlocked', devModeUnlocked).catch((e) => toast.error(`Failed to save developer mode: ${toUserMessage(e)}`));
+        void hostApi.settings.set('devModeUnlocked', devModeUnlocked).catch(() => reportFailure('开发者模式没有保存成功，请稍后再试。'));
       },
       resetSettings: async () => {
         try {
           await hostApi.settings.reset();
-        } catch (e) {
-          toast.error(`Failed to reset settings on host: ${toUserMessage(e)}`);
+        } catch {
+          reportFailure('设置没有恢复成功，请稍后再试。');
         }
         set(defaultSettings);
       },

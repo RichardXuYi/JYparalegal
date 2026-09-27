@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Eye, EyeOff, Loader2, Play, RefreshCw, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { toast } from 'sonner';
+import { reportFailure, reportSuccess } from '@/lib/notice';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -62,7 +62,7 @@ export function ImageGenerationSettings() {
       setShowRelayApiKey(false);
       setTestAgentId(settings.defaultAgentId);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : String(error));
+      reportFailure(error instanceof Error ? error.message : String(error));
     } finally {
       setLoading(false);
     }
@@ -134,9 +134,9 @@ export function ImageGenerationSettings() {
       setRelayModel(next.openAiRelay?.model || 'gpt-image-2');
       setRelayApiKey('');
       setShowRelayApiKey(false);
-      toast.success(t('imageGeneration.toast.saved'));
+      reportSuccess(t('imageGeneration.toast.saved'));
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : String(error));
+      reportFailure(error instanceof Error ? error.message : String(error));
     } finally {
       setSaving(false);
     }
@@ -152,9 +152,9 @@ export function ImageGenerationSettings() {
       setRelayApiKey('');
       setShowRelayApiKey(false);
       setClearConfirmOpen(false);
-      toast.success(t('imageGeneration.toast.cleared'));
+      reportSuccess(t('imageGeneration.toast.cleared'));
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : String(error));
+      reportFailure(error instanceof Error ? error.message : String(error));
     } finally {
       setClearing(false);
     }
@@ -162,7 +162,7 @@ export function ImageGenerationSettings() {
 
   const handleTest = async () => {
     if (dirty) {
-      toast.message(t('imageGeneration.toast.saveBeforeTest'));
+      reportFailure(t('imageGeneration.toast.saveBeforeTest'));
       return;
     }
     if (!hasConfiguredRelay) {
@@ -177,18 +177,18 @@ export function ImageGenerationSettings() {
       if (result.success) {
         const outputPath = extractTestOutputPath(result.result);
         if (outputPath) {
-          toast.success(t('imageGeneration.toast.testSuccessWithPath', {
+          reportSuccess(t('imageGeneration.toast.testSuccessWithPath', {
             ms: Math.round(result.durationMs),
             path: outputPath,
           }));
         } else {
-          toast.success(t('imageGeneration.toast.testSuccess', { ms: Math.round(result.durationMs) }));
+          reportSuccess(t('imageGeneration.toast.testSuccess', { ms: Math.round(result.durationMs) }));
         }
       } else {
-        toast.error(result.error || result.stderr || t('imageGeneration.toast.testFailed'));
+        reportFailure(result.error || result.stderr || t('imageGeneration.toast.testFailed'));
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : String(error));
+      reportFailure(error instanceof Error ? error.message : String(error));
     } finally {
       setTesting(false);
     }

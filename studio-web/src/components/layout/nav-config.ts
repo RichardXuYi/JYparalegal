@@ -78,8 +78,8 @@ export const LEGAL_MODULES: LegalModule[] = [
     route: '/moot',
     label: '模拟法庭',
     icon: Scale,
-    cta: { label: '即将开发', to: '/moot' },
-    groups: [{ title: '模拟法庭', entries: [{ key: 'moot', label: '演练工作台（即将开发）' }] }],
+    cta: { label: '进入庭审', to: '/moot' },
+    groups: [{ title: '模拟法庭', entries: [{ key: 'moot', label: '演练工作台' }] }],
   },
   {
     route: '/overview',

@@ -30,6 +30,9 @@ USER_BOOTSTRAP_PASSWORD: "123456"
 USER_BOOTSTRAP_EMAIL: xuyi@example.com
 USER_BOOTSTRAP_FORCE: true
 
+USER_FULL_ACCESS_ENABLED: true
+USER_FULL_ACCESS_USERNAME: xuyi
+
 # 企业数据初始化：把 xuyi 变成企业 owner + 建公司 grandpoem + 员工 diandian，
 # 并供给 ENTERPRISE 租户（否则签署等法律域因 requireTenant / 无授权公司而不可用）
 COMPANY_BOOTSTRAP_ENABLED: true

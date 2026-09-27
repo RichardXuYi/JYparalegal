@@ -128,5 +128,10 @@
     "guest": "Non connecté",
     "workspace": "Espace de travail",
     "employeeView": "Vue employé"
+  },
+  "notice": {
+    "errorTitle": "Non terminé",
+    "lockedTitle": "Abonnement requis",
+    "acknowledge": "Compris"
   }
 }

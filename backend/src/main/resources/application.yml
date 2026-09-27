@@ -9,7 +9,7 @@ spring:
     multipart:
       enabled: true
       max-file-size: 50MB
-      max-request-size: 50MB
+      max-request-size: 55MB
   datasource:
     url: jdbc:mysql://localhost:13306/jy_financial?useUnicode=true&characterEncoding=utf8&useSSL=true&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=false
     username: jy_app
@@ -85,6 +85,9 @@ jy:
     issuer: ${CP_ISSUER:https://cp.jyparalegal.local}
     service-username: ${CP_SERVICE_USERNAME:}
     service-password: ${CP_SERVICE_PASSWORD:}
+  # 档案目录。案卷、原文和笔录都在这个文件夹，不另接数据库。
+  archive:
+    dir: ${ARCHIVE_DIR:./data/archive}
 
 # 支付通道配置（仅保留模拟通道，可端到端跑通，不涉及真实资金/密钥；
 # 如需接入真实通道再恢复 alipay/wechat 密钥配置）
@@ -117,3 +120,7 @@ USER_BOOTSTRAP_USERNAME: xuyi
 USER_BOOTSTRAP_PASSWORD:
 USER_BOOTSTRAP_EMAIL: xuyi@example.com
 USER_BOOTSTRAP_FORCE: false
+
+# 指定账号开通全部法律功能（套餐 PRO）。部署到远程后，启动时把 xuyi 从免费套餐改成已购买。
+USER_FULL_ACCESS_ENABLED: true
+USER_FULL_ACCESS_USERNAME: xuyi

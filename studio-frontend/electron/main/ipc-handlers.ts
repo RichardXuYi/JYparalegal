@@ -31,6 +31,7 @@ import { applyProxySettings } from './proxy';
 import { syncLaunchAtStartupSettingFromStore } from './launch-at-startup';
 import { getRecentTokenUsageHistory } from '../utils/token-usage';
 import { proxyPlatformRequest } from '../services/backend-auth-api';
+import { desktopHearingCleanup, desktopHearingEvents, desktopHearingOpen, desktopHearingStep, multipartBody } from '../services/moot-desktop-step';
 import { getProviderService } from '../services/providers/provider-service';
 import {
   getOpenClawProviderKey,
@@ -135,7 +136,7 @@ export function registerIpcHandlers(
   registerDialogHandlers();
 
   // App handlers
-  registerAppHandlers();
+  registerAppHandlers(gatewayManager);
 
   // Settings handlers
   registerSettingsHandlers(gatewayManager);
@@ -1130,7 +1131,7 @@ function registerDialogHandlers(): void {
 /**
  * App-related IPC handlers
  */
-function registerAppHandlers(): void {
+function registerAppHandlers(gatewayManager: GatewayManager): void {
   // Get app version
   ipcMain.handle('app:version', () => {
     return app.getVersion();
@@ -1146,12 +1147,39 @@ function registerAppHandlers(): void {
     return process.platform;
   });
 
-  ipcMain.handle('platform:fetch', async (_, payload: { path?: string; method?: string; body?: string | null }) => {
+  ipcMain.handle('platform:fetch', async (_, payload: {
+    path?: string;
+    method?: string;
+    body?: string | null;
+    multipartFile?: { name?: string; bytes?: Uint8Array };
+  }) => {
     if (!payload || typeof payload.path !== 'string') {
       return { status: 400, body: JSON.stringify({ code: 400, msg: 'bad platform request', data: null }) };
     }
+    const path = payload.path;
+    if (payload.multipartFile?.bytes && payload.multipartFile.name) {
+      const built = multipartBody(payload.multipartFile.name, payload.multipartFile.bytes);
+      return proxyPlatformRequest({
+        path,
+        method: 'POST',
+        rawBody: built.body,
+        contentType: built.contentType,
+      });
+    }
+    if (path.includes('/platform/moot/cases/') && path.includes('/open')) {
+      return desktopHearingOpen(gatewayManager, path, payload.body ?? null);
+    }
+    if (path.includes('/platform/moot/hearings/') && path.includes('/events')) {
+      return desktopHearingEvents(path);
+    }
+    if (path.includes('/platform/moot/hearings/') && path.includes('/step')) {
+      return desktopHearingStep(gatewayManager, path);
+    }
+    if (path.includes('/platform/moot/hearings/') && path.includes('/cleanup')) {
+      return desktopHearingCleanup(gatewayManager, path);
+    }
     return proxyPlatformRequest({
-      path: payload.path,
+      path,
       method: payload.method,
       body: payload.body,
     });
