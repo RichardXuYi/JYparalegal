@@ -1,0 +1,47 @@
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+.settings/
+.classpath
+.project
+.factorypath
+
+# Build
+target/
+build/
+*.class
+*.jar
+*.war
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+
+# Uploads
+uploads/
+
+# Secrets (if any)
+*.pem
+*.key
+credentials.json
+
+# IDE / CI 目录（不纳入版本管理）
+.github/
+.qoder/
