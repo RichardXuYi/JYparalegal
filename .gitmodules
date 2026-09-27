@@ -2,15 +2,19 @@
 	path = studio-frontend
 	url = https://github.com/RichardXuYi/JYparalegal.git
 	branch = sub/studio-frontend
+	ignore = untracked
 [submodule "backend"]
 	path = backend
 	url = https://github.com/RichardXuYi/JYparalegal.git
 	branch = sub/backend
+	ignore = untracked
 [submodule "control-plane"]
 	path = control-plane
 	url = https://github.com/RichardXuYi/JYparalegal.git
 	branch = sub/control-plane
+	ignore = untracked
 [submodule "studio-web"]
 	path = studio-web
 	url = https://github.com/RichardXuYi/JYparalegal.git
 	branch = sub/studio-web
+	ignore = untracked
