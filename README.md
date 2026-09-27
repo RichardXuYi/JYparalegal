@@ -6,15 +6,31 @@
 
 ```
 .
-├── backend/          数据平面（DP）：Spring Boot 业务主服务，端口 8181
-├── control-plane/    控制平面（CP）：e签宝 SaaS API V3 桥接与签章配额服务，端口 8281
+├── backend/            数据平面（DP）：Spring Boot 业务主服务，端口 8181
+├── control-plane/      控制平面（CP）：e签宝 SaaS API V3 桥接与签章配额服务，端口 8281
+├── studio-frontend/    GrandPoem Studio 桌面端（Electron + React）
+├── studio-web/         GrandPoem Studio Web 版（React + Fastify host server）
+├── docs/               PRD、方案与核验文档
 └── README.md
 ```
 
+## 分支维护模型
+
+本仓库采用"主子分支"结构维护，main 的 git 历史中通过 merge 提交永久保留各子分支的提交链：
+
+| 分支 | 内容 | 维护方 |
+|---|---|---|
+| `main` | 全量集成：qianduan + houduan + docs 等小文件 | 本地（集成端） |
+| `qianduan` | 仅 `studio-web/` 与 `studio-frontend/` | 前端工作流 |
+| `houduan` | 仅 `backend/` 与 `control-plane/`（附带 target 编译产物快照，main 不跟踪） | 服务器端 |
+
+日常流程：前端改动提交到 `qianduan`、后端改动提交到 `houduan`，再分别 `git merge` 进 `main` 后推送。结构性节点用带注释 tag 标记（当前：`structure-v1`，2026-09-27）。
+
 ## 架构概览
 
-- **backend（DP）**：Spring Boot 3.5.4 / Java 21，REST + WebSocket，多租户。数据层为 MySQL（Flyway 迁移）+ Redis（会话 / 缓存），业务代码在 `com.jyfc.backend.module` 下按模块划分（account、agent、auth、dashboard、knowledge、sign、signdoc、template、tenant、trade、version 等）。
+- **backend（DP）**：Spring Boot 3.5.4 / Java 21，REST + WebSocket，多租户。数据层为 MySQL（Flyway 迁移）+ Redis（会话 / 缓存），业务代码在 `com.jyfc.backend.module` 下按模块划分（account、agent、auth、dashboard、knowledge、moot（模拟法庭）、sign、signdoc、template、tenant、trade、version 等）。
 - **control-plane（CP）**：独立小服务，作为与 e签宝 的唯一出口（chokepoint）。负责签发 RS256 passport JWT、执行送签配额扣减、接收并转发 e签宝 回调到 DP。
+- **studio-frontend / studio-web**：同一套 Studio 前端的桌面与浏览器两种形态（代码近似镜像，改动需同步）。React + TypeScript + Vite + Zustand；桌面端基于 Electron 40，Web 端附带 Fastify host server 桥接本地能力。
 - **信任模型**：CP 用 RSA 私钥签发 passport，私钥永不出 CP；DP 通过 `/cp/.well-known/jwks.json` 获取公钥验签。DP 侧 `jy.cp.mode` 三态可配：
   - `required`：送签必须经 CP 且 CP 不可达即失败（生产默认，fail-closed）；
   - `local`：DP 用 `tenant_quota` 本地兜底（单机 / 演示）；
@@ -22,13 +38,15 @@
 
 ## 技术栈
 
-| | backend | control-plane |
+| | backend / control-plane | studio-frontend / studio-web |
 |---|---|---|
-| 框架 | Spring Boot 3.5.4 | Spring Boot 3.5.4 |
-| JDK | Java 21 | Java 21 |
-| 认证 | Session Cookie + JWT（java-jwt 4.5.0，跨端 Bearer） | CP 服务账号 + RS256 passport |
-| 数据 | JPA + MySQL + Redis + Flyway 11.4 | 无数据库（依赖 e签宝 / 回调 DP） |
-| 其他 | springdoc OpenAPI、POI、PDFBox、WebFlux | e签宝 SaaS API V3 |
+| 框架 | Spring Boot 3.5.4 | React + TypeScript + Vite |
+| 运行时 | Java 21 | Node.js（桌面端 Electron 40；Web 端含 Fastify 5 服务） |
+| 认证 | Session Cookie + JWT（java-jwt 4.5.0，跨端 Bearer） | 经 DP 登录，Bearer / Cookie 双通道 |
+| 数据 | JPA + MySQL + Redis + Flyway 11.4（CP 无数据库） | 状态：Zustand；构建：pnpm workspace |
+| 其他 | springdoc OpenAPI、POI、PDFBox、WebFlux、e签宝 SaaS API V3 | i18n（zh/en/de/fr）、共享 `shared/` 契约层 |
+
+当前版本：**1.5.0**（backend jar、两个 Studio 包一致）。
 
 ## 快速开始
 
@@ -70,6 +88,18 @@ mvn spring-boot:run
 
 > 多实例部署 CP 时，必须通过环境变量注入同一份 RSA PEM 密钥（`CP_JWT_RSA_PRIVATE_KEY*`），否则跨实例验签失败；`cp.data.dir` 需挂持久卷。
 
+### 启动 Studio（Web / 桌面）
+
+```bash
+# Web 版
+cd studio-web
+pnpm install && pnpm dev
+
+# 桌面版（Electron）
+cd studio-frontend
+pnpm install && pnpm dev
+```
+
 ## 配置与环境变量
 
 所有敏感配置均由环境变量注入，不在仓库中内置默认值。常用项：
@@ -85,6 +115,7 @@ mvn spring-boot:run
 | `APP_CORS_ALLOWED_ORIGINS` | CORS 白名单 | 仅本地开发源 |
 | `ESIGN_APP_ID/SECRET` | e签宝 凭证（CP） | 空，需注入 |
 | `CP_ESIGN_CALLBACK_TOKEN` | CP 回调 DP 的令牌 | 空 |
+| `ARCHIVE_DIR` | 模拟法庭案卷档案目录 | `./data/archive` |
 
 ## 数据库迁移
 
@@ -99,4 +130,8 @@ mvn spring-boot:run
 
 ## 部署
 
-`backend/Dockerfile` 为多阶段构建（Maven 构建 + `eclipse-temurin:21-jre` 运行）。control-plane 可用 `mvn package` 产出可执行 jar（仓库中附带 `control-plane-1.0.0.jar`）。
+`backend/Dockerfile` 为多阶段构建（Maven 构建 + `eclipse-temurin:21-jre` 运行）。control-plane 用 `mvn package` 产出可执行 jar。Studio 桌面端经 Electron 打包（`studio-frontend`），Web 端部署 `studio-web` 构建产物与 Fastify host server。
+
+## 文档
+
+产品与验收文档在 `docs/`：`docs/prd/`（三期 PRD）、`docs/二期方案-模拟法庭与档案库.md`、`docs/二期审核/`（核验报告与差距清单）、`docs/demo/`（演示页）。
