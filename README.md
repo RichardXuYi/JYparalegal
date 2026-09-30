@@ -35,6 +35,8 @@ scripts/      打包与 OpenClaw 捆绑
 
 Gateway 生命周期有终态：确定性启动故障（如遗留状态目录迁移失败 exit 78）在**一个启动流程内**进入 `failed` 终态，不再空转 3×10 次重试；终态只响应显式重试，不自动恢复。界面按 `src/lib/connection-status.ts` 的判定函数呈现：启动期（网关尚未就绪且未进终态）由全屏品牌加载动画 `InitializingScreen` 承载，就绪/终态/45 秒上限后整页进入主界面；运行期波动走非阻塞状态横幅（重连计数 + 倒计时）；终态故障走对话框（本地化原因、就绪层级、日志末尾、重试 / 查看日志 / 复制启动报告 / Doctor 修复）。顶栏状态胶囊常驻可点击。**不存在压在已渲染页面上的连接模态。**
 
+终态故障对话框打开期间不再重复渲染顶部终态横幅，关闭后横幅作为兜底回落（避免同一条错误在低对比度底色上再出现一遍）。其它失败——列表加载、模型调用、上传、更新、登录态等——统一走 `src/lib/notice.ts` 的 `reportFailure()` → `NoticeHost` 确认弹窗（可携带重试 / 重新登录等恢复动作），不再使用页内红字或横幅；`NoticeHost` 于 `src/App.tsx` 全局挂载，启动页、登录页与移动壳都能落地。
+
 确定性复现故障路径（仅 dev 构建生效）：
 
 ```bash
@@ -46,6 +48,8 @@ GP_GATEWAY_ENTRY_OVERRIDE="scripts/dev/fake-gateway-exit78.mjs" pnpm dev
 聊天顶栏切换模型调用 `sessions.patch`，只影响当前会话，Gateway 进程保持连接。设置里的默认模型写入 `agents.entries.<id>.model` 或 `agents.defaults.model`，由 Gateway 热应用。删除 Provider 仍会重启 Gateway。
 
 依赖声明为 `openclaw@2026.9.6`。`@openclaw/qqbot` 与飞书包装仍可能停在更早版本，升级时单独核对。
+
+打包时 `scripts/bundle-openclaw.mjs` 保留 pnpm 的**按消费者解析**：gateway 的直依赖占顶层 `node_modules`，某个消费者解析到的实例与顶层不同时，在它自己的 `node_modules` 下保留一份私有副本，而不是按包名去重丢掉多版本（该不变量见 `harness/specs/rules/packaged-dependency-resolution.md`）。
 
 ## 界面范围
 

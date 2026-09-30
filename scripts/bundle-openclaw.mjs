@@ -19,18 +19,19 @@
 import 'zx/globals';
 import { ELECTRON_MAIN_RUNTIME_PACKAGES, EXTRA_BUNDLED_PACKAGES } from './openclaw-bundle-config.mjs';
 import { patchExtensionOpenClawSelfImports } from './openclaw-self-import-patch.mjs';
+import {
+  collectDeps,
+  executeCopyPlan,
+  getVirtualStoreNodeModules,
+  makeVersionResolver,
+  normWin,
+  planLayout,
+} from './openclaw-deps.mjs';
 
 const ROOT = path.resolve(__dirname, '..');
 const OUTPUT = path.join(ROOT, 'build', 'openclaw');
 const NODE_MODULES = path.join(ROOT, 'node_modules');
 const BUNDLED_OPENCLAW_SKILL_ALLOWLIST = new Set(['skill-creator']);
-
-// On Windows, pnpm virtual store paths can exceed MAX_PATH (260 chars).
-function normWin(p) {
-  if (process.platform !== 'win32') return p;
-  if (p.startsWith('\\\\?\\')) return p;
-  return '\\\\?\\' + p.replace(/\//g, '\\');
-}
 
 echo`?? Bundling openclaw for electron-builder...`;
 
@@ -135,59 +136,9 @@ if (bundledSkillsTrim.removed > 0) {
 // We BFS from openclaw's virtual store node_modules, following each symlink
 // to discover the target's own virtual store node_modules and its deps.
 
-const collected = new Map(); // realPath -> packageName (for deduplication)
-const queue = []; // BFS queue of virtual-store node_modules dirs to visit
-
-/**
- * Given a real path of a package, find the containing virtual-store node_modules.
- * e.g. .pnpm/chalk@5.4.1/node_modules/chalk -> .pnpm/chalk@5.4.1/node_modules
- * e.g. .pnpm/@clack+core@0.4.1/node_modules/@clack/core -> .pnpm/@clack+core@0.4.1/node_modules
- */
-function getVirtualStoreNodeModules(realPkgPath) {
-  let dir = realPkgPath;
-  while (dir !== path.dirname(dir)) {
-    if (path.basename(dir) === 'node_modules') {
-      return dir;
-    }
-    dir = path.dirname(dir);
-  }
-  return null;
-}
-
-/**
- * List all package entries in a virtual-store node_modules directory.
- * Handles both regular packages (chalk) and scoped packages (@clack/prompts).
- * Returns array of { name, fullPath }.
- */
-function listPackages(nodeModulesDir) {
-  const result = [];
-  const nDir = normWin(nodeModulesDir);
-  if (!fs.existsSync(nDir)) return result;
-
-  for (const entry of fs.readdirSync(nDir)) {
-    if (entry === '.bin') continue;
-    // Use original (non-normWin) path so callers can call
-    // getVirtualStoreNodeModules() on fullPath correctly.
-    const entryPath = path.join(nodeModulesDir, entry);
-
-    if (entry.startsWith('@')) {
-      try {
-        const scopeEntries = fs.readdirSync(normWin(entryPath));
-        for (const sub of scopeEntries) {
-          result.push({
-            name: `${entry}/${sub}`,
-            fullPath: path.join(entryPath, sub),
-          });
-        }
-      } catch {
-        // Not a directory, skip
-      }
-    } else {
-      result.push({ name: entry, fullPath: entryPath });
-    }
-  }
-  return result;
-}
+// collectDeps() (shared with the plugin bundler) owns the BFS walk, the visited
+// set, and pnpm's per-consumer resolution map; seeds are added below.
+const seeds = []; // BFS entry points: { nodeModulesDir, skipPkg }
 
 // Start BFS from openclaw's virtual store node_modules
 const openclawVirtualNM = getVirtualStoreNodeModules(openclawReal);
@@ -197,7 +148,35 @@ if (!openclawVirtualNM) {
 }
 
 echo`   Virtual store root: ${openclawVirtualNM}`;
-queue.push({ nodeModulesDir: openclawVirtualNM, skipPkg: 'openclaw' });
+seeds.push({ nodeModulesDir: openclawVirtualNM, skipPkg: 'openclaw' });
+
+// pnpm resolves one instance of each dependency *per consumer*. Flattening the
+// bundle by package name alone (first version wins) silently dropped the other
+// instances: htmlparser2@10 (entities ^7.0.1) resolved openclaw's pinned
+// entities 8.1.0 and died at ESM link time on the removed `fromCodePoint`
+// export. collectDeps() records pnpm's own resolution (depsByPackage) so
+// planLayout() can reproduce it; versionOfPackage() reads versions for reports.
+const versionOfPackage = makeVersionResolver();
+
+// Extra packages the Electron main process and the built-in extensions resolve
+// from the bundle root via createRequire, so they must keep a top-level slot.
+const extraRoots = [];
+for (const pkgName of EXTRA_BUNDLED_PACKAGES) {
+  const pkgLink = path.join(NODE_MODULES, ...pkgName.split('/'));
+  if (!fs.existsSync(pkgLink)) {
+    echo`   ???  Extra package ${pkgName} not found in workspace node_modules, skipping.`;
+    continue;
+  }
+
+  let pkgReal;
+  try { pkgReal = fs.realpathSync(pkgLink); } catch { continue; }
+
+  extraRoots.push({ name: pkgName, realPath: pkgReal });
+  const extraVirtualNM = getVirtualStoreNodeModules(pkgReal);
+  if (extraVirtualNM) {
+    seeds.push({ nodeModulesDir: extraVirtualNM, skipPkg: pkgName });
+  }
+}
 
 const SKIP_PACKAGES = new Set([
   // Extra bundled extensions can declare openclaw as a peer/optional dependency.
@@ -214,149 +193,88 @@ const SKIP_PACKAGES = new Set([
   '@discordjs/opus',
 ]);
 const SKIP_SCOPES = ['@cloudflare/', '@types/'];
-let skippedDevCount = 0;
-
-while (queue.length > 0) {
-  const { nodeModulesDir, skipPkg } = queue.shift();
-  const packages = listPackages(nodeModulesDir);
-
-  for (const { name, fullPath } of packages) {
-    // Skip the package that owns this virtual store entry (it's the package itself, not a dep)
-    if (name === skipPkg) continue;
-
-    if (SKIP_PACKAGES.has(name) || SKIP_SCOPES.some(s => name.startsWith(s))) {
-      skippedDevCount++;
-      continue;
-    }
-
-    let realPath;
-    try {
-      realPath = fs.realpathSync(fullPath);
-    } catch {
-      continue; // broken symlink, skip
-    }
-
-    if (collected.has(realPath)) continue; // already visited
-    collected.set(realPath, name);
-
-    // Find this package's own virtual store node_modules to discover ITS deps
-    const depVirtualNM = getVirtualStoreNodeModules(realPath);
-    if (depVirtualNM && depVirtualNM !== nodeModulesDir) {
-      // Determine the package's "self name" in its own virtual store
-      // For scoped: @clack/core -> skip "@clack/core" when scanning
-      queue.push({ nodeModulesDir: depVirtualNM, skipPkg: name });
-    }
-  }
-}
+const { collected, depsByPackage, skippedCount: skippedDevCount } = collectDeps(seeds, {
+  skipPackages: SKIP_PACKAGES,
+  skipScopes: SKIP_SCOPES,
+});
 
 echo`   Found ${collected.size} total packages (direct + transitive)`;
 echo`   Skipped ${skippedDevCount} dev-only package references`;
 
-// 4b. Collect extra packages required by GrandPoem Studio's Electron main process that are
-//     NOT deps of openclaw.  These are resolved from openclaw's context at runtime
-//     (via createRequire from the openclaw directory) so they must live in the
-//     bundled openclaw/node_modules/.
+// 4b. Extra packages required by GrandPoem Studio's Electron main process and the
+//     built-in extensions are seeded into the BFS above (see `extraRoots`), so
+//     their transitive deps are collected together with openclaw's.
+
+// 5. Lay the collected packages out under OUTPUT/node_modules/.
 //
-//     For each package we resolve it from the workspace's own node_modules,
-//     then BFS its transitive deps exactly like we did for openclaw above.
-let extraCount = 0;
-for (const pkgName of EXTRA_BUNDLED_PACKAGES) {
-  const pkgLink = path.join(NODE_MODULES, ...pkgName.split('/'));
-  if (!fs.existsSync(pkgLink)) {
-    echo`   ???  Extra package ${pkgName} not found in workspace node_modules, skipping.`;
-    continue;
-  }
-
-  let pkgReal;
-  try { pkgReal = fs.realpathSync(pkgLink); } catch { continue; }
-
-  if (!collected.has(pkgReal)) {
-    collected.set(pkgReal, pkgName);
-    extraCount++;
-
-    // BFS this package's own transitive deps
-    const depVirtualNM = getVirtualStoreNodeModules(pkgReal);
-    if (depVirtualNM) {
-      const extraQueue = [{ nodeModulesDir: depVirtualNM, skipPkg: pkgName }];
-      while (extraQueue.length > 0) {
-        const { nodeModulesDir, skipPkg } = extraQueue.shift();
-        const packages = listPackages(nodeModulesDir);
-        for (const { name, fullPath } of packages) {
-          if (name === skipPkg) continue;
-          if (SKIP_PACKAGES.has(name) || SKIP_SCOPES.some(s => name.startsWith(s))) continue;
-          let realPath;
-          try { realPath = fs.realpathSync(fullPath); } catch { continue; }
-          if (collected.has(realPath)) continue;
-          collected.set(realPath, name);
-          extraCount++;
-          const innerVirtualNM = getVirtualStoreNodeModules(realPath);
-          if (innerVirtualNM && innerVirtualNM !== nodeModulesDir) {
-            extraQueue.push({ nodeModulesDir: innerVirtualNM, skipPkg: name });
-          }
-        }
-      }
-    }
-  }
-}
-
-if (extraCount > 0) {
-  echo`   Added ${extraCount} extra packages (+ transitive deps) for Electron main process`;
-}
-
-// 5. Copy all collected packages into OUTPUT/node_modules/ (flat structure)
-//
-// IMPORTANT: BFS guarantees direct deps are encountered before transitive deps.
-// When the same package name appears at different versions (e.g. chalk@5 from
-// openclaw directly, chalk@4 from a transitive dep), we keep the FIRST one
-// (direct dep version) and skip later duplicates. This prevents version
-// conflicts like CJS chalk@4 overwriting ESM chalk@5.
+// Top-level slots belong to the gateway's own direct dependencies (and to the
+// extra root packages above): those are the versions the gateway itself is
+// installed with. Every other package reuses a top-level instance when pnpm
+// resolved that same instance for it, and otherwise gets a private copy under
+// <consumer>/node_modules/, which is where Node resolution would find it in a
+// real install. Copying a single version per package name instead silently
+// deleted the remaining instances and broke the gateway at ESM link time.
 const outputNodeModules = path.join(OUTPUT, 'node_modules');
 fs.mkdirSync(outputNodeModules, { recursive: true });
 
-const copiedNames = new Set(); // Track package names already copied
-let copiedCount = 0;
-let skippedDupes = 0;
-
-const preferredBundledPackages = new Set(EXTRA_BUNDLED_PACKAGES);
-const preferredBundledPackageRealPaths = new Set();
-for (const pkgName of EXTRA_BUNDLED_PACKAGES) {
-  const pkgLink = path.join(NODE_MODULES, ...pkgName.split('/'));
-  if (!fs.existsSync(pkgLink)) continue;
-  try {
-    preferredBundledPackageRealPaths.add(fs.realpathSync(pkgLink));
-  } catch {
-    // ignore
-  }
+// Gateway direct dependencies own the shared top-level slots first; the extra
+// root packages must also keep a top-level slot (they are resolved from the
+// bundle root via createRequire), so they are strict claims -- a version
+// conflict there is a hard layout error, not a silent private copy.
+const topLevelClaims = [];
+const openclawDeps = depsByPackage.get(openclawReal) ?? new Map();
+for (const [depName, depRealPath] of openclawDeps) {
+  topLevelClaims.push({ realPath: depRealPath, name: depName });
+}
+for (const extra of extraRoots) {
+  topLevelClaims.push({ realPath: extra.realPath, name: extra.name, strict: true });
 }
 
-const collectedEntries = [...collected].sort(([leftRealPath, leftName], [rightRealPath, rightName]) => {
-  const leftPreferredRealPath = preferredBundledPackageRealPaths.has(leftRealPath);
-  const rightPreferredRealPath = preferredBundledPackageRealPaths.has(rightRealPath);
-  if (leftPreferredRealPath !== rightPreferredRealPath) return leftPreferredRealPath ? -1 : 1;
-
-  const leftPreferred = preferredBundledPackages.has(leftName);
-  const rightPreferred = preferredBundledPackages.has(rightName);
-  if (leftPreferred !== rightPreferred) return leftPreferred ? -1 : 1;
-
-  return 0;
+const { copyPlan, topLevelOwner, privateCopies, placementErrors } = planLayout({
+  outputNodeModules,
+  depsByPackage,
+  versionOfPackage,
+  topLevelClaims,
 });
 
-for (const [realPath, pkgName] of collectedEntries) {
-  if (copiedNames.has(pkgName)) {
-    skippedDupes++;
-    continue; // Keep the first version (closer to openclaw in dep tree)
-  }
-  copiedNames.add(pkgName);
+const extraCount = extraRoots.length;
+if (extraCount > 0) {
+  echo`   Added ${extraCount} extra root package(s) (+ transitive deps) for the Electron main process`;
+}
 
-  const dest = path.join(outputNodeModules, pkgName);
-
-  try {
-    fs.mkdirSync(normWin(path.dirname(dest)), { recursive: true });
-    fs.cpSync(normWin(realPath), normWin(dest), { recursive: true, dereference: true });
-    copiedCount++;
-  } catch (err) {
-    echo`   ???  Skipped ${pkgName}: ${err.message}`;
+if (placementErrors.length > 0) {
+  echo``;
+  echo`Bundle layout failed: the gateway's version cannot serve these root requirements:`;
+  for (const error of placementErrors) {
+    echo`   - ${error.name}: bundle root holds ${error.heldBy}, requirement wants ${error.wanted}`;
   }
+  echo`   Align the consumer version with the gateway (pnpm-workspace.yaml overrides) or upgrade it.`;
+  process.exit(1);
+}
+
+const copiedNames = new Set(topLevelOwner.keys()); // names occupying OUTPUT/node_modules/
+
+// Fail closed on any copy error: these are resolved runtime dependencies of the
+// gateway, and shipping a bundle with any of them missing crashes OpenClaw at
+// ESM link time (the exact entities/htmlparser2 failure this layout prevents).
+const { copiedCount, failures: copyFailures } = executeCopyPlan(copyPlan, { outputRoot: OUTPUT });
+if (copyFailures.length > 0) {
+  echo``;
+  echo`ERROR: failed to copy ${copyFailures.length} resolved dependency package(s) into the bundle:`;
+  for (const failure of copyFailures) {
+    echo`   - ${failure.dest}: ${failure.message}`;
+  }
+  echo`   Aborting: a partial openclaw bundle would crash the gateway at load time.`;
+  process.exit(1);
+}
+
+echo`   Top-level packages (gateway priority): ${copiedNames.size}`;
+echo`   Version conflicts kept as private copies: ${privateCopies.length}`;
+for (const copy of privateCopies.slice(0, 25)) {
+  echo`      ${copy.name}@${copy.version} <- ${copy.consumer}`;
+}
+if (privateCopies.length > 25) {
+  echo`      ... and ${privateCopies.length - 25} more`;
 }
 
 // 5b. Merge built-in extension node_modules into top-level node_modules
@@ -1058,7 +976,7 @@ echo``;
 echo`??Bundle complete: ${OUTPUT}`;
 echo`   Unique packages copied: ${copiedCount}`;
 echo`   Dev-only packages skipped: ${skippedDevCount}`;
-echo`   Duplicate versions skipped: ${skippedDupes}`;
+echo`   Private copies (version conflicts): ${privateCopies.length}`;
 echo`   Total discovered: ${collected.size}`;
 echo`   openclaw.mjs: ${entryExists ? 'YES' : 'NO'}`;
 echo`   dist/entry.js: ${distExists ? 'YES' : 'NO'}`;

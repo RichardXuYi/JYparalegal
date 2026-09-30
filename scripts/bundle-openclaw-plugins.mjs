@@ -21,22 +21,18 @@ import 'zx/globals';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  collectDeps,
+  executeCopyPlan,
+  getVirtualStoreNodeModules,
+  makeVersionResolver,
+  planLayout,
+} from './openclaw-deps.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const OUTPUT_ROOT = path.join(ROOT, 'build', 'openclaw-plugins');
 const NODE_MODULES = path.join(ROOT, 'node_modules');
-
-// On Windows, pnpm virtual store paths can exceed MAX_PATH (260 chars).
-// Adding \\?\ prefix bypasses the limit for Win32 fs calls.
-// Node.js 18.17+ also handles this transparently when LongPathsEnabled=1,
-// but this is an extra safety net for build machines where the registry key
-// may not be set yet.
-function normWin(p) {
-  if (process.platform !== 'win32') return p;
-  if (p.startsWith('\\\\?\\')) return p;
-  return '\\\\?\\' + p.replace(/\//g, '\\');
-}
 
 const PLUGINS = [
   { npmName: '@soimy/dingtalk', pluginId: 'dingtalk' },
@@ -47,46 +43,6 @@ const PLUGINS = [
   { npmName: '@openclaw/whatsapp', pluginId: 'whatsapp' },
   { npmName: '@tencent-weixin/openclaw-weixin', pluginId: 'openclaw-weixin' },
 ];
-
-function getVirtualStoreNodeModules(realPkgPath) {
-  let dir = realPkgPath;
-  while (dir !== path.dirname(dir)) {
-    if (path.basename(dir) === 'node_modules') return dir;
-    dir = path.dirname(dir);
-  }
-  return null;
-}
-
-function listPackages(nodeModulesDir) {
-  const result = [];
-  const nDir = normWin(nodeModulesDir);
-  if (!fs.existsSync(nDir)) return result;
-
-  for (const entry of fs.readdirSync(nDir)) {
-    if (entry === '.bin') continue;
-    // Use original (non-normWin) path so callers can call
-    // getVirtualStoreNodeModules() on fullPath correctly.
-    const entryPath = path.join(nodeModulesDir, entry);
-
-    if (entry.startsWith('@')) {
-      let scopeEntries = [];
-      try {
-        scopeEntries = fs.readdirSync(normWin(entryPath));
-      } catch {
-        continue;
-      }
-      for (const sub of scopeEntries) {
-        result.push({
-          name: `${entry}/${sub}`,
-          fullPath: path.join(entryPath, sub),
-        });
-      }
-    } else {
-      result.push({ name: entry, fullPath: entryPath });
-    }
-  }
-  return result;
-}
 
 function bundleOnePlugin({ npmName, pluginId }) {
   const pkgPath = path.join(NODE_MODULES, ...npmName.split('/'));
@@ -107,70 +63,58 @@ function bundleOnePlugin({ npmName, pluginId }) {
   // 1) Copy plugin package itself
   fs.cpSync(realPluginPath, outputDir, { recursive: true, dereference: true });
 
-  // 2) Collect transitive deps from pnpm virtual store
-  const collected = new Map();
-  const queue = [];
+  // 2) Collect transitive deps from the pnpm virtual store, recording pnpm's
+  //    per-consumer resolution. The previous first-wins flatten (skip a package
+  //    name once seen) silently dropped the second instance whenever a plugin's
+  //    tree resolved two versions of the same name -- the exact entities/
+  //    htmlparser2 class of failure that broke the gateway bundle at ESM link
+  //    time. collectDeps + planLayout reproduce pnpm's layout instead.
   const rootVirtualNM = getVirtualStoreNodeModules(realPluginPath);
   if (!rootVirtualNM) {
     throw new Error(`Cannot resolve virtual store node_modules for ${npmName}`);
   }
-  queue.push({ nodeModulesDir: rootVirtualNM, skipPkg: npmName });
 
   // Skip peerDependencies -- they're provided by the host openclaw gateway.
-  const SKIP_PACKAGES = new Set(['typescript', '@playwright/test']);
-  const SKIP_SCOPES = ['@types/'];
+  const skipPackages = new Set(['typescript', '@playwright/test']);
   try {
     const pluginPkg = JSON.parse(fs.readFileSync(path.join(outputDir, 'package.json'), 'utf8'));
     for (const peer of Object.keys(pluginPkg.peerDependencies || {})) {
-      SKIP_PACKAGES.add(peer);
+      skipPackages.add(peer);
     }
   } catch { /* ignore */ }
 
-  while (queue.length > 0) {
-    const { nodeModulesDir, skipPkg } = queue.shift();
-    for (const { name, fullPath } of listPackages(nodeModulesDir)) {
-      if (name === skipPkg) continue;
-      if (SKIP_PACKAGES.has(name) || SKIP_SCOPES.some((s) => name.startsWith(s))) continue;
+  const { collected, depsByPackage, skippedCount } = collectDeps(
+    [{ nodeModulesDir: rootVirtualNM, skipPkg: npmName }],
+    { skipPackages, skipScopes: ['@types/'] },
+  );
 
-      let realPath;
-      try {
-        realPath = fs.realpathSync(fullPath);
-      } catch {
-        continue;
-      }
-      if (collected.has(realPath)) continue;
-      collected.set(realPath, name);
-
-      const depVirtualNM = getVirtualStoreNodeModules(realPath);
-      if (depVirtualNM && depVirtualNM !== nodeModulesDir) {
-        queue.push({ nodeModulesDir: depVirtualNM, skipPkg: name });
-      }
-    }
-  }
-
-  // 3) Copy flattened deps into plugin/node_modules
+  // 3) Lay deps out under plugin/node_modules: the plugin's own direct deps own
+  //    the top-level slots; every conflicting version becomes a private copy
+  //    under <consumer>/node_modules/, where Node resolution would find it.
   const outputNodeModules = path.join(outputDir, 'node_modules');
   fs.mkdirSync(outputNodeModules, { recursive: true });
 
-  let copiedCount = 0;
-  let skippedDupes = 0;
-  const copiedNames = new Set();
+  const versionOfPackage = makeVersionResolver();
+  const pluginDeps = depsByPackage.get(realPluginPath) ?? new Map();
+  const topLevelClaims = [];
+  for (const [depName, depRealPath] of pluginDeps) {
+    topLevelClaims.push({ realPath: depRealPath, name: depName });
+  }
 
-  for (const [realPath, pkgName] of collected) {
-    if (copiedNames.has(pkgName)) {
-      skippedDupes++;
-      continue;
-    }
-    copiedNames.add(pkgName);
+  const { copyPlan, privateCopies } = planLayout({
+    outputNodeModules,
+    depsByPackage,
+    versionOfPackage,
+    topLevelClaims,
+  });
 
-    const dest = path.join(outputNodeModules, pkgName);
-    try {
-      fs.mkdirSync(normWin(path.dirname(dest)), { recursive: true });
-      fs.cpSync(normWin(realPath), normWin(dest), { recursive: true, dereference: true });
-      copiedCount++;
-    } catch (err) {
-      echo`   [WARN]  Skipped ${pkgName}: ${err.message}`;
-    }
+  const { copiedCount, failures } = executeCopyPlan(copyPlan, { outputRoot: outputDir });
+  if (failures.length > 0) {
+    // Fail closed: a plugin missing a resolved runtime dep crashes at load time,
+    // so a copy error must abort the build rather than ship a partial mirror.
+    echo`   [ERROR] ${pluginId}: failed to copy ${failures.length} dependency package(s):`;
+    for (const f of failures) echo`      - ${f.dest}: ${f.message}`;
+    throw new Error(`Plugin bundle incomplete for ${pluginId}`);
   }
 
   const manifestPath = path.join(outputDir, 'openclaw.plugin.json');
@@ -183,7 +127,11 @@ function bundleOnePlugin({ npmName, pluginId }) {
   //    validates that these match, so we fix it post-copy.
   patchPluginId(outputDir, pluginId);
 
-  echo`   [OK] ${pluginId}: copied ${copiedCount} deps (skipped dupes: ${skippedDupes})`;
+  echo`   [OK] ${pluginId}: copied ${copiedCount} deps `
+    + `(${collected.size} discovered, ${privateCopies.length} private copies, ${skippedCount} skipped)`;
+  for (const copy of privateCopies) {
+    echo`      ${copy.name}@${copy.version} <- ${copy.consumer}`;
+  }
 }
 
 /**

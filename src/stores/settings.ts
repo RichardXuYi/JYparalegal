@@ -170,35 +170,35 @@ export const useSettingsStore = create<SettingsState>()(
 
       setTheme: (theme) => {
         set({ theme });
-        void hostApi.settings.set('theme', theme).catch((e) => reportFailure('主题没有保存成功，请稍后再试。'));
+        void hostApi.settings.set('theme', theme).catch(() => reportFailure('主题没有保存成功，请稍后再试。'));
       },
       setLanguage: (language) => {
         const resolvedLanguage = resolveSupportedLanguage(language);
         i18n.changeLanguage(resolvedLanguage);
         set({ language: resolvedLanguage });
         void markLanguageExplicit(resolvedLanguage);
-        void hostApi.settings.set('language', resolvedLanguage).catch((e) => reportFailure('语言没有保存成功，请稍后再试。'));
+        void hostApi.settings.set('language', resolvedLanguage).catch(() => reportFailure('语言没有保存成功，请稍后再试。'));
       },
       setStartMinimized: (startMinimized) => set({ startMinimized }),
       setShellAnimation: (shellAnimation) => {
         set({ shellAnimation });
-        void hostApi.settings.set('shellAnimation', shellAnimation).catch((e) => reportFailure('界面动画没有保存成功，请稍后再试。'));
+        void hostApi.settings.set('shellAnimation', shellAnimation).catch(() => reportFailure('界面动画没有保存成功，请稍后再试。'));
       },
       setLaunchAtStartup: (launchAtStartup) => {
         set({ launchAtStartup });
-        void hostApi.settings.set('launchAtStartup', launchAtStartup).catch((e) => reportFailure('开机启动没有保存成功，请稍后再试。'));
+        void hostApi.settings.set('launchAtStartup', launchAtStartup).catch(() => reportFailure('开机启动没有保存成功，请稍后再试。'));
       },
       setTelemetryEnabled: (telemetryEnabled) => {
         set({ telemetryEnabled });
-        void hostApi.settings.set('telemetryEnabled', telemetryEnabled).catch((e) => reportFailure('这项设置没有保存成功，请稍后再试。'));
+        void hostApi.settings.set('telemetryEnabled', telemetryEnabled).catch(() => reportFailure('这项设置没有保存成功，请稍后再试。'));
       },
       setGatewayAutoStart: (gatewayAutoStart) => {
         set({ gatewayAutoStart });
-        void hostApi.settings.set('gatewayAutoStart', gatewayAutoStart).catch((e) => reportFailure('助手自动启动没有保存成功，请稍后再试。'));
+        void hostApi.settings.set('gatewayAutoStart', gatewayAutoStart).catch(() => reportFailure('助手自动启动没有保存成功，请稍后再试。'));
       },
       setGatewayPort: (gatewayPort) => {
         set({ gatewayPort });
-        void hostApi.settings.set('gatewayPort', gatewayPort).catch((e) => reportFailure('端口没有保存成功，请稍后再试。'));
+        void hostApi.settings.set('gatewayPort', gatewayPort).catch(() => reportFailure('端口没有保存成功，请稍后再试。'));
       },
       setProxyEnabled: (proxyEnabled) => set({ proxyEnabled }),
       setProxyServer: (proxyServer) => set({ proxyServer }),
@@ -209,18 +209,18 @@ export const useSettingsStore = create<SettingsState>()(
       setUpdateChannel: (updateChannel) => set({ updateChannel }),
       setAutoCheckUpdate: (autoCheckUpdate) => {
         set({ autoCheckUpdate });
-        void hostApi.settings.set('autoCheckUpdate', autoCheckUpdate).catch((e) => reportFailure('自动检查更新没有保存成功，请稍后再试。'));
+        void hostApi.settings.set('autoCheckUpdate', autoCheckUpdate).catch(() => reportFailure('自动检查更新没有保存成功，请稍后再试。'));
       },
       setAutoSyncSkills: (autoSyncSkills) => {
         set({ autoSyncSkills });
-        void hostApi.settings.set('autoSyncSkills', autoSyncSkills).catch((e) => reportFailure('技能同步没有保存成功，请稍后再试。'));
+        void hostApi.settings.set('autoSyncSkills', autoSyncSkills).catch(() => reportFailure('技能同步没有保存成功，请稍后再试。'));
       },
 
       setSidebarCollapsed: (sidebarCollapsed) => set({ sidebarCollapsed }),
       setSidebarWidth: (sidebarWidth) => set({ sidebarWidth: clampSidebarWidth(sidebarWidth) }),
       setDevModeUnlocked: (devModeUnlocked) => {
         set({ devModeUnlocked });
-        void hostApi.settings.set('devModeUnlocked', devModeUnlocked).catch((e) => reportFailure('开发者模式没有保存成功，请稍后再试。'));
+        void hostApi.settings.set('devModeUnlocked', devModeUnlocked).catch(() => reportFailure('开发者模式没有保存成功，请稍后再试。'));
       },
       resetSettings: async () => {
         try {

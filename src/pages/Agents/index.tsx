@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, Bot, Check, Plus, RefreshCw, Settings2, Trash2 } from 'lucide-react';
+import { Bot, Check, Plus, RefreshCw, Settings2, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -39,6 +39,10 @@ export function Agents() {
   const gatewayStatus = useGatewayStore((state) => state.status);
   const refreshProviderSnapshot = useProviderStore((state) => state.refreshProviderSnapshot);
   const lastGatewayStateRef = useRef(gatewayStatus.state);
+  // The agent list load failure used to render as a red strip above the cards.
+  // It now surfaces in the shared notice dialog, keyed by message so an
+  // identical repeat of the same failure is reported once per episode.
+  const notifiedErrorRef = useRef<string | null>(null);
   const {
     agents,
     loading,
@@ -109,6 +113,16 @@ export function Agents() {
     void Promise.all([fetchAgents(), fetchChannelAccounts()]);
   };
 
+  useEffect(() => {
+    if (!error) {
+      notifiedErrorRef.current = null;
+      return;
+    }
+    if (notifiedErrorRef.current === error) return;
+    notifiedErrorRef.current = error;
+    reportFailure(error);
+  }, [error]);
+
   if (loading && !hasCompletedInitialLoad) {
     return (
       <div className="flex flex-col h-full w-full dark:bg-background items-center justify-center">
@@ -146,15 +160,6 @@ export function Agents() {
         />
 
         <div className="flex-1 overflow-y-auto pr-2 pb-10 min-h-0 -mr-2">
-          {error && (
-            <div className="mb-8 p-4 rounded-xl border border-destructive/50 bg-destructive/10 flex items-center gap-3">
-              <AlertCircle className="h-5 w-5 text-destructive" />
-              <span className="text-destructive text-sm font-medium">
-                {error}
-              </span>
-            </div>
-          )}
-
           <div className="space-y-3">
             {visibleAgents.map((agent) => (
               <AgentCard
@@ -515,6 +520,20 @@ function AgentSettingsModal({
       })),
   );
 
+  // Channel account failures used to render as tiny red text under the account
+  // name; they now surface in the shared notice dialog.
+  const channelErrorMessage = assignedChannels.find((channel) => channel.error)?.error ?? null;
+  const notifiedChannelErrorRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!channelErrorMessage) {
+      notifiedChannelErrorRef.current = null;
+      return;
+    }
+    if (notifiedChannelErrorRef.current === channelErrorMessage) return;
+    notifiedChannelErrorRef.current = channelErrorMessage;
+    reportFailure(channelErrorMessage);
+  }, [channelErrorMessage]);
+
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && handleRequestClose()}>
       <DialogContent className="w-[calc(100%-2rem)] max-w-2xl max-h-[90vh] flex flex-col rounded-3xl border-0 shadow-2xl bg-surface-modal">
@@ -615,9 +634,6 @@ function AgentSettingsModal({
                         <p className="text-sm text-muted-foreground">
                           {CHANNEL_NAMES[channel.channelType]} · {channel.accountId === 'default' ? t('settingsDialog.mainAccount') : channel.accountId}
                         </p>
-                        {channel.error && (
-                          <p className="text-xs text-destructive mt-1">{channel.error}</p>
-                        )}
                       </div>
                     </div>
                     <div className="shrink-0" />

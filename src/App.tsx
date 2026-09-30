@@ -21,6 +21,7 @@ import { rendererExtensionRegistry } from './extensions/registry';
 import { loadExternalRendererExtensions } from './extensions/_ext-bridge.generated';
 import { UpdateNotifier } from './components/update/UpdateNotifier';
 import { GatewayFailureDialog } from './components/common/GatewayFailureDialog';
+import { NoticeHost } from './components/common/NoticeHost';
 import { InitializingScreen } from './components/common/InitializingScreen';
 import { useNewChatAction } from './components/layout/use-new-chat-action';
 import { hostEvents } from './lib/host-events';
@@ -273,11 +274,17 @@ function App() {
       style={{ zIndex: 99999 }}
     />
   );
+  // The NoticeHost must be mounted on every screen: the layouts are skipped by
+  // the boot/auth branches below, so a failed action there would have nowhere to
+  // surface. Mounting it here also covers the mobile shell, which has no
+  // layout-level host of its own.
+  const noticeHost = <NoticeHost />;
 
   if (authStatus !== 'ready' && !isSsoRoute) {
     return (
       <ErrorBoundary>
         <InitializingScreen visible={true} />
+        {noticeHost}
       </ErrorBoundary>
     );
   }
@@ -291,6 +298,7 @@ function App() {
               <Route path="/sso" element={<SsoBridge />} />
             </Routes>
           </Suspense>
+          {noticeHost}
           {toaster}
         </TooltipProvider>
       </ErrorBoundary>
@@ -307,6 +315,7 @@ function App() {
               <Route path="*" element={<Login />} />
             </Routes>
           </Suspense>
+          {noticeHost}
           {toaster}
         </TooltipProvider>
       </ErrorBoundary>
@@ -317,6 +326,7 @@ function App() {
     return (
       <ErrorBoundary>
         <InitializingScreen visible={true} />
+        {noticeHost}
       </ErrorBoundary>
     );
   }
@@ -352,6 +362,7 @@ function App() {
 
         <UpdateNotifier />
         <GatewayFailureDialog />
+        {noticeHost}
         {toaster}
       </TooltipProvider>
     </ErrorBoundary>

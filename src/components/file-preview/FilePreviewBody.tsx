@@ -19,7 +19,7 @@
  * All sandbox / read-only / large-file / binary edge cases are handled
  * here so callers only pass a `FilePreviewTarget` and a `readOnly` flag.
  */
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FolderOpen, Save, ShieldAlert, Undo2 } from 'lucide-react';
 import { reportFailure, reportSuccess } from '@/lib/notice';
 import { useTranslation } from 'react-i18next';
@@ -415,6 +415,31 @@ export function FilePreviewBody({
     }
   }, [file, size, t]);
 
+  // 读取失败原来在预览区里内联展示（含「在文件管理器中显示」入口），现在改走统一失败弹窗，
+  // 恢复入口作为弹窗主操作保留。用 ref 记录已上报文案，避免重渲染时重复弹出。
+  const notifiedErrorRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (state.status !== 'error') {
+      notifiedErrorRef.current = null;
+      return;
+    }
+    if (notifiedErrorRef.current === state.message) return;
+    notifiedErrorRef.current = state.message;
+    reportFailure(
+      state.message === 'notFound'
+        ? t('filePreview.errors.notFound', 'File not found')
+        : t('filePreview.errors.loadFailed', { defaultValue: 'Load failed: {{error}}', error: state.message }),
+      undefined,
+      {
+        actions: [{
+          label: t('filePreview.actions.openInFinder', 'Show in file manager'),
+          primary: true,
+          onClick: handleOpenInFinder,
+        }],
+      },
+    );
+  }, [state, handleOpenInFinder, t]);
+
   const renderUnsupportedFormat = () => {
     const directOpen = shouldOfferDirectOpenFallback(file.ext, size);
     return (
@@ -528,20 +553,8 @@ export function FilePreviewBody({
       );
     }
     if (state.status === 'error') {
-      const errMsg = state.message;
-      const hint =
-        errMsg === 'notFound'
-          ? t('filePreview.errors.notFound', 'File not found')
-          : t('filePreview.errors.loadFailed', { defaultValue: 'Load failed: {{error}}', error: errMsg });
-      return (
-        <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center text-sm text-muted-foreground">
-          <p>{hint}</p>
-          <Button variant="outline" size="sm" onClick={handleOpenInFinder}>
-            <FolderOpen className="mr-2 h-4 w-4" />
-            {t('filePreview.actions.openInFinder', 'Show in file manager')}
-          </Button>
-        </div>
-      );
+      // 失败已通过统一弹窗上报（含「在文件管理器中显示」恢复入口），这里不再重复展示。
+      return null;
     }
 
     return (

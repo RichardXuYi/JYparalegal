@@ -5,14 +5,15 @@
  * 改用 Studio 现有 UI 组件与设计令牌。所有认证经主进程 `hostApi.auth`
  * 完成（渲染进程不直接访问后端），符合 harness 后端通信边界。
  */
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertCircle, Building2, Lock, LogIn, Shield, User } from 'lucide-react';
+import { Building2, Lock, LogIn, Shield, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { TitleBar } from '@/components/layout/TitleBar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { reportFailure } from '@/lib/notice';
 import { useAuthStore } from '@/stores/auth';
 
 export function Login() {
@@ -25,14 +26,29 @@ export function Login() {
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [fieldErrors, setFieldErrors] = useState<{ username?: string; password?: string }>({});
+
+  // Login failures used to render as red inline text. They now surface in the
+  // shared notice dialog, reported once per failure message.
+  const notifiedErrorRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!error) {
+      notifiedErrorRef.current = null;
+      return;
+    }
+    if (notifiedErrorRef.current === error) return;
+    notifiedErrorRef.current = error;
+    reportFailure(error);
+  }, [error]);
 
   function validate() {
-    const next: { username?: string; password?: string } = {};
-    if (!username.trim()) next.username = '请输入账号';
-    if (!password) next.password = '请输入密码';
-    setFieldErrors(next);
-    return Object.keys(next).length === 0;
+    // Field errors are shown in the notice dialog as well — the purple theme
+    // renders inline red text unreadably.
+    const message = !username.trim() ? '请输入账号' : (!password ? '请输入密码' : null);
+    if (message) {
+      reportFailure(message);
+      return false;
+    }
+    return true;
   }
 
   async function handleSubmit() {
@@ -135,16 +151,9 @@ export function Login() {
                     onChange={(e) => setUsername(e.target.value)}
                     autoComplete="username"
                     className="pl-12 h-12 bg-slate-50 border-slate-200 text-slate-800 focus-visible:ring-blue-500/30"
-                    aria-invalid={!!fieldErrors.username}
                     placeholder="请输入您的账号"
                   />
                 </div>
-                {fieldErrors.username ? (
-                  <div className="flex items-center gap-1.5 text-sm text-red-600 mt-1.5">
-                    <AlertCircle className="h-4 w-4" />
-                    <span>{fieldErrors.username}</span>
-                  </div>
-                ) : null}
               </div>
 
               <div className="space-y-2">
@@ -158,19 +167,12 @@ export function Login() {
                     onChange={(e) => setPassword(e.target.value)}
                     autoComplete="current-password"
                     className="pl-12 h-12 bg-slate-50 border-slate-200 text-slate-800 focus-visible:ring-blue-500/30"
-                    aria-invalid={!!fieldErrors.password}
                     placeholder="请输入您的密码"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') void handleSubmit();
                     }}
                   />
                 </div>
-                {fieldErrors.password ? (
-                  <div className="flex items-center gap-1.5 text-sm text-red-600 mt-1.5">
-                    <AlertCircle className="h-4 w-4" />
-                    <span>{fieldErrors.password}</span>
-                  </div>
-                ) : null}
               </div>
 
               <label className="flex items-center gap-2 py-2 cursor-pointer select-none">
@@ -182,13 +184,6 @@ export function Login() {
                 />
                 <span className="text-sm text-slate-500">记住我（30天内免登录）</span>
               </label>
-
-              {error ? (
-                <div className="flex items-center gap-2 rounded-lg bg-red-50 border border-red-200 px-3 py-2.5 text-sm text-red-600">
-                  <AlertCircle className="h-4 w-4 shrink-0" />
-                  <span>{error}</span>
-                </div>
-              ) : null}
 
               <Button
                 className="w-full h-12 bg-gradient-to-r from-blue-600 via-blue-500 to-purple-600 hover:opacity-90 text-white font-semibold shadow-lg shadow-blue-500/30 dark:from-orange-600 dark:via-red-500 dark:to-red-600 dark:shadow-red-500/30"

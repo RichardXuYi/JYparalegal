@@ -589,6 +589,11 @@ function TaskDialog({ open, job, configuredChannels, onClose, onSave }: TaskDial
   const [skillsError, setSkillsError] = useState<string | null>(null);
   const messageRef = useRef<HTMLTextAreaElement>(null);
   const skillPickerRef = useRef<HTMLDivElement>(null);
+  // Failures that used to render as inline red text inside the dialog now
+  // surface in the shared notice dialog, keyed by message so an identical
+  // repeat is reported once per episode.
+  const notifiedSkillsErrorRef = useRef<string | null>(null);
+  const notifiedDeliveryChannelErrorRef = useRef<string | null>(null);
   const [prevOpen, setPrevOpen] = useState(open);
 
   if (prevOpen !== open) {
@@ -821,6 +826,32 @@ function TaskDialog({ open, job, configuredChannels, onClose, onSave }: TaskDial
   const availableTargetOptions = currentDeliveryTargetOption
     ? [currentDeliveryTargetOption, ...channelTargetOptions.filter((option) => option.value !== deliveryTarget)]
     : channelTargetOptions;
+
+  // Quick-access skill load failures used to render inside the skill picker.
+  useEffect(() => {
+    if (!skillsError) {
+      notifiedSkillsErrorRef.current = null;
+      return;
+    }
+    if (notifiedSkillsErrorRef.current === skillsError) return;
+    notifiedSkillsErrorRef.current = skillsError;
+    reportFailure(skillsError);
+  }, [skillsError]);
+
+  // The unsupported delivery channel hint used to render under the channel
+  // select; it now opens the shared notice dialog instead.
+  useEffect(() => {
+    if (!unsupportedDeliveryChannel) {
+      notifiedDeliveryChannelErrorRef.current = null;
+      return;
+    }
+    const message = t('dialog.deliveryChannelUnsupported', {
+      channel: getChannelDisplayName(effectiveDeliveryChannel),
+    });
+    if (notifiedDeliveryChannelErrorRef.current === message) return;
+    notifiedDeliveryChannelErrorRef.current = message;
+    reportFailure(message);
+  }, [effectiveDeliveryChannel, t, unsupportedDeliveryChannel]);
 
   // Keep the delivery account/target state in sync during render when their
   // inputs change (React-recommended adjust-during-render pattern) instead of
@@ -1081,8 +1112,6 @@ function TaskDialog({ open, job, configuredChannels, onClose, onSave }: TaskDial
                       <div className="max-h-64 overflow-y-auto">
                         {skillsLoading ? (
                           <div className="px-3 py-4 text-xs text-muted-foreground">{t('dialog.skillLoading')}</div>
-                        ) : skillsError ? (
-                          <div className="px-3 py-4 text-xs text-destructive">{skillsError}</div>
                         ) : filteredQuickSkills.length === 0 ? (
                           <div className="px-3 py-4 text-xs text-muted-foreground">{t('dialog.skillEmpty')}</div>
                         ) : (
@@ -1337,9 +1366,6 @@ function TaskDialog({ open, job, configuredChannels, onClose, onSave }: TaskDial
                   </SelectField>
                   {availableChannels.length === 0 && (
                     <p className="text-xs text-muted-foreground">{t('dialog.noChannels')}</p>
-                  )}
-                  {unsupportedDeliveryChannel && (
-                    <p className="text-xs text-destructive">{t('dialog.deliveryChannelUnsupported', { channel: getChannelDisplayName(effectiveDeliveryChannel) })}</p>
                   )}
                   {selectedChannel && (
                     <p className="text-xs text-muted-foreground">
@@ -1647,6 +1673,19 @@ export function Cron() {
     };
   }, [fetchConfiguredChannels]);
 
+  // Scheduled task list load failures used to render as a red strip above the
+  // statistics. They now surface in the shared notice dialog.
+  const notifiedErrorRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!error) {
+      notifiedErrorRef.current = null;
+      return;
+    }
+    if (notifiedErrorRef.current === error) return;
+    notifiedErrorRef.current = error;
+    reportFailure(error);
+  }, [error]);
+
   // Statistics
   const safeJobs = Array.isArray(jobs) ? jobs : [];
   const activeJobs = safeJobs.filter((j) => j.enabled);
@@ -1725,16 +1764,6 @@ export function Cron() {
               <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
               <span className="text-yellow-700 dark:text-yellow-400 text-sm font-medium">
                 {t('gatewayWarning')}
-              </span>
-            </div>
-          )}
-
-          {/* Error Display */}
-          {error && (
-            <div className="mb-8 p-4 rounded-xl border border-destructive/50 bg-destructive/10 flex items-center gap-3">
-              <AlertCircle className="h-5 w-5 text-destructive" />
-              <span className="text-destructive text-sm font-medium">
-                {error}
               </span>
             </div>
           )}

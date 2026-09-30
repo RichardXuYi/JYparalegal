@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
 import { EntitlementGate } from '@/components/legal/EntitlementGate';
+import { reportFailure } from '@/lib/notice';
 import {
   EMPTY_REQUIREMENT, EntitlementError, type PartyDraft, type SignRequirement,
   api, defaultExpireLocal, emptyParty, toApiTime,
@@ -75,7 +76,6 @@ export default function TaskSetup() {
   const [guide, setGuide] = useState(() => localStorage.getItem('jy.sign.createGuide') !== '1');
   const [guideStep, setGuideStep] = useState(0);
   const [reqIndex, setReqIndex] = useState<number | null>(null);
-  const [error, setError] = useState('');
   const [locked, setLocked] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -98,7 +98,7 @@ export default function TaskSetup() {
       if (t.quotaSnapshot != null) setQuota(t.quotaSnapshot);
     }).catch((e: unknown) => {
       if (e instanceof EntitlementError) setLocked(true);
-      else setError(e instanceof Error ? e.message : '加载失败');
+      else reportFailure(e, '加载失败');
     });
     void api<PartyRow[]>(`/platform/sign/tasks/${id}/parties`).then((rows) => {
       if (rows.length === 0) return;
@@ -121,9 +121,8 @@ export default function TaskSetup() {
 
   const save = async () => {
     const verr = validateParties(parties, false);
-    if (verr) { setError(verr); throw new Error(verr); }
+    if (verr) { reportFailure(verr); throw new Error(verr); }
     setBusy(true);
-    setError('');
     try {
       await api(`/platform/sign/tasks/${id}`, {
         method: 'PATCH',
@@ -150,7 +149,7 @@ export default function TaskSetup() {
       });
     } catch (e) {
       if (e instanceof EntitlementError) setLocked(true);
-      else setError(e instanceof Error ? e.message : '保存失败');
+      else reportFailure(e, '保存失败');
       throw e;
     } finally {
       setBusy(false);
@@ -159,15 +158,14 @@ export default function TaskSetup() {
 
   const next = async () => {
     setSubmitted(true);
-    setError('');
-    if (!title.trim()) { setError('请填写任务主题'); return; }
+    if (!title.trim()) { reportFailure('请填写任务主题'); return; }
     const verr = validateParties(parties, true);
-    if (verr) { setError(verr); return; }
+    if (verr) { reportFailure(verr); return; }
     try {
       await save();
       nav(`/signing/${id}/compose`);
     } catch {
-      /* save already set error */
+      /* save already reported the failure */
     }
   };
 
@@ -196,7 +194,6 @@ export default function TaskSetup() {
         <button className="rounded-md border border-border px-3 py-1.5 text-sm" disabled={busy} onClick={() => void save().catch(() => undefined)}>保存</button>
         <button className="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground disabled:opacity-50" disabled={busy} onClick={() => void next()}>下一步</button>
       </div>
-      {error && <div className="mx-5 mt-3 rounded-md bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400">{error}</div>}
       <div className="flex-1 overflow-y-auto px-5 py-4">
         <section className="mb-4 rounded-lg border border-border bg-card p-4">
           <h2 className="mb-3 text-sm font-semibold">基本信息</h2>

@@ -139,6 +139,10 @@ export function Channels() {
   const queuedFetchOptionsRef = useRef<FetchPageDataOptions | null>(null);
   const agentsFetchInFlightRef = useRef<Promise<void> | null>(null);
   const hasLoadedAgentsRef = useRef(false);
+  // The channel list load failure used to render as a red strip above the list.
+  // It now surfaces in the shared notice dialog, keyed by message so an
+  // identical repeat of the same failure is reported once per episode.
+  const notifiedErrorRef = useRef<string | null>(null);
 
   const displayedChannelTypes = getPrimaryChannels();
   const displayedGatewayHealth = isStaleNotRunningHealthForRunningGateway(gatewayHealth, gatewayStatus.state)
@@ -476,6 +480,16 @@ export function Channels() {
     return nextAccountId;
   };
 
+  useEffect(() => {
+    if (error === null) {
+      notifiedErrorRef.current = null;
+      return;
+    }
+    if (notifiedErrorRef.current === error) return;
+    notifiedErrorRef.current = error;
+    reportFailure(error);
+  }, [error]);
+
   if (loading && !hasStableValue) {
     return (
       <div className="flex flex-col h-full w-full dark:bg-background items-center justify-center">
@@ -590,15 +604,6 @@ export function Channels() {
                   </pre>
                 </div>
               )}
-            </div>
-          )}
-
-          {error && (
-            <div className="mb-8 p-4 rounded-xl border border-destructive/50 bg-destructive/10 flex items-center gap-3">
-              <AlertCircle className="h-5 w-5 text-destructive" />
-              <span className="text-destructive text-sm font-medium">
-                {error}
-              </span>
             </div>
           )}
 

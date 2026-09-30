@@ -2,11 +2,12 @@
  * Update Settings Component
  * Displays update status and allows manual update checking/installation
  */
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import { Download, RefreshCw, Loader2, Rocket, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useUpdateStore } from '@/stores/update';
+import { reportFailure } from '@/lib/notice';
 import { useTranslation } from 'react-i18next';
 
 function formatBytes(bytes: number): string {
@@ -45,6 +46,27 @@ export function UpdateSettings() {
     await checkForUpdates();
   }, [checkForUpdates, clearError]);
 
+  // Update failures used to render as a red inline block. They now surface in
+  // the shared notice dialog (with "check for updates" as the recovery action),
+  // reported once per failure message.
+  const notifiedErrorRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (status !== 'error' || !error) {
+      notifiedErrorRef.current = null;
+      return;
+    }
+    if (notifiedErrorRef.current === error) return;
+    notifiedErrorRef.current = error;
+    reportFailure(error, t('updates.status.failed'), {
+      title: t('updates.errorDetails'),
+      actions: [{
+        label: t('updates.action.check'),
+        onClick: () => { void handleCheckForUpdates(); },
+        primary: true,
+      }],
+    });
+  }, [status, error, t, handleCheckForUpdates]);
+
   const renderStatusIcon = () => {
     switch (status) {
       case 'checking':
@@ -75,7 +97,7 @@ export function UpdateSettings() {
       case 'downloaded':
         return t('updates.status.downloaded', { version: updateInfo?.version });
       case 'error':
-        return error || t('updates.status.failed');
+        return t('updates.status.failed');
       case 'not-available':
         return t('updates.status.latest');
       default:
@@ -197,14 +219,6 @@ export function UpdateSettings() {
               <p className="whitespace-pre-wrap">{updateInfo.releaseNotes}</p>
             </div>
           )}
-        </div>
-      )}
-
-      {/* Error Details */}
-      {status === 'error' && error && (
-        <div className="rounded-lg bg-red-50 dark:bg-red-900/10 p-4 text-red-600 dark:text-red-400 text-sm">
-          <p className="font-medium mb-1">{t('updates.errorDetails')}</p>
-          <p>{error}</p>
         </div>
       )}
 

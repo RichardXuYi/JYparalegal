@@ -7,17 +7,17 @@
  */
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertCircle, Building2, Lock, Phone, UserPlus } from 'lucide-react';
+import { Building2, Lock, Phone, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { TitleBar } from '@/components/layout/TitleBar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { hostApi } from '@/lib/host-api';
+import { reportFailure } from '@/lib/notice';
 import { useAuthStore } from '@/stores/auth';
 
 type UserType = 'PERSONAL' | 'ENTERPRISE';
-type FieldErrors = Partial<Record<'phone' | 'password' | 'confirmPassword' | 'companyName', string>>;
 
 const PHONE_RE = /^1[3-9]\d{9}$/;
 
@@ -34,23 +34,29 @@ export function Register() {
   const [legalPerson, setLegalPerson] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
   const enterprise = userType === 'ENTERPRISE';
 
   function validate(): boolean {
-    const next: FieldErrors = {};
-    if (!PHONE_RE.test(phone.trim())) next.phone = '请输入有效的手机号';
-    if (password.length < 6) next.password = '密码至少 6 位';
-    if (confirmPassword !== password) next.confirmPassword = '两次输入的密码不一致';
-    if (enterprise && !companyName.trim()) next.companyName = '请填写公司名称';
-    setFieldErrors(next);
-    return Object.keys(next).length === 0;
+    // Field errors surface in the shared notice dialog (inline red text is
+    // unreadable on the purple theme), one message per failed check.
+    const message = !PHONE_RE.test(phone.trim())
+      ? '请输入有效的手机号'
+      : password.length < 6
+        ? '密码至少 6 位'
+        : confirmPassword !== password
+          ? '两次输入的密码不一致'
+          : (enterprise && !companyName.trim())
+            ? '请填写公司名称'
+            : null;
+    if (message) {
+      reportFailure(message);
+      return false;
+    }
+    return true;
   }
 
   async function handleSubmit() {
-    setError(null);
     if (!validate()) return;
     setSubmitting(true);
     try {
@@ -68,7 +74,7 @@ export function Register() {
           : {}),
       });
       if (!result.success) {
-        setError(result.error || '注册失败，请稍后重试');
+        reportFailure(result.error || '注册失败，请稍后重试');
         return;
       }
       // 注册成功后用手机号+密码自动登录
@@ -80,7 +86,7 @@ export function Register() {
         navigate('/login', { replace: true });
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : '注册失败，请稍后重试');
+      reportFailure(e instanceof Error ? e.message : '注册失败，请稍后重试');
     } finally {
       setSubmitting(false);
     }
@@ -136,9 +142,8 @@ export function Register() {
               <div className="relative group">
                 <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
                 <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel"
-                  className={inputCls} aria-invalid={!!fieldErrors.phone} placeholder="请输入手机号" />
+                  className={inputCls} placeholder="请输入手机号" />
               </div>
-              {fieldErrors.phone ? <FieldError msg={fieldErrors.phone} /> : null}
             </div>
 
             {/* 密码 */}
@@ -147,9 +152,8 @@ export function Register() {
               <div className="relative group">
                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
                 <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-                  autoComplete="new-password" className={inputCls} aria-invalid={!!fieldErrors.password} placeholder="至少 6 位" />
+                  autoComplete="new-password" className={inputCls} placeholder="至少 6 位" />
               </div>
-              {fieldErrors.password ? <FieldError msg={fieldErrors.password} /> : null}
             </div>
 
             {/* 确认密码 */}
@@ -158,10 +162,9 @@ export function Register() {
               <div className="relative group">
                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
                 <Input id="confirmPassword" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
-                  autoComplete="new-password" className={inputCls} aria-invalid={!!fieldErrors.confirmPassword} placeholder="再次输入密码"
+                  autoComplete="new-password" className={inputCls} placeholder="再次输入密码"
                   onKeyDown={(e) => { if (e.key === 'Enter') void handleSubmit(); }} />
               </div>
-              {fieldErrors.confirmPassword ? <FieldError msg={fieldErrors.confirmPassword} /> : null}
             </div>
 
             {/* 企业信息 */}
@@ -173,8 +176,7 @@ export function Register() {
                 <div className="space-y-2">
                   <Label htmlFor="companyName" className="text-sm font-medium text-slate-600">公司名称 <span className="text-red-500">*</span></Label>
                   <Input id="companyName" value={companyName} onChange={(e) => setCompanyName(e.target.value)}
-                    className="h-11 bg-white border-slate-200 text-slate-800" aria-invalid={!!fieldErrors.companyName} placeholder="企业全称" />
-                  {fieldErrors.companyName ? <FieldError msg={fieldErrors.companyName} /> : null}
+                    className="h-11 bg-white border-slate-200 text-slate-800" placeholder="企业全称" />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="creditCode" className="text-sm font-medium text-slate-600">统一社会信用代码</Label>
@@ -200,13 +202,6 @@ export function Register() {
               </p>
             )}
 
-            {error ? (
-              <div className="flex items-center gap-2 rounded-lg bg-red-50 border border-red-200 px-3 py-2.5 text-sm text-red-600">
-                <AlertCircle className="h-4 w-4 shrink-0" />
-                <span>{error}</span>
-              </div>
-            ) : null}
-
             <Button className="w-full h-12 bg-gradient-to-r from-blue-600 via-blue-500 to-purple-600 hover:opacity-90 text-white font-semibold shadow-lg shadow-blue-500/30 dark:from-orange-600 dark:via-red-500 dark:to-red-600 dark:shadow-red-500/30"
               size="lg" onClick={() => void handleSubmit()} disabled={submitting}>
               {submitting ? (
@@ -227,15 +222,6 @@ export function Register() {
           </CardContent>
         </Card>
       </div>
-    </div>
-  );
-}
-
-function FieldError({ msg }: { msg: string }) {
-  return (
-    <div className="flex items-center gap-1.5 text-sm text-red-600 mt-1.5">
-      <AlertCircle className="h-4 w-4" />
-      <span>{msg}</span>
     </div>
   );
 }

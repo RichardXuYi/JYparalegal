@@ -15,7 +15,6 @@ import {
   Key,
   ExternalLink,
   Copy,
-  XCircle,
   ChevronDown,
   Search,
 } from 'lucide-react';
@@ -501,7 +500,6 @@ function ProviderCard({
   const [validating, setValidating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [arkMode, setArkMode] = useState<ArkMode>('apikey');
-  const [validationError, setValidationError] = useState<string | null>(null);
   const runtimeProviderKey = useMemo(() => resolveRuntimeProviderKey(account), [account]);
   const supportsModelMetaEditing = MODEL_META_EDITABLE_VENDORS.includes(account.vendorId);
   const parsedEditModels = useMemo(() => parseModelIdList(modelId), [modelId]);
@@ -595,7 +593,6 @@ function ProviderCard({
       setModelId(stripAccountModelPrefixes(account));
       setFallbackModelsText(normalizeFallbackModels(account.fallbackModels).join('\n'));
       setFallbackProviderIds(normalizeFallbackProviderIds(account.fallbackAccountIds));
-      setValidationError(null);
       setArkMode(
         isArkCodePlanMode(
           account.vendorId,
@@ -682,7 +679,6 @@ function ProviderCard({
 
   const handleSaveEdits = async () => {
     setSaving(true);
-    setValidationError(null);
     try {
       const payload: { newApiKey?: string; updates?: Partial<ProviderConfig> } = {};
       const normalizedFallbackModels = normalizeFallbackModels(fallbackModelsText.split('\n'));
@@ -696,7 +692,7 @@ function ProviderCard({
         });
         setValidating(false);
         if (!result.valid) {
-          setValidationError(result.error || t('aiProviders.toast.invalidKey'));
+          reportFailure(result.error || t('aiProviders.toast.invalidKey'));
           setSaving(false);
           return;
         }
@@ -705,14 +701,14 @@ function ProviderCard({
 
       {
         if (showModelIdField && parsedEditModels.length === 0) {
-          setValidationError(t('aiProviders.toast.modelRequired'));
+          reportFailure(t('aiProviders.toast.modelRequired'));
           setSaving(false);
           return;
         }
         if (showModelIdField) {
           const invalidEditModel = parsedEditModels.find((model) => /\s/.test(model));
           if (invalidEditModel) {
-            setValidationError(t('aiProviders.toast.invalidModelFormat', 'Model ID must not contain spaces'));
+            reportFailure(t('aiProviders.toast.invalidModelFormat', 'Model ID must not contain spaces'));
             setSaving(false);
             return;
           }
@@ -1000,7 +996,6 @@ function ProviderCard({
                     value={modelId}
                     onChange={(v) => {
                       setModelId(v);
-                      setValidationError(null);
                     }}
                     placeholder={typeInfo?.modelIdPlaceholder || 'provider/model-id'}
                   />
@@ -1248,7 +1243,6 @@ function ProviderCard({
                     value={newKey}
                     onChange={(e) => {
                       setNewKey(e.target.value);
-                      setValidationError(null);
                     }}
                     className={cn(currentInputClasses, 'pr-10')}
                   />
@@ -1305,16 +1299,6 @@ function ProviderCard({
                   <X className="h-4 w-4" />
                 </Button>
               </div>
-              {validationError && (
-                <p
-                  data-testid={`provider-edit-validation-error-${account.id}`}
-                  className="text-xs text-red-500 flex items-center gap-1 mt-1"
-                >
-                  <XCircle className="h-3 w-3 shrink-0" />
-                  <span className="font-medium">{t('aiProviders.dialog.failed')}:</span>
-                  <span>{validationError}</span>
-                </p>
-              )}
               <p className="text-xs text-muted-foreground">
                 {t('aiProviders.dialog.replaceApiKeyHelp')}
               </p>
@@ -1378,7 +1362,6 @@ function AddProviderDialog({
   const [arkMode, setArkMode] = useState<ArkMode>('apikey');
   const [showKey, setShowKey] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [validationError, setValidationError] = useState<string | null>(null);
 
   // OAuth Flow State
   const [oauthFlowing, setOauthFlowing] = useState(false);
@@ -1416,7 +1399,6 @@ function AddProviderDialog({
       setArkMode('apikey');
       setShowKey(false);
       setSaving(false);
-      setValidationError(null);
       setOauthFlowing(false);
       setOauthData(null);
       setManualCodeInput('');
@@ -1543,7 +1525,6 @@ function AddProviderDialog({
       setOauthFlowing(false);
       setOauthData(null);
       setManualCodeInput('');
-      setValidationError(null);
 
       const { onClose: close, t: translate } = latestRef.current;
       const accountId = payload?.accountId || pendingOAuthRef.current?.accountId;
@@ -1628,6 +1609,27 @@ function AddProviderDialog({
     await hostApi.providers.cancelOAuth();
   };
 
+  // OAuth failures used to render inside the inline flow card. They now surface
+  // in the shared notice dialog, with "Try Again" kept as the recovery action.
+  // Reported once per failure message.
+  const notifiedOAuthErrorRef = React.useRef<string | null>(null);
+  useEffect(() => {
+    if (!oauthError) {
+      notifiedOAuthErrorRef.current = null;
+      return;
+    }
+    if (notifiedOAuthErrorRef.current === oauthError) return;
+    notifiedOAuthErrorRef.current = oauthError;
+    reportFailure(oauthError, undefined, {
+      title: t('aiProviders.oauth.authFailed'),
+      actions: [{
+        label: 'Try Again',
+        onClick: () => { void handleCancelOAuth(); },
+        primary: true,
+      }],
+    });
+  }, [oauthError, t]);
+
   const handleSubmitManualOAuthCode = async () => {
     const value = manualCodeInput.trim();
     if (!value) return;
@@ -1662,7 +1664,6 @@ function AddProviderDialog({
     setUserAgent('');
     setShowAdvancedConfig(false);
     setArkMode('apikey');
-    setValidationError(null);
   };
 
   const handleAdd = async () => {
@@ -1685,14 +1686,13 @@ function AddProviderDialog({
     }
 
     setSaving(true);
-    setValidationError(null);
 
     try {
       // Validate key first if the provider requires one and a key was entered
       const requiresKey = typeInfo?.requiresApiKey ?? false;
       const normalizedApiKey = normalizeProviderApiKeyInput(apiKey);
       if (requiresKey && !normalizedApiKey) {
-        setValidationError(t('aiProviders.toast.invalidKey')); // reusing invalid key msg or should add 'required' msg? null checks
+        reportFailure(t('aiProviders.toast.invalidKey')); // reusing invalid key msg or should add 'required' msg? null checks
         setSaving(false);
         return;
       }
@@ -1702,7 +1702,7 @@ function AddProviderDialog({
           apiProtocol: (selectedType === 'custom' || selectedType === 'ollama') ? apiProtocol : undefined,
         });
         if (!result.valid) {
-          setValidationError(result.error || t('aiProviders.toast.invalidKey'));
+          reportFailure(result.error || t('aiProviders.toast.invalidKey'));
           setSaving(false);
           return;
         }
@@ -1711,7 +1711,7 @@ function AddProviderDialog({
       const requiresModel = showModelIdField;
       const parsedModels = parseModelIdList(modelId);
       if (requiresModel && parsedModels.length === 0) {
-        setValidationError(t('aiProviders.toast.modelRequired'));
+        reportFailure(t('aiProviders.toast.modelRequired'));
         setSaving(false);
         return;
       }
@@ -1719,7 +1719,7 @@ function AddProviderDialog({
       if (requiresModel) {
         const invalidModel = parsedModels.find((model) => /\s/.test(model));
         if (invalidModel) {
-          setValidationError(t('aiProviders.toast.invalidModelFormat', 'Model ID must not contain spaces'));
+          reportFailure(t('aiProviders.toast.invalidModelFormat', 'Model ID must not contain spaces'));
           setSaving(false);
           return;
         }
@@ -1754,7 +1754,7 @@ function AddProviderDialog({
         }
       );
     } catch (error) {
-      setValidationError(
+      reportFailure(
         error instanceof Error ? error.message : t('aiProviders.toast.failedAdd')
       );
     } finally {
@@ -1829,7 +1829,6 @@ function AddProviderDialog({
                     setSelectedType(null);
                     setSelectedGroupKey(null);
                     setSelectedOfferingId(null);
-                    setValidationError(null);
                     setBaseUrl('');
                     setModelId('');
                     setUserAgent('');
@@ -1974,7 +1973,6 @@ function AddProviderDialog({
                         value={apiKey}
                         onChange={(e) => {
                           setApiKey(e.target.value);
-                          setValidationError(null);
                         }}
                         className={inputClasses}
                       />
@@ -1986,9 +1984,6 @@ function AddProviderDialog({
                         {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>
                     </div>
-                    {validationError && (
-                      <p className="text-meta text-red-500 font-medium">{validationError}</p>
-                    )}
                     <p className="text-xs text-muted-foreground">
                       {t('aiProviders.dialog.apiKeyStored')}
                     </p>
@@ -2002,7 +1997,6 @@ function AddProviderDialog({
                       value={modelId}
                       onChange={(v) => {
                         setModelId(v);
-                        setValidationError(null);
                       }}
                       placeholder={typeInfo?.modelIdPlaceholder || 'provider/model-id'}
                     />
@@ -2037,7 +2031,6 @@ function AddProviderDialog({
                           if (modelId.trim() === codePlanPreset.modelId) {
                             setModelId(typeInfo?.defaultModelId || '');
                           }
-                          setValidationError(null);
                         }}
                         className={cn("flex-1 py-1.5 px-3 rounded-lg border transition-colors", arkMode === 'apikey' ? "bg-surface-modal border-black/20 dark:border-white/20 shadow-sm font-medium" : "border-transparent bg-black/5 dark:bg-white/5 text-muted-foreground hover:bg-black/10 dark:hover:bg-white/10")}
                       >
@@ -2049,7 +2042,6 @@ function AddProviderDialog({
                           setArkMode('codeplan');
                           setBaseUrl(codePlanPreset.baseUrl);
                           setModelId(codePlanPreset.modelId);
-                          setValidationError(null);
                         }}
                         className={cn("flex-1 py-1.5 px-3 rounded-lg border transition-colors", arkMode === 'codeplan' ? "bg-surface-modal border-black/20 dark:border-white/20 shadow-sm font-medium" : "border-transparent bg-black/5 dark:bg-white/5 text-muted-foreground hover:bg-black/10 dark:hover:bg-white/10")}
                       >
@@ -2137,22 +2129,13 @@ function AddProviderDialog({
                     </div>
 
                     {/* OAuth Active State Modal / Inline View */}
-                    {oauthFlowing && (
+                    {oauthFlowing && !oauthError && (
                       <div className="mt-4 p-5 border border-black/10 dark:border-white/10 rounded-2xl bg-surface-modal shadow-sm relative overflow-hidden">
                         {/* Background pulse effect */}
                         <div className="absolute inset-0 bg-blue-500/5 animate-pulse" />
 
                         <div className="relative z-10 flex flex-col items-center justify-center text-center space-y-5">
-                          {oauthError ? (
-                            <div className="text-red-500 space-y-3">
-                              <XCircle className="h-10 w-10 mx-auto" />
-                              <p className="font-semibold text-sm">{t('aiProviders.oauth.authFailed')}</p>
-                              <p className="text-meta opacity-80">{oauthError}</p>
-                              <Button variant="outline" size="sm" onClick={handleCancelOAuth} className="mt-2 rounded-full px-6 h-9">
-                                Try Again
-                              </Button>
-                            </div>
-                          ) : !oauthData ? (
+                          {!oauthData ? (
                             <div className="space-y-4 py-6">
                               <Loader2 className="h-10 w-10 animate-spin text-blue-500 mx-auto" />
                               <p className="text-meta font-medium text-muted-foreground animate-pulse">{t('aiProviders.oauth.requestingCode')}</p>

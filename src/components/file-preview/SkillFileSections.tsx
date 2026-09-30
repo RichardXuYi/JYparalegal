@@ -7,6 +7,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { reportFailure } from '@/lib/notice';
 import { cn } from '@/lib/utils';
 import {
   EMPTY_SKILL_GROUPS,
@@ -48,6 +49,8 @@ export function SkillFileSections({ baseDir, onOpen, className }: SkillFileSecti
       .catch((err) => {
         if (cancelled) return;
         setError(String(err));
+        // 目录扫描失败原来用内联红条提示，现在改走统一失败弹窗。
+        reportFailure(err, t('detail.sections.scanFailed', { defaultValue: 'Failed to scan skill directory' }));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -55,7 +58,7 @@ export function SkillFileSections({ baseDir, onOpen, className }: SkillFileSecti
     return () => {
       cancelled = true;
     };
-  }, [baseDir]);
+  }, [baseDir, t]);
 
   if (!baseDir) return null;
 
@@ -68,11 +71,8 @@ export function SkillFileSections({ baseDir, onOpen, className }: SkillFileSecti
   }
 
   if (error) {
-    return (
-      <div className={cn('rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-xs text-destructive', className)}>
-        {t('detail.sections.scanFailed', { defaultValue: 'Failed to scan skill directory' })}
-      </div>
-    );
+    // 失败已通过统一弹窗上报，这里不再重复展示错误文案。
+    return null;
   }
 
   if (isSkillFileGroupsEmpty(groups)) {

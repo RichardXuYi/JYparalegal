@@ -238,7 +238,6 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false }:
   const [skillQuery, setSkillQuery] = useState('');
   const [quickSkills, setQuickSkills] = useState<QuickAccessSkill[]>([]);
   const [skillsLoading, setSkillsLoading] = useState(false);
-  const [skillsError, setSkillsError] = useState<string | null>(null);
   const [selectedSkill, setSelectedSkill] = useState<QuickAccessSkill | null>(null);
   const [switchingModelRef, setSwitchingModelRef] = useState<string | null>(null);
   const [optimisticModelRef, setOptimisticModelRef] = useState<string | null>(null);
@@ -411,7 +410,6 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false }:
     setSkillPickerOpen(false);
     setSkillQuery('');
     setQuickSkills([]);
-    setSkillsError(null);
   }, [currentAgentId]);
 
   useEffect(() => {
@@ -451,11 +449,9 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false }:
   const loadQuickSkills = useCallback(async (): Promise<QuickAccessSkill[]> => {
     if (!currentAgent) {
       setQuickSkills([]);
-      setSkillsError(null);
       return [];
     }
     setSkillsLoading(true);
-    setSkillsError(null);
     try {
       const result = await fetchQuickAccessSkills({
         workspace: currentAgent.workspace,
@@ -469,7 +465,8 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false }:
       return list;
     } catch (error) {
       setQuickSkills([]);
-      setSkillsError(String(error));
+      // 技能列表加载失败原来用选择器里的内联小字提示，现在改走统一失败弹窗。
+      reportFailure(error, 'Failed to load skills');
       return [];
     } finally {
       setSkillsLoading(false);
@@ -687,6 +684,34 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false }:
   const hasFailedAttachments = attachments.some((a) => a.status === 'error');
   const canSend = (input.trim() || attachments.length > 0) && allReady && !inputDisabled && !sending;
   const canStop = sending && !inputDisabled && !!onStop;
+
+  // 附件暂存失败原来只在缩略图上盖一个 "Error" 角标，现在改走统一失败弹窗；
+  // 页脚的「重试失败附件」入口保留，同时作为弹窗主操作。用签名去重避免重渲染时重复上报。
+  const notifiedAttachmentErrorRef = useRef<string | null>(null);
+  useEffect(() => {
+    const failed = attachments.filter((a) => a.status === 'error');
+    const signature = failed.map((a) => `${a.fileName}:${a.error ?? ''}`).join('|');
+    if (!signature) {
+      notifiedAttachmentErrorRef.current = null;
+      return;
+    }
+    if (notifiedAttachmentErrorRef.current === signature) return;
+    notifiedAttachmentErrorRef.current = signature;
+    reportFailure(
+      failed.map((a) => a.error ?? a.fileName).join('；'),
+      'Failed to stage attachment',
+      {
+        actions: [{
+          label: t('composer.retryFailedAttachments'),
+          primary: true,
+          onClick: () => {
+            setAttachments((prev) => prev.filter((att) => att.status !== 'error'));
+            void pickFiles();
+          },
+        }],
+      },
+    );
+  }, [attachments, pickFiles, t]);
 
   const handleSend = useCallback(async () => {
     if (!canSend) return;
@@ -1049,10 +1074,6 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false }:
                       <div className="px-3 py-4 text-xs text-muted-foreground">
                         {t('composer.skillLoading')}
                       </div>
-                    ) : skillsError ? (
-                      <div className="px-3 py-4 text-xs text-destructive">
-                        {skillsError}
-                      </div>
                     ) : filteredQuickSkills.length === 0 ? (
                       <div className="px-3 py-4 text-xs text-muted-foreground">
                         {t('composer.skillEmpty')}
@@ -1306,13 +1327,6 @@ function AttachmentPreview({
       {attachment.status === 'staging' && (
         <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
           <Loader2 className="h-4 w-4 text-white animate-spin" />
-        </div>
-      )}
-
-      {/* Error overlay */}
-      {attachment.status === 'error' && (
-        <div className="absolute inset-0 bg-destructive/20 flex items-center justify-center">
-          <span className="text-2xs text-destructive font-medium px-1">Error</span>
         </div>
       )}
 

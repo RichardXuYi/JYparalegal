@@ -10,17 +10,30 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertCircle, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth';
 import { TitleBar } from '@/components/layout/TitleBar';
+import { reportFailure } from '@/lib/notice';
 import { resetAllUserStores } from '@/lib/user-session-reset';
 
 export function SsoBridge() {
   const navigate = useNavigate();
   const restore = useAuthStore((s) => s.restore);
-  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const handledRef = useRef(false);
+
+  // SSO failures used to render as centered red text. They now surface in the
+  // shared notice dialog, with "log in again" kept as the recovery entry.
+  const reportSsoFailure = useCallback((reason: string) => {
+    setLoading(false);
+    reportFailure(reason, undefined, {
+      actions: [{
+        label: '重新登录',
+        onClick: () => navigate('/login'),
+        primary: true,
+      }],
+    });
+  }, [navigate]);
 
   // Core SSO login: exchange the app-frontend accessToken for a studio JWT,
   // persist it, restore auth state, and navigate to the main chat page.
@@ -57,16 +70,14 @@ export function SsoBridge() {
               state: { initialMessage: message || undefined },
             });
           } else {
-            setError(data.error || '登录失败');
-            setLoading(false);
+            reportSsoFailure(data.error || '登录失败');
           }
         })
         .catch(() => {
-          setError('网络错误');
-          setLoading(false);
+          reportSsoFailure('网络错误');
         });
     },
-    [navigate, restore],
+    [navigate, restore, reportSsoFailure],
   );
 
   useEffect(() => {
@@ -105,8 +116,7 @@ export function SsoBridge() {
     // an error instead of spinning forever.
     const timeoutId = window.setTimeout(() => {
       if (!handledRef.current) {
-        setError('缺少认证信息');
-        setLoading(false);
+        reportSsoFailure('缺少认证信息');
       }
     }, 3000);
 
@@ -114,7 +124,7 @@ export function SsoBridge() {
       window.removeEventListener('message', handler);
       window.clearTimeout(timeoutId);
     };
-  }, [handleSsoLogin]);
+  }, [handleSsoLogin, reportSsoFailure]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background relative">
@@ -122,17 +132,10 @@ export function SsoBridge() {
         <TitleBar />
       </div>
       <div className="flex flex-col items-center gap-4 p-8">
-        {loading && !error && (
+        {loading && (
           <>
             <Loader2 className="h-12 w-12 animate-spin text-primary" />
             <p className="text-muted-foreground">正在登录...</p>
-          </>
-        )}
-        {error && (
-          <>
-            <AlertCircle className="h-12 w-12 text-destructive" />
-            <p className="text-destructive">{error}</p>
-            <p className="text-sm text-muted-foreground">请关闭此窗口后重试</p>
           </>
         )}
       </div>

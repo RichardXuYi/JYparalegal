@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LegalPageHeader } from '@/components/legal/LegalPageHeader';
 import { ApiError, EntitlementError, platformGet, platformSend } from '@/lib/platform-api';
@@ -364,6 +364,29 @@ export default function MockCourt() {
     && !hearing.slots.some((slot) => slot.status === 'SPEAKING')
     && hearing.utterances.length > 0;
 
+  // 发言引用了检索片段里缺失的法条：原来在每条发言下内联红字提示，现在改走统一失败弹窗。
+  // 签名去重（SSE 每次推送都会重渲染），同一批缺失只上报一次。
+  const missingClausesReport = (hearing?.utterances ?? [])
+    .map((item) => {
+      const excerpts = (hearing?.retrievals ?? [])
+        .filter((row) => row.slotId === item.slot_id)
+        .map((row) => row.excerpt);
+      return missingClauses(item.body, excerpts);
+    })
+    .filter((list) => list.length > 0)
+    .map((list) => t('moot.missing', { list: list.join('、') }))
+    .join('；');
+  const notifiedMissingRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!missingClausesReport) {
+      notifiedMissingRef.current = null;
+      return;
+    }
+    if (notifiedMissingRef.current === missingClausesReport) return;
+    notifiedMissingRef.current = missingClausesReport;
+    reportFailure(missingClausesReport);
+  }, [missingClausesReport]);
+
   return (
     <div className="flex h-full flex-col gap-3 overflow-hidden p-5">
       <LegalPageHeader title={t('moot.title')} actions={active ? <span className="text-meta text-muted-foreground">{t('moot.caseNo', { id: active.id })}</span> : undefined} />
@@ -478,17 +501,12 @@ export default function MockCourt() {
           <div className="grid min-h-0 flex-1 gap-3 md:grid-cols-[1fr_280px]">
             <div className="overflow-auto rounded-lg border border-border bg-card p-3">
               {live ? <article className="mb-3 rounded-md border border-border p-3 text-sm">{live}</article> : null}
-              {hearing.utterances.map((item) => {
-                const excerpts = hearing.retrievals.filter((row) => row.slotId === item.slot_id).map((row) => row.excerpt);
-                const missing = missingClauses(item.body, excerpts);
-                return (
-                  <article key={item.id} className="mb-3 rounded-md border border-border p-3">
-                    <div className="mb-1 text-meta text-muted-foreground">{item.speaker === 'HUMAN' ? t('moot.humanSpeaker') : roleLabel(item.role_code)}</div>
-                    <p>{item.body}</p>
-                    {missing.length > 0 && <p className="mt-2 text-meta text-destructive">{t('moot.missing', { list: missing.join('、') })}</p>}
-                  </article>
-                );
-              })}
+              {hearing.utterances.map((item) => (
+                <article key={item.id} className="mb-3 rounded-md border border-border p-3">
+                  <div className="mb-1 text-meta text-muted-foreground">{item.speaker === 'HUMAN' ? t('moot.humanSpeaker') : roleLabel(item.role_code)}</div>
+                  <p>{item.body}</p>
+                </article>
+              ))}
             </div>
             <div className="overflow-auto rounded-lg border border-border bg-card p-3 text-sm">
               <h2 className="mb-2 font-semibold">{t('moot.summary')}</h2>
