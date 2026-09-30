@@ -597,13 +597,44 @@ function cleanupBundle(outputDir) {
     'node_modules/pdfjs-dist/legacy',
     'node_modules/pdfjs-dist/types',
     'node_modules/node-llama-cpp/llama',
-    'node_modules/koffi/src',
+    // koffi: keep src/koffi/*.cjs and *.js. koffi/index.cjs requires
+    // './src/koffi/index.cjs', so deleting the whole 'src' tree makes the
+    // package throw MODULE_NOT_FOUND; OpenClaw then exits 78
+    // (state-migration-failed). Only C++/asm build sources are dropped.
+    // (src/koffi/src holds both C++ sources AND runtime .cjs loaders such as
+    //  static.cjs / trampolines.cjs, so it must NOT be removed wholesale;
+    //  the extensions filter below drops only the build-time sources.)
+    'node_modules/koffi/src/koffi/CMakeLists.txt',
     'node_modules/koffi/vendor',
     'node_modules/koffi/doc',
+    'node_modules/koffi/lib/native',
     'dist/extensions/feishu', // Removed in favor of official @larksuite/openclaw-lark plugin
   ];
   for (const rel of LARGE_REMOVALS) {
     if (rmSafe(path.join(outputDir, rel))) removedCount++;
+  }
+
+  // koffi ships its C++/asm sources next to the runtime JS loaders
+  // (src/koffi/src/*.cc|*.hh|*.inc|*.asm|*.S). The loaders are required at
+  // runtime (src/koffi/index.cjs -> ./src/static.cjs), so remove only the
+  // build sources by extension rather than the directory.
+  const KOFFI_BUILD_EXTS = ['.cc', '.hh', '.h', '.inc', '.asm', '.S', '.def'];
+  const koffiSrcDirs = [
+    path.join(outputDir, 'node_modules/koffi/src/koffi/src'),
+    path.join(outputDir, 'node_modules/koffi/lib'),
+  ];
+  for (const dir of koffiSrcDirs) {
+    if (!fs.existsSync(dir)) continue;
+    const walkRemove = (current) => {
+      let entries;
+      try { entries = fs.readdirSync(current, { withFileTypes: true }); } catch { return; }
+      for (const entry of entries) {
+        const full = path.join(current, entry.name);
+        if (entry.isDirectory()) walkRemove(full);
+        else if (KOFFI_BUILD_EXTS.some((e) => entry.name.endsWith(e)) && rmSafe(full)) removedCount++;
+      }
+    };
+    walkRemove(dir);
   }
 
   removedCount += cleanupKnownRuntimeJunk(outputDir);
