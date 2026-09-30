@@ -19,6 +19,7 @@ import { rendererExtensionRegistry } from './extensions/registry';
 import { loadExternalRendererExtensions } from './extensions/_ext-bridge.generated';
 
 import { GatewayFailureDialog } from './components/common/GatewayFailureDialog';
+import { NoticeHost } from './components/common/NoticeHost';
 import { InitializingScreen } from './components/common/InitializingScreen';
 import { useNewChatAction } from './components/layout/use-new-chat-action';
 import { hostEvents } from './lib/host-events';
@@ -270,11 +271,18 @@ function App() {
   const isSsoRoute = typeof window !== 'undefined' && window.location.hash.startsWith('#/sso');
 
   // Auth gate: block until the backend session has been validated.
+  // The NoticeHost must be mounted on every screen: the layouts are skipped by
+  // the boot/auth branches below, so a failed action there would have nowhere to
+  // surface. Mounting it here also covers the mobile shell, which has no
+  // layout-level host of its own.
+  const noticeHost = <NoticeHost />;
+
   // Exception: SSO bridge route is accessible during initialization.
   if (authStatus !== 'ready' && !isSsoRoute) {
     return (
       <ErrorBoundary>
         <InitializingScreen visible={true} />
+        {noticeHost}
       </ErrorBoundary>
     );
   }
@@ -289,6 +297,7 @@ function App() {
               <Route path="/sso" element={<SsoBridge />} />
             </Routes>
           </Suspense>
+          {noticeHost}
           <Toaster
             position={isMobileShell ? 'top-center' : 'bottom-right'}
             richColors
@@ -311,6 +320,7 @@ function App() {
               <Route path="*" element={<Login />} />
             </Routes>
           </Suspense>
+          {noticeHost}
           <Toaster
             position={isMobileShell ? 'top-center' : 'bottom-right'}
             richColors
@@ -329,6 +339,7 @@ function App() {
     return (
       <ErrorBoundary>
         <InitializingScreen visible={true} />
+        {noticeHost}
       </ErrorBoundary>
     );
   }
@@ -365,6 +376,7 @@ function App() {
 
         {/* Non-blocking banner + terminal failure dialog */}
         <GatewayFailureDialog />
+        {noticeHost}
 
         {/* Global toast notifications (mobile: bottom is taken by tab bar / input) */}
         <Toaster

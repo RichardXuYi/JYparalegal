@@ -1,6 +1,23 @@
 import { toast } from 'sonner';
 
-export type AppNotice = { kind: 'error' | 'locked'; message: string };
+export type AppNoticeAction = {
+  label: string;
+  onClick: () => void;
+  primary?: boolean;
+};
+
+export type AppNotice = {
+  kind: 'error' | 'locked';
+  message: string;
+  title?: string;
+  actions?: AppNoticeAction[];
+};
+
+export type ReportFailureOptions = {
+  title?: string;
+  /** Recovery affordances rendered next to the acknowledge button. */
+  actions?: AppNoticeAction[];
+};
 
 let current: AppNotice | null = null;
 const listeners = new Set<(notice: AppNotice | null) => void>();
@@ -77,9 +94,14 @@ function isLocked(reason: unknown): boolean {
 }
 
 /** 失败或未开通套餐：必须点确认才关闭。 */
-export function reportFailure(reason: unknown, fallback = '操作没有完成'): void {
+export function reportFailure(reason: unknown, fallback = '操作没有完成', options: ReportFailureOptions = {}): void {
   const message = textOf(reason, fallback);
-  emit({ kind: isLocked(reason) ? 'locked' : 'error', message });
+  emit({
+    kind: isLocked(reason) ? 'locked' : 'error',
+    message,
+    title: options.title,
+    actions: options.actions,
+  });
 }
 
 /** 成功：顶部出现后自行消失，不挡住操作。 */

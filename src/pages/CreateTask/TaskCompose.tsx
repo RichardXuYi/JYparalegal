@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { reportFailure } from '@/lib/notice';
 import { api } from './api';
 
 type DocRow = { id: number; fileName?: string; sizeBytes?: number };
@@ -11,22 +12,20 @@ export default function TaskCompose() {
   const nav = useNavigate();
   const [docs, setDocs] = useState<DocRow[]>([]);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
 
   const load = useCallback(() => {
     void api<DocRow[]>(`/platform/sign/tasks/${id}/docs`)
       .then(setDocs)
-      .catch((e: Error) => setError(e.message));
+      .catch((e: unknown) => reportFailure(e, '加载失败'));
   }, [id]);
   useEffect(load, [load]);
 
   const upload = async (file: File) => {
     if (file.size > 50 * 1024 * 1024) {
-      setError('单个文件不能超过 50MB');
+      reportFailure('单个文件不能超过 50MB');
       return;
     }
     setBusy(true);
-    setError('');
     try {
       const contentBase64 = await fileToBase64(file);
       await api(`/platform/sign/tasks/${id}/docs`, {
@@ -35,7 +34,7 @@ export default function TaskCompose() {
       });
       load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : '上传失败');
+      reportFailure(e, '上传失败');
     } finally {
       setBusy(false);
     }
@@ -43,12 +42,11 @@ export default function TaskCompose() {
 
   const submit = async () => {
     setBusy(true);
-    setError('');
     try {
       await api(`/platform/sign/tasks/${id}/submit`, { method: 'POST', body: '{}' });
       nav(`/signing/${id}`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : '提交失败');
+      reportFailure(e, '提交失败');
     } finally {
       setBusy(false);
     }
@@ -64,7 +62,6 @@ export default function TaskCompose() {
         <button className="rounded-md border border-border px-3 py-1.5 text-sm" onClick={() => nav(`/signing/${id}/setup`)}>上一步</button>
         <button className="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground disabled:opacity-50" disabled={busy} onClick={() => void submit()}>确认提交</button>
       </div>
-      {error && <div className="mx-5 mt-3 rounded-md bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400">{error}</div>}
       <div className="flex flex-1 items-center justify-center p-8">
         <div className="w-full max-w-lg rounded-lg border border-dashed border-border bg-card p-8 text-center">
           <div className="text-sm text-muted-foreground">拖入或选择文件。支持 doc、docx、wps、pdf、xls、xlsx、jpg、jpeg、bmp、png、rtf。</div>

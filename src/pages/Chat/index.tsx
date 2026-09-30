@@ -5,7 +5,7 @@
  * are in the toolbar; messages render with markdown + streaming.
  */
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, ArrowDownToLine, Loader2, Sparkles } from 'lucide-react';
+import { ArrowDownToLine, Loader2, Sparkles } from 'lucide-react';
 import { useChatStore, type ChatRuntimeRunState, type RawMessage } from '@/stores/chat';
 import { isInternalMessage } from '@/stores/chat/helpers';
 import { buildBaselineRunKey, getBaseline } from '@/stores/baseline-cache';
@@ -175,7 +175,6 @@ export function Chat() {
   const pendingFinal = useChatStore((s) => s.pendingFinal);
   const activeRunId = useChatStore((s) => s.activeRunId);
   const runtimeRuns = useChatStore((s) => s.runtimeRuns ?? {});
-  const clearError = useChatStore((s) => s.clearError);
   const fetchAgents = useAgentsStore((s) => s.fetchAgents);
   const agents = useAgentsStore((s) => s.agents);
 
@@ -197,6 +196,21 @@ export function Chat() {
   useEffect(() => {
     closeArtifactPanel();
   }, [currentSessionKey, closeArtifactPanel]);
+
+  // Model/run failures used to render as a low-contrast strip above the
+  // composer. They now surface in the shared notice dialog, keyed by message so
+  // an identical repeat of the same failure is reported once per episode.
+  const notifiedErrorRef = useRef<string | null>(null);
+  useEffect(() => {
+    const message = runError ?? error ?? null;
+    if (message === null) {
+      notifiedErrorRef.current = null;
+      return;
+    }
+    if (notifiedErrorRef.current === message) return;
+    notifiedErrorRef.current = message;
+    reportFailure(message, undefined, { title: t('runError.title') });
+  }, [runError, error, t]);
   const [childTranscripts, setChildTranscripts] = useState<Record<string, RawMessage[]>>({});
   const [questionDirectoryOpenSessionKey, setQuestionDirectoryOpenSessionKey] = useState<string | null>(null);
 
@@ -1172,49 +1186,6 @@ export function Chat() {
           )}
         </div>
       </div>
-
-      {/* Run error callout */}
-      {runError && (
-        <div className="px-4 pt-2" data-testid="chat-run-error">
-          <div className="max-w-4xl mx-auto rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3">
-            <div className="flex items-start justify-between gap-3">
-              <p className="text-sm font-medium text-destructive flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 shrink-0" />
-                {t('runError.title')}
-              </p>
-              <button
-                type="button"
-                onClick={clearError}
-                className="shrink-0 text-xs text-destructive/60 hover:text-destructive underline"
-                data-testid="chat-run-error-dismiss"
-              >
-                {t('common:actions.dismiss')}
-              </button>
-            </div>
-            <p className="mt-1 text-sm text-destructive/90 break-words">
-              {runError}
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Error bar */}
-      {error && (
-        <div className="px-4 py-2 bg-destructive/10 border-t border-destructive/20">
-          <div className="max-w-4xl mx-auto flex items-center justify-between">
-            <p className="text-sm text-destructive flex items-center gap-2">
-              <AlertCircle className="h-4 w-4" />
-              {error}
-            </p>
-            <button
-              onClick={clearError}
-              className="text-xs text-destructive/60 hover:text-destructive underline"
-            >
-              {t('common:actions.dismiss')}
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Transparent loading overlay */}
       {minLoading && !sending && (

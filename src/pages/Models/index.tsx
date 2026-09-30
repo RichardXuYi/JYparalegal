@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { useGatewayStore } from '@/stores/gateway';
 import { useSettingsStore } from '@/stores/settings';
 import { hostApi } from '@/lib/host-api';
+import { reportFailure } from '@/lib/notice';
 import { trackUiEvent } from '@/lib/telemetry';
 import { ProvidersSettings } from '@/components/settings/ProvidersSettings';
 import { SettingsPageHeader } from '@/components/settings/primitives';
@@ -272,6 +273,22 @@ export function Models() {
   const pagedUsageHistory = filteredUsageHistory.slice((safeUsagePage - 1) * usagePageSize, safeUsagePage * usagePageSize);
   const usageLoading = isGatewayRunning && fetchState.status === 'loading' && visibleUsageHistory.length === 0;
   const usageRefreshing = isGatewayRunning && fetchState.status === 'loading' && visibleUsageHistory.length > 0;
+  const hasUsageParseError = filteredUsageHistory.some((entry) => entry.usageStatus === 'error');
+
+  // Token-usage parse failures used to render as a red note on every affected
+  // row. They now surface once in the shared notice dialog, keyed by message so
+  // the same failure is not re-reported while it stays present.
+  const notifiedUsageErrorRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!hasUsageParseError) {
+      notifiedUsageErrorRef.current = null;
+      return;
+    }
+    const message = t('dashboard:recentTokenHistory.usageParseError');
+    if (notifiedUsageErrorRef.current === message) return;
+    notifiedUsageErrorRef.current = message;
+    reportFailure(message);
+  }, [hasUsageParseError, t]);
 
   return (
     <div data-testid="models-page" className="flex flex-col h-full w-full dark:bg-background overflow-hidden">
@@ -426,11 +443,6 @@ export function Models() {
                                 {t('dashboard:recentTokenHistory.noUsage')}
                               </p>
                             )}
-                            {entry.usageStatus === 'error' && (
-                              <p className="text-xs text-red-500 dark:text-red-400 mt-0.5">
-                                {t('dashboard:recentTokenHistory.usageParseError')}
-                              </p>
-                            )}
                             <p className="text-xs text-muted-foreground mt-0.5">
                               {formatUsageTimestamp(entry.timestamp)}
                             </p>
@@ -448,13 +460,11 @@ export function Models() {
                                 <span className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-usage-cache"></div>{t('dashboard:recentTokenHistory.cacheWrite', { value: formatTokenCount(entry.cacheWriteTokens) })}</span>
                               )}
                             </>
-                          ) : (
+                          ) : entry.usageStatus === 'missing' ? (
                             <span className="text-xs">
-                              {entry.usageStatus === 'missing'
-                                ? t('dashboard:recentTokenHistory.noUsage')
-                                : t('dashboard:recentTokenHistory.usageParseError')}
+                              {t('dashboard:recentTokenHistory.noUsage')}
                             </span>
-                          )}
+                          ) : null}
                           {typeof entry.costUsd === 'number' && Number.isFinite(entry.costUsd) && (
                             <span className="flex items-center gap-1.5 ml-auto text-foreground/80 bg-black/5 dark:bg-white/5 px-2 py-0.5 rounded-md">{t('dashboard:recentTokenHistory.cost', { amount: entry.costUsd.toFixed(4) })}</span>
                           )}

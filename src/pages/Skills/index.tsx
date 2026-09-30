@@ -432,6 +432,39 @@ export function Skills() {
 
   const [skillsDirPath, setSkillsDirPath] = useState('~/.openclaw/skills');
 
+  // Skill directory load failures used to render as a red strip above the grid.
+  // They now surface in the shared notice dialog, keyed by message so an
+  // identical repeat of the same failure is reported once per episode.
+  const notifiedErrorRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!error) {
+      notifiedErrorRef.current = null;
+      return;
+    }
+    const message = FETCH_ERROR_CODES.has(error)
+      ? t(`toast.${error}`, { path: skillsDirPath })
+      : error;
+    if (notifiedErrorRef.current === message) return;
+    notifiedErrorRef.current = message;
+    reportFailure(message);
+  }, [error, skillsDirPath, t]);
+
+  // SkillHub search failures used to render as a red strip above the results.
+  const notifiedSearchErrorRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!searchError) {
+      notifiedSearchErrorRef.current = null;
+      return;
+    }
+    const code = searchError.replace('Error: ', '');
+    const message = SEARCH_ERROR_CODES.has(code)
+      ? t(`toast.${code}`, { path: skillsDirPath })
+      : searchError;
+    if (notifiedSearchErrorRef.current === message) return;
+    notifiedSearchErrorRef.current = message;
+    reportFailure(message);
+  }, [searchError, skillsDirPath, t]);
+
   useEffect(() => {
     hostApi.openclaw.getSkillsDir()
       .then((dir) => setSkillsDirPath(dir))
@@ -615,17 +648,6 @@ export function Skills() {
 
         {/* Content Area */}
         <div className="flex-1 overflow-y-auto pr-2 pb-10 min-h-0 -mr-2">
-          {error && (
-            <div className="mb-4 p-4 rounded-xl border border-destructive/50 bg-destructive/10 text-destructive text-sm font-medium flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 shrink-0" />
-              <span>
-                {FETCH_ERROR_CODES.has(error)
-                  ? t(`toast.${error}`, { path: skillsDirPath })
-                  : error}
-              </span>
-            </div>
-          )}
-
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
             {filteredSkills.length === 0 ? (
               <div className="xl:col-span-2 flex flex-col items-center justify-center py-20 text-muted-foreground">
@@ -717,17 +739,6 @@ export function Skills() {
           </div>
 
           <div className="flex-1 overflow-y-auto px-6 py-4">
-            {searchError && (
-              <div className="mb-4 p-4 rounded-xl border border-destructive/50 bg-destructive/10 text-destructive text-sm font-medium flex items-center gap-2">
-                <AlertCircle className="h-5 w-5 shrink-0" />
-                <span>
-                  {SEARCH_ERROR_CODES.has(searchError.replace('Error: ', ''))
-                    ? t(`toast.${searchError.replace('Error: ', '')}`, { path: skillsDirPath })
-                    : searchError}
-                </span>
-              </div>
-            )}
-
             {searching && (
               <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
                 <LoadingSpinner size="lg" />

@@ -25,6 +25,7 @@ export function GatewayStatusBanner() {
   const status = useGatewayStore((s) => s.status);
   const startGateway = useGatewayStore((s) => s.start);
   const openFailureDialog = useGatewayUiStore((s) => s.openFailureDialog);
+  const openFailureDetectedAt = useGatewayUiStore((s) => s.openFailureDetectedAt);
 
   const surface = deriveGatewaySurface({ status });
 
@@ -40,9 +41,13 @@ export function GatewayStatusBanner() {
 
   if (surface === null) return null;
 
-  // Terminal failure: compact one-liner; the full dialog renders on top.
+  // Terminal failure: the dialog carries the reason and the recovery actions.
+  // While it shows this episode, a second copy as a low-contrast strip is pure
+  // noise, so the strip only returns as the fallback once the dialog is closed.
   if (surface.kind === 'dialog' || status.state === 'failed') {
     const failure = status.failure;
+    if (failure && openFailureDetectedAt === failure.detectedAt) return null;
+
     const reason = failure
       ? t(failure.reasonKey, { ...failure.reasonParams, defaultValue: t('gateway.failed') })
       : t('gateway.failed');

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Inline workspace browser body —left tree + right preview.
  *
  * Strictly scoped to the current agent's `agent.workspace` directory.
@@ -44,6 +44,16 @@ const SheetViewerLazy = lazy(() => import('./SheetViewer'));
 
 /** Inline rich-doc viewers tap out past this —falls back to direct open. */
 const RICH_PREVIEW_MAX_BYTES = 50 * 1024 * 1024;
+
+/**
+ * 把底层读取错误码映射成界面文案（翻译结果由调用方传入，
+ * 这样在 effect 里调用时不必把 helper 本身放进依赖数组）。
+ */
+function fileErrorHint(message: string, outsideSandbox: string, notFound: string): string {
+  if (message === 'outsideSandbox') return outsideSandbox;
+  if (message === 'notFound') return notFound;
+  return message;
+}
 
 export interface WorkspaceBrowserBodyProps {
   agent: AgentSummary | null;
@@ -115,6 +125,7 @@ export function WorkspaceBrowserBody({
         if (cancelled) return;
         if (!res) {
           setState({ status: 'error', message: 'load' });
+          reportFailure(t('workspace.empty', 'Workspace is empty or inaccessible'));
           return;
         }
         setState({ status: 'ready', root: res.root, truncated: res.truncated });
@@ -122,12 +133,19 @@ export function WorkspaceBrowserBody({
       })
       .catch((err) => {
         if (cancelled) return;
-        setState({ status: 'error', message: err instanceof Error ? err.message : String(err) });
+        const message = err instanceof Error ? err.message : String(err);
+        setState({ status: 'error', message });
+        // 目录树加载失败原来在左栏内联红字提示，现在改走统一失败弹窗。
+        reportFailure(
+          message === 'outsideSandbox'
+            ? t('filePreview.errors.outsideSandbox', 'Path is outside the workspace; read denied')
+            : t('workspace.empty', 'Workspace is empty or inaccessible'),
+        );
       });
     return () => {
       cancelled = true;
     };
-  }, [workspace, runStartedAt, refreshTick, showHidden, refreshSignal]);
+  }, [workspace, runStartedAt, refreshTick, showHidden, refreshSignal, t]);
 
   const selectedNode = useMemo(() => {
     if (!selectedRel || state.status !== 'ready') return null;
@@ -199,18 +217,30 @@ export function WorkspaceBrowserBody({
             return;
           }
           setFileState({ status: 'error', message: String(res.error ?? 'unknown') });
+          // 预览读取失败原来在右栏内联红字提示，现在改走统一失败弹窗。
+          reportFailure(fileErrorHint(
+            String(res.error ?? 'unknown'),
+            t('filePreview.errors.outsideSandbox', 'Path is outside the workspace; read denied'),
+            t('filePreview.errors.notFound', 'File not found'),
+          ));
           return;
         }
         setFileState({ status: 'ready', content: res.content ?? '' });
       })
       .catch((err) => {
         if (cancelled) return;
-        setFileState({ status: 'error', message: err instanceof Error ? err.message : String(err) });
+        const message = err instanceof Error ? err.message : String(err);
+        setFileState({ status: 'error', message });
+        reportFailure(fileErrorHint(
+          message,
+          t('filePreview.errors.outsideSandbox', 'Path is outside the workspace; read denied'),
+          t('filePreview.errors.notFound', 'File not found'),
+        ));
       });
     return () => {
       cancelled = true;
     };
-  }, [selectedNode]);
+  }, [selectedNode, t]);
 
   const handleOpenSelectedInFinder = useCallback(() => {
     if (!selectedNode || selectedNode.isDir) return;
@@ -256,13 +286,8 @@ export function WorkspaceBrowserBody({
       );
     }
     if (state.status === 'error') {
-      return (
-        <div className="px-4 py-6 text-xs text-destructive">
-          {state.message === 'outsideSandbox'
-            ? t('filePreview.errors.outsideSandbox', 'Path is outside the workspace; read denied')
-            : t('workspace.empty', 'Workspace is empty or inaccessible')}
-        </div>
-      );
+      // 失败已通过统一弹窗上报，这里不再重复展示错误文案。
+      return null;
     }
     return (
       <div className="space-y-1 overflow-y-auto">
@@ -384,17 +409,8 @@ export function WorkspaceBrowserBody({
       );
     }
     if (fileState.status === 'error') {
-      const errMsg = fileState.message;
-      const hint = errMsg === 'outsideSandbox'
-        ? t('filePreview.errors.outsideSandbox', 'Path is outside the workspace; read denied')
-        : errMsg === 'notFound'
-          ? t('filePreview.errors.notFound', 'File not found')
-          : errMsg;
-      return (
-        <div className="flex h-full items-center justify-center px-6 text-center text-sm text-destructive">
-          {hint}
-        </div>
-      );
+      // 失败已通过统一弹窗上报，这里不再重复展示错误文案。
+      return null;
     }
     if (fileState.status === 'unsupported') {
       const directOpen = shouldOfferDirectOpenFallback(selectedNode.ext, fileState.size);

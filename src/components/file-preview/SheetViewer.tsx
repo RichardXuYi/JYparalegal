@@ -19,6 +19,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { readBinaryFile } from '@/lib/file-preview-client';
+import { reportFailure } from '@/lib/notice';
 import { cn } from '@/lib/utils';
 
 const SHEET_MAX_BYTES = 50 * 1024 * 1024;
@@ -97,6 +98,13 @@ export default function SheetViewer({ filePath, fileName, className }: SheetView
             return;
           }
           setState({ status: 'error', message: String(res.error ?? 'unknown') });
+          // 预览失败改成统一弹窗，页内不再保留同样的错误提示。
+          reportFailure(
+            t('filePreview.sheet.loadFailed', {
+              defaultValue: 'Spreadsheet failed to load: {{error}}',
+              error: String(res.error ?? 'unknown'),
+            }),
+          );
           return;
         }
         const xlsx = await import('xlsx');
@@ -132,17 +140,18 @@ export default function SheetViewer({ filePath, fileName, className }: SheetView
         setState({ status: 'ready', sheets });
       } catch (err) {
         if (cancelled) return;
-        setState({
-          status: 'error',
-          message: err instanceof Error ? err.message : String(err),
-        });
+        const message = err instanceof Error ? err.message : String(err);
+        setState({ status: 'error', message });
+        reportFailure(
+          t('filePreview.sheet.loadFailed', { defaultValue: 'Spreadsheet failed to load: {{error}}', error: message }),
+        );
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [filePath]);
+  }, [filePath, t]);
 
   const activeSheet = state.status === 'ready' ? state.sheets[sheetIndex] : null;
   const totalRows = activeSheet?.rows.length ?? 0;
@@ -200,11 +209,8 @@ export default function SheetViewer({ filePath, fileName, className }: SheetView
     );
   }
   if (state.status === 'error') {
-    return (
-      <div className={cn('flex h-full flex-col items-center justify-center gap-2 px-6 text-center text-sm text-destructive', className)}>
-        <p>{t('filePreview.sheet.loadFailed', { defaultValue: 'Spreadsheet failed to load: {{error}}', error: state.message })}</p>
-      </div>
-    );
+    // 失败已通过统一弹窗上报，这里不再重复展示错误文案。
+    return null;
   }
 
   if (!activeSheet) {

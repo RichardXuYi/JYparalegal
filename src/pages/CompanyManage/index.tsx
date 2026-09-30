@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { reportFailure, reportSuccess } from '@/lib/notice';
 import { LegalPageHeader } from '@/components/legal/LegalPageHeader';
 import { platformGet, platformSend, notifyIfEntitlement } from '@/lib/platform-api';
@@ -30,7 +30,25 @@ export default function CompanyManage() {
       .catch(() => { setCompanies([]); setListState('error'); });
   }, []);
   useEffect(load, [load]);
-  const reload = () => { setListState('loading'); load(); };
+
+  // 企业列表加载失败原来在左栏内联提示 + 重试按钮，现在改成统一失败弹窗；
+  // 「重试」作为弹窗主操作保留。用 ref 去重，避免重渲染时反复上报。
+  const notifiedLoadErrorRef = useRef(false);
+  useEffect(() => {
+    if (listState !== 'error') {
+      notifiedLoadErrorRef.current = false;
+      return;
+    }
+    if (notifiedLoadErrorRef.current) return;
+    notifiedLoadErrorRef.current = true;
+    reportFailure('企业加载失败', undefined, {
+      actions: [{
+        label: '重试',
+        primary: true,
+        onClick: () => { setListState('loading'); load(); },
+      }],
+    });
+  }, [listState, load]);
 
   useEffect(() => {
     if (sel == null) return;
@@ -74,12 +92,6 @@ export default function CompanyManage() {
         <div className="rounded-lg border border-border bg-card p-3">
           <h4 className="mb-2 px-1 text-xs font-semibold text-muted-foreground">企业</h4>
           {listState === 'loading' && <div className="p-4 text-center text-sm text-muted-foreground">正在加载…</div>}
-          {listState === 'error' && (
-            <div className="flex flex-col items-center gap-3 p-4 text-center text-sm">
-              <span className="text-muted-foreground">企业加载失败</span>
-              <button className="rounded-md border border-border px-3 py-1.5 hover:bg-muted" onClick={reload}>重试</button>
-            </div>
-          )}
           {listState === 'ready' && companies.length === 0 && <div className="p-4 text-center text-sm text-muted-foreground">暂无企业</div>}
           {listState === 'ready' && companies.map((c) => (
             <button key={c.id} onClick={() => setSel(c.id)}

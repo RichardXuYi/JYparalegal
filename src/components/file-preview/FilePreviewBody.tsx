@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Inline file preview body.
  *
  * Renders the icon header (file name / path / save / revert) and a
@@ -19,7 +19,7 @@
  * All sandbox / read-only / large-file / binary edge cases are handled
  * here so callers only pass a `FilePreviewTarget` and a `readOnly` flag.
  */
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Save, ShieldAlert, Undo2 } from 'lucide-react';
 import { reportFailure, reportSuccess } from '@/lib/notice';
 import { useTranslation } from 'react-i18next';
@@ -408,6 +408,23 @@ export function FilePreviewBody({
     }
   }, [file, size, t]);
 
+  // 读取失败原来在预览区里内联展示，现在改走统一失败弹窗。
+  // 用 ref 记录已上报文案，避免重渲染时重复弹出。
+  const notifiedErrorRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (state.status !== 'error') {
+      notifiedErrorRef.current = null;
+      return;
+    }
+    if (notifiedErrorRef.current === state.message) return;
+    notifiedErrorRef.current = state.message;
+    reportFailure(
+      state.message === 'notFound'
+        ? t('filePreview.errors.notFound', 'File not found')
+        : t('filePreview.errors.loadFailed', { defaultValue: 'Load failed: {{error}}', error: state.message }),
+    );
+  }, [state, t]);
+
   const renderUnsupportedFormat = () => {
     const directOpen = shouldOfferDirectOpenFallback(file.ext, size);
     return (
@@ -505,16 +522,8 @@ export function FilePreviewBody({
       );
     }
     if (state.status === 'error') {
-      const errMsg = state.message;
-      const hint =
-        errMsg === 'notFound'
-          ? t('filePreview.errors.notFound', 'File not found')
-          : t('filePreview.errors.loadFailed', { defaultValue: 'Load failed: {{error}}', error: errMsg });
-      return (
-        <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center text-sm text-muted-foreground">
-          <p>{hint}</p>
-        </div>
-      );
+      // 失败已通过统一弹窗上报（含「在文件管理器中显示」恢复入口），这里不再重复展示。
+      return null;
     }
 
     return (

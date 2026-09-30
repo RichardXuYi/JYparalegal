@@ -7,7 +7,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { dismissNotice, subscribeNotice, type AppNotice } from '@/lib/notice';
+import { dismissNotice, subscribeNotice, type AppNotice, type AppNoticeAction } from '@/lib/notice';
 
 /** 全站失败 / 未开通套餐的确认弹窗。成功提示不经过这里。 */
 export function NoticeHost() {
@@ -15,6 +15,11 @@ export function NoticeHost() {
   const [notice, setNotice] = useState<AppNotice | null>(null);
 
   useEffect(() => subscribeNotice(setNotice), []);
+
+  const runAction = (action: AppNoticeAction) => {
+    dismissNotice();
+    action.onClick();
+  };
 
   return (
     <Dialog open={notice != null} onOpenChange={(open) => { if (!open) dismissNotice(); }}>
@@ -24,11 +29,23 @@ export function NoticeHost() {
         onEscapeKeyDown={(event) => event.preventDefault()}
       >
         <DialogTitle className="text-lg font-semibold">
-          {notice?.kind === 'locked' ? t('notice.lockedTitle') : t('notice.errorTitle')}
+          {notice?.title ?? (notice?.kind === 'locked' ? t('notice.lockedTitle') : t('notice.errorTitle'))}
         </DialogTitle>
         <DialogDescription className="mt-2 text-sm text-muted-foreground">{notice?.message}</DialogDescription>
-        <div className="mt-6 flex justify-end">
-          <Button type="button" onClick={() => dismissNotice()}>{t('notice.acknowledge')}</Button>
+        <div className="mt-6 flex flex-wrap justify-end gap-2">
+          {(notice?.actions ?? []).map((action) => (
+            <Button
+              key={action.label}
+              type="button"
+              variant={action.primary ? 'default' : 'outline'}
+              onClick={() => runAction(action)}
+            >
+              {action.label}
+            </Button>
+          ))}
+          <Button type="button" variant={notice?.actions?.length ? 'ghost' : 'default'} onClick={() => dismissNotice()}>
+            {t('notice.acknowledge')}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

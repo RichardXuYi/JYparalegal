@@ -13,6 +13,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { readBinaryFile } from '@/lib/file-preview-client';
+import { reportFailure } from '@/lib/notice';
 import { cn } from '@/lib/utils';
 
 const PDF_MAX_BYTES = 50 * 1024 * 1024;
@@ -79,6 +80,13 @@ export default function PdfViewer({
             return;
           }
           setState({ filePath, status: 'error', message: String(res.error ?? 'unknown') });
+          // 预览失败改成统一弹窗，页内不再保留同样的错误提示。
+          reportFailure(
+            t('filePreview.pdf.loadFailed', {
+              defaultValue: 'PDF failed to load: {{error}}',
+              error: String(res.error ?? 'unknown'),
+            }),
+          );
           return;
         }
         const cloned = new Uint8Array(res.data.byteLength);
@@ -91,11 +99,11 @@ export default function PdfViewer({
         setState({ filePath, status: 'ready', url: objectUrl });
       } catch (err) {
         if (cancelled) return;
-        setState({
-          filePath,
-          status: 'error',
-          message: err instanceof Error ? err.message : String(err),
-        });
+        const message = err instanceof Error ? err.message : String(err);
+        setState({ filePath, status: 'error', message });
+        reportFailure(
+          t('filePreview.pdf.loadFailed', { defaultValue: 'PDF failed to load: {{error}}', error: message }),
+        );
       }
     })();
 
@@ -105,7 +113,7 @@ export default function PdfViewer({
         URL.revokeObjectURL(objectUrl);
       }
     };
-  }, [filePath]);
+  }, [filePath, t]);
 
   useEffect(() => {
     if (!iframeState.loaded || !iframeState.url) return;
@@ -134,13 +142,8 @@ export default function PdfViewer({
     );
   }
   if (currentState.status === 'error') {
-    return (
-      <div className={cn('flex h-full flex-col items-center justify-center gap-2 px-6 text-center text-sm text-destructive', className)}>
-        <p>
-          {t('filePreview.pdf.loadFailed', { defaultValue: 'PDF failed to load: {{error}}', error: currentState.message })}
-        </p>
-      </div>
-    );
+    // 失败已通过统一弹窗上报，这里不再重复展示错误文案。
+    return null;
   }
 
   const workspaceSurface = surface === 'workspace';

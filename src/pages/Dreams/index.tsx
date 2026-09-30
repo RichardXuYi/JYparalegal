@@ -230,13 +230,16 @@ export function Dreams() {
   const [dreaming, setDreaming] = useState<DreamingStatus | null>(null);
   const [diary, setDiary] = useState<DreamDiaryResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [runningAction, setRunningAction] = useState<DreamActionKey | null>(null);
   const [runningToggle, setRunningToggle] = useState<DreamToggleKey | null>(null);
   const [lastActionMessage, setLastActionMessage] = useState<string | null>(null);
   const [pendingConfirmation, setPendingConfirmation] = useState<PendingConfirmation | null>(null);
   const [openingFullUi, setOpeningFullUi] = useState(false);
   const refreshInFlightRef = useRef<Promise<void> | null>(null);
+  // The memory store / phase signal failure used to render as a red card in the
+  // signals panel. It now surfaces in the shared notice dialog, keyed by message
+  // so an identical repeat of the same failure is reported once per episode.
+  const notifiedSignalsErrorRef = useRef<string | null>(null);
 
   const gatewayRunning = gatewayStatus.state === 'running';
   const gatewayReady = gatewayStatus.gatewayReady !== false;
@@ -258,14 +261,12 @@ export function Dreams() {
 
     if (!dreamsReady) {
       setLoading(false);
-      setError(null);
       return;
     }
 
     let refreshPromise!: Promise<void>;
     refreshPromise = (async () => {
       setLoading(true);
-      setError(null);
       try {
         const [statusResponse, diaryResponse] = await Promise.all([
           rpc<unknown>('doctor.memory.status', {}, 12_000),
@@ -275,7 +276,7 @@ export function Dreams() {
         setDiary(diaryResponse);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        setError(isMemoryDoctorStartupError(message) ? t('errors.memoryInitializing') : message);
+        reportFailure(isMemoryDoctorStartupError(message) ? t('errors.memoryInitializing') : message);
       } finally {
         setLoading(false);
         if (refreshInFlightRef.current === refreshPromise) {
@@ -300,6 +301,17 @@ export function Dreams() {
     };
   }, [refreshAll]);
 
+  const signalsErrorMessage = dreaming?.storeError || dreaming?.phaseSignalError || null;
+  useEffect(() => {
+    if (!signalsErrorMessage) {
+      notifiedSignalsErrorRef.current = null;
+      return;
+    }
+    if (notifiedSignalsErrorRef.current === signalsErrorMessage) return;
+    notifiedSignalsErrorRef.current = signalsErrorMessage;
+    reportFailure(signalsErrorMessage);
+  }, [signalsErrorMessage]);
+
   const buildActionMessage = useCallback((action: DreamActionKey, result: unknown): string => {
     if (action === 'backfill') {
       const count = firstNumber(result, ['written', 'created', 'count']);
@@ -323,7 +335,6 @@ export function Dreams() {
 
   const runAction = useCallback(async (action: DreamActionKey) => {
     setRunningAction(action);
-    setError(null);
     setLastActionMessage(null);
     try {
       const result = await rpc<unknown>(DREAM_ACTION_METHODS[action], {}, 120_000);
@@ -333,7 +344,6 @@ export function Dreams() {
       await refreshAll();
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      setError(message);
       reportFailure(message);
     } finally {
       setRunningAction(null);
@@ -344,7 +354,6 @@ export function Dreams() {
   const setDreamingEnabled = useCallback(async (enabled: boolean) => {
     const toggleKey: DreamToggleKey = enabled ? 'enable' : 'disable';
     setRunningToggle(toggleKey);
-    setError(null);
     setLastActionMessage(null);
     try {
       const snapshot = await rpc<ConfigSnapshot>('config.get', {}, 12_000);
@@ -362,7 +371,6 @@ export function Dreams() {
       reportSuccess(message);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      setError(message);
       reportFailure(message);
     } finally {
       setRunningToggle(null);
@@ -380,7 +388,6 @@ export function Dreams() {
 
   const openFullDreams = useCallback(async () => {
     setOpeningFullUi(true);
-    setError(null);
     try {
       const result = await hostApi.gateway.controlUi('dreams');
       if (result.success && result.url) {
@@ -390,7 +397,6 @@ export function Dreams() {
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      setError(message);
       reportFailure(message);
     } finally {
       setOpeningFullUi(false);
@@ -472,11 +478,6 @@ export function Dreams() {
           </div>
         )}
 
-        {error && (
-          <div data-testid="dreams-error" className="mb-4 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-            {error}
-          </div>
-        )}
 
         {lastActionMessage && (
           <div data-testid="dreams-action-message" className={cn('mb-4 rounded-xl border px-4 py-3 text-sm', SUCCESS_NOTICE_CLASS)}>
@@ -629,11 +630,6 @@ export function Dreams() {
               </p>
             </CardHeader>
             <CardContent className="space-y-2 p-4 pt-0">
-              {(dreaming?.storeError || dreaming?.phaseSignalError) && (
-                <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                  {dreaming.storeError || dreaming.phaseSignalError}
-                </div>
-              )}
               {recentSignals.length === 0 ? (
                 <div className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
                   {t('signals.empty')}

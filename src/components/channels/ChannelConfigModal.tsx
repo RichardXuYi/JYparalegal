@@ -8,7 +8,6 @@ import {
   Eye,
   EyeOff,
   Check,
-  AlertCircle,
   CheckCircle,
   ShieldCheck,
 } from 'lucide-react';
@@ -319,7 +318,17 @@ export function ChannelConfigModal({
       const result = await hostApi.channels.validateCredentials(selectedType, configValues);
 
       const warnings = result.warnings || [];
-      if (result.valid && result.details) {
+      if (!result.valid) {
+        // Credential-check failures used to render as an inline red block. They
+        // now surface in the shared notice dialog.
+        reportFailure(
+          (result.errors || ['Validation failed']).join('\n'),
+          t('dialog.validationFailed'),
+          { title: t('dialog.validationFailed') },
+        );
+        return;
+      }
+      if (result.details) {
         const details = result.details;
         if (details.botUsername) warnings.push(`Bot: @${details.botUsername}`);
         if (details.guildName) warnings.push(`Server: ${details.guildName}`);
@@ -327,16 +336,12 @@ export function ChannelConfigModal({
       }
 
       setValidationResult({
-        valid: result.valid || false,
-        errors: result.errors || [],
+        valid: true,
+        errors: [],
         warnings,
       });
     } catch (error) {
-      setValidationResult({
-        valid: false,
-        errors: [String(error)],
-        warnings: [],
-      });
+      reportFailure(String(error), t('dialog.validationFailed'), { title: t('dialog.validationFailed') });
     } finally {
       setValidating(false);
     }
@@ -385,11 +390,11 @@ export function ChannelConfigModal({
         const validationResponse = await hostApi.channels.validateCredentials(selectedType, configValues);
 
         if (!validationResponse.valid) {
-          setValidationResult({
-            valid: false,
-            errors: validationResponse.errors || ['Validation failed'],
-            warnings: validationResponse.warnings || [],
-          });
+          reportFailure(
+            (validationResponse.errors || ['Validation failed']).join('\n'),
+            t('dialog.validationFailed'),
+            { title: t('dialog.validationFailed') },
+          );
           setConnecting(false);
           return;
         }
@@ -645,11 +650,8 @@ export function ChannelConfigModal({
                     placeholder={t('account.customIdPlaceholder')}
                     className={cn(inputClasses, accountIdError && 'border-destructive/50 focus-visible:ring-destructive/30')}
                   />
-                  {accountIdError ? (
-                    <p className="text-xs text-destructive">{accountIdError}</p>
-                  ) : (
-                    <p className="text-xs text-muted-foreground">{t('account.customIdHint')}</p>
-                  )}
+                  {/* Account id errors surface in the shared notice dialog. */}
+                  <p className="text-xs text-muted-foreground">{t('account.customIdHint')}</p>
                 </div>
               )}
 
@@ -666,47 +668,19 @@ export function ChannelConfigModal({
                 ))}
               </div>
 
-              {validationResult && (
-                <div
-                  className={cn(
-                    'p-4 rounded-2xl text-sm border',
-                    validationResult.valid
-                      ? 'bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20'
-                      : 'bg-destructive/10 text-destructive border-destructive/20'
-                  )}
-                >
+              {validationResult && validationResult.valid && (
+                <div className="p-4 rounded-2xl text-sm border bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20">
                   <div className="flex items-start gap-2">
-                    {validationResult.valid ? (
-                      <CheckCircle className="h-4 w-4 mt-0.5 shrink-0" />
-                    ) : (
-                      <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-                    )}
+                    <CheckCircle className="h-4 w-4 mt-0.5 shrink-0" />
                     <div className="min-w-0">
                       <h4 className="font-medium mb-1">
-                        {validationResult.valid ? t('dialog.credentialsVerified') : t('dialog.validationFailed')}
+                        {t('dialog.credentialsVerified')}
                       </h4>
-                      {validationResult.errors.length > 0 && (
-                        <ul className="list-disc list-inside space-y-0.5">
-                          {validationResult.errors.map((err, index) => (
-                            <li key={index}>{err}</li>
-                          ))}
-                        </ul>
-                      )}
-                      {validationResult.valid && validationResult.warnings.length > 0 && (
+                      {validationResult.warnings.length > 0 && (
                         <div className="mt-1 text-green-600 dark:text-green-400 space-y-0.5">
                           {validationResult.warnings.map((info, index) => (
                             <p key={index} className="text-xs">{info}</p>
                           ))}
-                        </div>
-                      )}
-                      {!validationResult.valid && validationResult.warnings.length > 0 && (
-                        <div className="mt-2 text-yellow-600 dark:text-yellow-500">
-                          <p className="font-medium text-xs uppercase mb-1">{t('dialog.warnings')}</p>
-                          <ul className="list-disc list-inside space-y-0.5">
-                            {validationResult.warnings.map((warn, index) => (
-                              <li key={index}>{warn}</li>
-                            ))}
-                          </ul>
                         </div>
                       )}
                     </div>
