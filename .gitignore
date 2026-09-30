@@ -68,3 +68,9 @@ backend/jy_financial_predrop_*.sql
 
 # Build tools (downloaded during packaging)
 resources/bin/
+
+# DSH file-permission recovery backups and reports (local diagnostics, not versioned)
+.dsh-acl-recovery/
+
+# Porting safety backup (temporary, not versioned)
+.port-backup-web-src/
