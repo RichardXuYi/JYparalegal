@@ -4,8 +4,8 @@
  * failure dialog). Kept separate from the data store so the gateway status
  * store stays byte-shareable logic only.
  *
- * 启动等待不再有任何阻塞面：加载期由 `InitializingScreen` 全屏承载（见 App.tsx 的
- * 启动闸门），运行期波动走非阻塞横幅，所以这里只保留终态故障对话框的状态。
+ * 启动等待由 `GatewayBootScreen`（launcher 式全屏，引擎首次 running 前）承载，
+ * 运行期波动走状态 chip + 终态故障对话框；不再有任何横幅（banner 已删除）。
  */
 import { create } from 'zustand';
 import type { GatewayStatus } from '@/types/gateway';

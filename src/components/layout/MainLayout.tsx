@@ -11,7 +11,6 @@ import { PlatformTabs } from './PlatformTabs';
 import { isLegalSection } from './nav-config';
 import { SettingsModal } from '@/components/settings/SettingsModal';
 import { PurchaseGateModal } from '@/components/PurchaseGateModal';
-import { GatewayStatusBanner } from '@/components/common/GatewayStatusBanner';
 import { ChatInput } from '@/pages/Chat/ChatInput';
 import { useChatStore } from '@/stores/chat';
 import { MAC_SIDEBAR_CHROME_HEIGHT } from '@shared/sidebar-layout';
@@ -36,7 +35,6 @@ export function MainLayout() {
     >
       <TopBar />
       <PlatformTabs />
-      <GatewayStatusBanner />
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
         {showContextSidebar && (

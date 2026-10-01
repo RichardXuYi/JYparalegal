@@ -65,12 +65,14 @@
     "starting": "Démarrage de la passerelle…",
     "reconnecting": "Reconnexion…",
     "failed": "Échec de la passerelle",
-    "banner": {
-      "reconnecting": "Reconnexion… tentative {{attempt}}/{{max}}, prochaine dans {{seconds}} s",
-      "reconnectingSimple": "Reconnexion… tentative {{attempt}}/{{max}}",
-      "degraded": "La passerelle n’est pas pleinement opérationnelle.",
-      "retry": "Réessayer",
-      "details": "Détails"
+    "retry": "Réessayer",
+    "boot": {
+      "tagline": "Préparation en cours",
+      "title": "Démarrage du moteur…",
+      "elapsed": "{{seconds}}s écoulées…",
+      "hintFirstRun": "Le premier lancement effectue un préchauffage unique du moteur, qui prend environ une minute. Vous n'attendez qu'une fois — ensuite l'application s'ouvre beaucoup plus vite.",
+      "hintWarm": "L'application sera prête dès que le moteur sera lancé. Veuillez patienter.",
+      "skip": "Ouvrir l'application"
     },
     "popover": {
       "title": "État de la passerelle",

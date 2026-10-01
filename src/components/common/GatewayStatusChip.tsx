@@ -142,7 +142,7 @@ export function GatewayStatusChip({ glass = false, className }: GatewayStatusChi
                   }}
                   className="rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:opacity-90 focus-visible:outline-none"
                 >
-                  {t('gateway.banner.retry')}
+                  {t('gateway.retry')}
                 </button>
               )}
             </div>

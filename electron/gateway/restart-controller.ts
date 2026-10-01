@@ -29,6 +29,11 @@ export class GatewayRestartController {
       logger.info(
         `Deferring Gateway restart (${reason}) until startup/reconnect settles (state=${context.state}, startLock=${context.startLock})`,
       );
+      // Capture who requested a restart during an in-flight startup: a deferred
+      // restart kills the just-booted Gateway and reboots it (~25s wasted), so
+      // the caller must be identifiable when debugging. Debug level to keep
+      // production logs clean (legitimate runtime deferrals do happen).
+      logger.debug(`[gateway-refresh] deferred restart requested by:\n${new Error('restart-request-stack').stack}`);
     } else {
       logger.debug(
         `Gateway restart already deferred; keeping pending request (${reason}, state=${context.state}, startLock=${context.startLock})`,

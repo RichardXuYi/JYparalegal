@@ -66,12 +66,14 @@
     "starting": "Starting gateway…",
     "reconnecting": "Reconnecting…",
     "failed": "Gateway failed",
-    "banner": {
-      "reconnecting": "Reconnecting… attempt {{attempt}}/{{max}}, next try in {{seconds}}s",
-      "reconnectingSimple": "Reconnecting… attempt {{attempt}}/{{max}}",
-      "degraded": "The gateway is not fully operational.",
-      "retry": "Retry",
-      "details": "Details"
+    "retry": "Retry",
+    "boot": {
+      "tagline": "Getting ready",
+      "title": "Starting the engine…",
+      "elapsed": "{{seconds}}s elapsed…",
+      "hintFirstRun": "The first launch performs a one-time engine warm-up, which takes about a minute. You only wait once — afterwards the app opens much faster.",
+      "hintWarm": "The app will be ready as soon as the engine starts. Please hold on.",
+      "skip": "Enter the app"
     },
     "popover": {
       "title": "Gateway status",

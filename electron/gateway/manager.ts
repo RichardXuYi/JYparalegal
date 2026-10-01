@@ -67,7 +67,7 @@ import {
   type GatewayStartupMetric,
 } from './startup-report';
 import { hasInvalidConfigFailureSignal } from './startup-recovery';
-import { getOpenClawConfigDir } from '../utils/paths';
+import { getOpenClawConfigDir, getOpenClawCompileCacheDir, isOpenClawCompileCacheCold } from '../utils/paths';
 import type { GatewayFailureInfo, GatewayReadinessTier } from '@shared/types/gateway';
 import {
   GatewayCapabilityMonitor,
@@ -103,6 +103,9 @@ export interface GatewayStatus {
   nextRetryAt?: number;
   /** Reconnect budget ceiling, for "attempt n/max" rendering. */
   reconnectMaxAttempts?: number;
+  /** True while booting a gateway whose compile cache is empty (cold first
+   *  launch) — lets the renderer show the first-run preparing screen. */
+  firstRun?: boolean;
 }
 
 export type GatewayHealthState = 'healthy' | 'degraded' | 'unresponsive';
@@ -259,6 +262,12 @@ export class GatewayManager extends EventEmitter {
       },
     });
     this.reconnectConfig = { ...DEFAULT_RECONNECT_CONFIG, ...config };
+    // Seed the cold-cache flag into the initial status so the renderer can
+    // show the first-run preparing screen the moment the shell paints —
+    // before the gateway (and its `starting` events) even exist.
+    this.stateController.setStatus({
+      firstRun: isOpenClawCompileCacheCold(getOpenClawCompileCacheDir()),
+    });
     // Device identity is loaded lazily in start() —not in the constructor —    // so that async file I/O and key generation don't block module loading.
 
     this.on('gateway:ready', () => {
@@ -375,7 +384,12 @@ export class GatewayManager extends EventEmitter {
       this.reconnectAttempts = 0;
     }
     this.isAutoReconnectStart = false; // consume the flag
-    this.setStatus({ state: 'starting', reconnectAttempts: this.reconnectAttempts, gatewayReady: false });
+    this.setStatus({
+      state: 'starting',
+      reconnectAttempts: this.reconnectAttempts,
+      gatewayReady: false,
+      firstRun: isOpenClawCompileCacheCold(getOpenClawCompileCacheDir()),
+    });
     this.resetGatewayReadyFallback();
 
     // Check if Python environment is ready (self-healing) asynchronously.
@@ -454,7 +468,7 @@ export class GatewayManager extends EventEmitter {
           this.lastStartupReport = null;
           this.portOccupiedStreak = 0;
           this.doctorRepairAttempted = false;
-          this.setStatus({ failure: null, nextRetryAt: undefined });
+          this.setStatus({ failure: null, nextRetryAt: undefined, firstRun: undefined });
           const tConnected = Date.now();
           logger.info('[metric] gateway.startup', {
             configSyncMs: tSpawned ? tSpawned - t0 : undefined,

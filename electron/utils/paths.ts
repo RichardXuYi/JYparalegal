@@ -5,7 +5,7 @@
 import { createRequire } from 'node:module';
 import { join } from 'path';
 import { homedir } from 'os';
-import { existsSync, mkdirSync, readFileSync, realpathSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync } from 'fs';
 import { getScopedOpenClawDir } from './user-scope';
 
 const require = createRequire(import.meta.url);
@@ -60,6 +60,30 @@ export function expandPath(path: string): string {
  */
 export function getOpenClawConfigDir(): string {
   return getScopedOpenClawDir();
+}
+
+/**
+ * Durable location of OpenClaw's V8 compile cache (see process-launcher:
+ * NODE_COMPILE_CACHE). Lives under userData so it survives Temp cleanup.
+ */
+export function getOpenClawCompileCacheDir(): string {
+  return join(getElectronApp().getPath('userData'), 'openclaw-compile-cache');
+}
+
+/**
+ * True when the compile cache holds no entries, i.e. the next gateway boot
+ * must recompile every module from scratch (first launch after install, or a
+ * cleared cache). Used to distinguish a "cold" boot worth a first-run
+ * preparing screen from a warm boot that only takes a few seconds.
+ */
+export function isOpenClawCompileCacheCold(dir: string): boolean {
+  try {
+    if (!existsSync(dir)) return true;
+    return readdirSync(dir).length === 0;
+  } catch {
+    // Unreadable cache dir: assume warm rather than block the user on a guess.
+    return false;
+  }
 }
 
 /**

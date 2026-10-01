@@ -21,6 +21,9 @@ import type {
 } from '@shared/host-api/contract';
 import { isRecord } from './payload-utils';
 import { setActiveScopeUser } from '../utils/user-scope';
+import { logger } from '../utils/logger';
+import { getSetting } from '../utils/store';
+import { syncAllProviderAuthToRuntime } from './providers/provider-runtime-sync';
 
 const DEFAULT_BASE_URL = process.env.NODE_ENV === 'development'
   ? 'http://localhost:8181'
@@ -184,6 +187,113 @@ async function toState(): Promise<AuthStateSnapshot> {
   return { isAuthenticated: Boolean(accessToken && user), user };
 }
 
+/**
+ * Network-free view of the persisted session. Used at boot to decide whether to
+ * auto-start the Gateway immediately, so spawn is not blocked on a backend
+ * round trip; the authoritative check (`validateSessionForBoot`) runs
+ * concurrently and reconciles via `applyScopeChange` on a definitive 401.
+ */
+export async function peekCachedAuthState(): Promise<AuthStateSnapshot> {
+  return toState();
+}
+
+/**
+ * Resolve the current session against the backend, refreshing an expired
+ * access token once. Shared by the renderer-facing `me()` and the boot-time
+ * `validateSessionForBoot()` so a cold start pays for at most one round trip.
+ *
+ * Logout (clearAuth + scope flip) happens ONLY on a definitive 401 that
+ * survives the refresh attempt. Any other non-OK response (5xx, a 402/403
+ * entitlement gate, a malformed envelope) or a network failure keeps the
+ * cached session: a backend hiccup must not log the user out, flip the
+ * OpenClaw scope, and force a wasted Gateway restart.
+ */
+async function resolveSessionState(ctx?: AuthApiContext): Promise<AuthStateSnapshot> {
+  const { accessToken, user } = await readAuth();
+  if (!accessToken || !user) {
+    return { isAuthenticated: false, user: null };
+  }
+
+  let result = await getJson<{ user?: unknown }>('/api/auth/me', accessToken).catch(() => null);
+  // Access token expired — attempt a one-time refresh then retry.
+  if (result && result.status === 401) {
+    const refreshed = await tryRefresh().catch(() => null);
+    if (refreshed) {
+      result = await getJson<{ user?: unknown }>('/api/auth/me', refreshed).catch(() => null);
+    }
+  }
+
+  if (!result) {
+    // Network failure: keep the cached session so offline restarts still work.
+    logger.info('[auth] session check: network failure, keeping cached session');
+    return { isAuthenticated: true, user };
+  }
+
+  if (result.status === 401) {
+    // Definitive auth rejection (the one-time refresh was already attempted).
+    logger.info('[auth] session rejected (401 after refresh) — logging out');
+    await clearAuth();
+    applyScopeChange(ctx, null);
+    return { isAuthenticated: false, user: null };
+  }
+
+  const data = result.envelope?.data;
+  if (!isOk(result.status, result.envelope) || !isRecord(data)) {
+    // Non-auth backend error (5xx / 402 / 403 / bad envelope): keep the cached
+    // session and do NOT flip scope — otherwise a transient backend error logs
+    // the user out and triggers a Gateway restart on every cold start.
+    logger.warn(`[auth] session check got status ${result.status}; keeping cached session (no logout)`);
+    return { isAuthenticated: true, user };
+  }
+
+  const freshUser = parseUser((data as { user?: unknown }).user) ?? user;
+  const current = await readAuth();
+  await writeAuth({ ...current, user: freshUser });
+  return { isAuthenticated: true, user: freshUser };
+}
+
+let bootSessionPromise: Promise<AuthStateSnapshot> | null = null;
+let bootSessionStartedAt = 0;
+const BOOT_SESSION_REUSE_MS = 15_000;
+
+/**
+ * Validate the persisted session during app boot, BEFORE the Gateway
+ * auto-starts, so the OpenClaw user scope is settled before the first spawn.
+ *
+ * Why this matters: the Gateway boots into the persisted account scope and a
+ * cold boot takes ~25s. If the session turns out to be expired, `me()` flips
+ * the scope to logged-out and requests a Gateway restart — which is deferred
+ * until the first boot finishes, then kills the just-booted Gateway and reboots
+ * it into the new scope. Validating first means the scope is correct before
+ * spawn, so a cold start boots the Gateway once instead of twice.
+ *
+ * Bounded by `timeoutMs`: on a slow/unreachable backend we fall back to the
+ * persisted scope rather than block startup. The underlying promise is cached
+ * and reused by the renderer's `me()` so boot pays one round trip at most.
+ */
+export async function validateSessionForBoot(timeoutMs = 3000): Promise<AuthStateSnapshot> {
+  if (!bootSessionPromise) {
+    bootSessionStartedAt = Date.now();
+    bootSessionPromise = resolveSessionState(undefined).catch((error) => {
+      logger.warn('[auth] boot session validation failed:', error);
+      return toState();
+    });
+  }
+  const underlying = bootSessionPromise;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<AuthStateSnapshot>((resolve) => {
+    timer = setTimeout(() => {
+      logger.warn(`[auth] boot session validation timed out after ${timeoutMs}ms; using persisted scope`);
+      void toState().then(resolve);
+    }, timeoutMs);
+  });
+  try {
+    return await Promise.race([underlying, timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 /** Result of an authenticated backend call made from a main-process service. */
 export type AuthorizedResult<T> = {
   ok: boolean;
@@ -341,7 +451,23 @@ export function applyScopeChange(ctx: AuthApiContext | undefined, userId: number
   scopeRestartChain = scopeRestartChain
     .then(async () => {
       const restartForEpoch = async (): Promise<void> => {
-        if (gatewayManager.getStatus().state === 'stopped') return;
+        if (gatewayManager.getStatus().state === 'stopped') {
+          // A login after a logged-out boot: the Gateway was intentionally not
+          // auto-started (there was no account scope to boot into). Start it
+          // now that the scope is settled, so login does not first wait for a
+          // wasted logged-out-scope boot that a scope change would then kill.
+          if (userId === null) return;
+          if (!(await getSetting('gatewayAutoStart'))) return;
+          try {
+            // Mirror the boot auto-start path: provider auth profiles must be
+            // written into the new account scope before the Gateway spawns.
+            await syncAllProviderAuthToRuntime();
+            await gatewayManager.start();
+          } catch (error) {
+            console.warn('[auth] Gateway start after login failed:', error);
+          }
+          return;
+        }
         try {
           await gatewayManager.restart();
         } catch (error) {
@@ -456,35 +582,16 @@ export function createAuthApi(ctx?: AuthApiContext): CompleteHostServiceRegistry
     },
 
     me: async (): Promise<AuthStateSnapshot> => {
-      const { accessToken, user } = await readAuth();
-      if (!accessToken || !user) {
-        return { isAuthenticated: false, user: null };
+      // Reuse the boot-time validation while it is still fresh so a cold start
+      // pays for one /api/auth/me round trip instead of two. Single-use: any
+      // later me() call re-validates against the backend.
+      if (bootSessionPromise && Date.now() - bootSessionStartedAt < BOOT_SESSION_REUSE_MS) {
+        const pending = bootSessionPromise;
+        bootSessionPromise = null;
+        return await pending;
       }
-
-      let result = await getJson<{ user?: unknown }>('/api/auth/me', accessToken).catch(() => null);
-      // Access token expired — attempt a one-time refresh then retry.
-      if (result && result.status === 401) {
-        const refreshed = await tryRefresh().catch(() => null);
-        if (refreshed) {
-          result = await getJson<{ user?: unknown }>('/api/auth/me', refreshed).catch(() => null);
-        }
-      }
-
-      if (!result) {
-        // Network failure: keep the cached session so offline restarts still work.
-        return { isAuthenticated: true, user };
-      }
-      if (!isOk(result.status, result.envelope) || !isRecord(result.envelope?.data)) {
-        // Session rejected by the backend — treat as a logout for scoping too.
-        await clearAuth();
-        applyScopeChange(ctx, null);
-        return { isAuthenticated: false, user: null };
-      }
-
-      const freshUser = parseUser((result.envelope!.data as { user?: unknown }).user) ?? user;
-      const current = await readAuth();
-      await writeAuth({ ...current, user: freshUser });
-      return { isAuthenticated: true, user: freshUser };
+      bootSessionPromise = null;
+      return await resolveSessionState(ctx);
     },
 
     getState: () => toState(),

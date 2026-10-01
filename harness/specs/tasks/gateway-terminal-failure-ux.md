@@ -78,11 +78,12 @@ expectedUserBehavior:
   - A deterministic boot failure (exit 78 / migration refusal) reaches a terminal
     failure dialog within one start flow, showing the reason, exit code and
     readiness tier, with Retry / View logs / Copy startup report / Run Doctor.
-  - No blocking surface over a rendered page: while the gateway has never run,
-    the full-screen `InitializingScreen` stays up (capped at
-    `BOOT_SCREEN_CAP_MS`) and the shell is revealed only once loading settles;
-    afterwards dips show a non-blocking banner, and a terminal failure never
-    silently shows only a red dot.
+  - No blocking surface over a rendered page: the app shell is released as soon
+    as the renderer stores initialize (it does not wait for the Gateway to reach
+    running). While the gateway has never run, `starting`/`reconnecting` and
+    degraded-ready show a non-blocking banner; afterwards dips show the same
+    banner, and a terminal failure surfaces the dialog (never silently only a
+    red dot).
   - Transient flaps still auto-reconnect with a visible attempt counter and
     countdown, and recover without user action.
   - After a terminal failure the client does not auto-retry; recovery is an

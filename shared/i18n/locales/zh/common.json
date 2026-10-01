@@ -66,12 +66,14 @@
     "starting": "网关启动中…",
     "reconnecting": "正在重新连接…",
     "failed": "网关故障",
-    "banner": {
-      "reconnecting": "正在重新连接… 第 {{attempt}}/{{max}} 次，{{seconds}} 秒后重试",
-      "reconnectingSimple": "正在重新连接… 第 {{attempt}}/{{max}} 次",
-      "degraded": "网关尚未完全就绪。",
-      "retry": "重试",
-      "details": "详情"
+    "retry": "重试",
+    "boot": {
+      "tagline": "正在准备",
+      "title": "正在启动引擎…",
+      "elapsed": "已进行 {{seconds}} 秒…",
+      "hintFirstRun": "首次启动需要为引擎做一次性预热，大约 1 分钟。这一步只需等一次，之后打开软件会快很多。",
+      "hintWarm": "引擎就绪后即可开始使用，请稍候。",
+      "skip": "先进入应用"
     },
     "popover": {
       "title": "网关状态",

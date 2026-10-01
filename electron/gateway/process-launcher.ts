@@ -4,7 +4,7 @@ import path from 'path';
 import type { GatewayLaunchContext } from './config-sync';
 import type { GatewayLifecycleState } from './process-policy';
 import { logger } from '../utils/logger';
-import { appendNodeRequireToNodeOptions } from '../utils/paths';
+import { appendNodeRequireToNodeOptions, getOpenClawCompileCacheDir } from '../utils/paths';
 
 const GATEWAY_FETCH_PRELOAD_SOURCE = `'use strict';
 (function () {
@@ -137,6 +137,17 @@ export async function launchGatewayProcess(options: {
   // `isDisabledByEnv()`).  Set after the `forkEnv` spread so any
   // pre-existing value inherited from the user shell cannot re-enable it.
   runtimeEnv.OPENCLAW_DISABLE_BONJOUR = '1';
+
+  // Pin OpenClaw's V8 compile cache to a durable per-app location.
+  //
+  // The gateway launcher calls `module.enableCompileCache()` (openclaw.mjs) and,
+  // absent `NODE_COMPILE_CACHE`, defaults the directory to `os.tmpdir()`. On
+  // Windows that path is subject to Temp / Disk Cleanup / OneDrive sweeps, so a
+  // cleared cache silently turns a warm launch back into a full cold compile of
+  // ~10k loose modules. Pointing it at userData keeps the compiled bytecode
+  // reusable across launches. OpenClaw still sub-keys it by version + install
+  // marker under this base, so a stale entry never masks a real binary change.
+  runtimeEnv.NODE_COMPILE_CACHE = getOpenClawCompileCacheDir();
 
   // Dev only: the bundled OpenClaw binary may be older than the version that
   // last wrote the scoped state dir's openclaw.json (e.g. after an openclaw

@@ -323,9 +323,9 @@ function mapChannelStatus(status: string): 'connected' | 'connecting' | 'disconn
 
 /**
  * Single funnel for every gateway-status transition: records whether the
- * session has seen the gateway running (which pins connection UI to the
- * non-blocking banner) and feeds the same status to the UI store that drives
- * the overlay grace window and the terminal-failure dialog.
+ * session has seen the gateway running (which ends the launcher-style boot
+ * screen — later dips surface via dialog/chip, never a banner) and feeds the
+ * same status to the UI store that drives the terminal-failure dialog.
  */
 function applyGatewayStatus(
   set: (partial: Partial<GatewayState>) => void,
