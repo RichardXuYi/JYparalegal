@@ -1,6 +1,7 @@
 #!/usr/bin/env zx
 
 import 'zx/globals';
+import { fetchWithProxy } from './lib/download.mjs';
 
 const ROOT_DIR = path.resolve(__dirname, '..');
 const AGENT_BROWSER_VERSION = 'v0.27.0';
@@ -78,7 +79,7 @@ async function setupTarget(id) {
   // Download (bare binary — no extraction needed)
   const startedAt = Date.now();
   echo(`   ⬇️  Downloading: ${downloadUrl}`);
-  const response = await fetch(downloadUrl);
+  const response = await fetchWithProxy(downloadUrl);
   if (!response.ok) {
     throw new Error(`Failed to download ${target.asset}: ${response.status} ${response.statusText}`);
   }

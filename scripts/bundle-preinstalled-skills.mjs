@@ -1,9 +1,13 @@
 #!/usr/bin/env zx
 
 import 'zx/globals';
+import { useWorkingBash } from './lib/shell.mjs';
 import { readFileSync, existsSync, mkdirSync, rmSync, cpSync, writeFileSync } from 'node:fs';
 import { join, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+// Pick a bash that actually works (Windows may resolve `bash` to the WSL stub).
+useWorkingBash();
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');

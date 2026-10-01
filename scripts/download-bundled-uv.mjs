@@ -1,6 +1,11 @@
 #!/usr/bin/env zx
 
 import 'zx/globals';
+import { useWorkingBash } from './lib/shell.mjs';
+import { fetchWithProxy } from './lib/download.mjs';
+
+// Pick a bash that actually works (Windows may resolve `bash` to the WSL stub).
+useWorkingBash();
 
 const ROOT_DIR = path.resolve(__dirname, '..');
 const UV_VERSION = '0.10.0';
@@ -65,7 +70,7 @@ async function setupTarget(id) {
   try {
     // Download
     echo`⬇️ Downloading: ${downloadUrl}`;
-    const response = await fetch(downloadUrl);
+    const response = await fetchWithProxy(downloadUrl);
     if (!response.ok) throw new Error(`Failed to download: ${response.statusText}`);
     const buffer = await response.arrayBuffer();
     await fs.writeFile(archivePath, Buffer.from(buffer));
