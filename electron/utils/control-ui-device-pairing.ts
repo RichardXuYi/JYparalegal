@@ -1,9 +1,10 @@
-﻿import { app, utilityProcess } from 'electron';
+import { utilityProcess } from 'electron';
 import { existsSync } from 'fs';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { getPort } from './config';
 import { prependPathEntry } from './env-path';
+import { withBundledBinPath } from './bundled-tool';
 import { logger } from './logger';
 import { getOpenClawConfigDir, getOpenClawDir, getOpenClawEntryPath } from './paths';
 import { getSetting } from './store';
@@ -102,13 +103,6 @@ async function listPendingPairingRequests(gateway: GatewayPairingRpcClient): Pro
   return [...merged.values()];
 }
 
-function getBundledBinPath(): string {
-  const target = `${process.platform}-${process.arch}`;
-  return app.isPackaged
-    ? join(process.resourcesPath, 'bin')
-    : join(process.cwd(), 'resources', 'bin', target);
-}
-
 /**
  * Run `openclaw devices approve` in-process (not shown to the user).
  * OpenClaw falls back to local pending.json on loopback when RPC is unavailable.
@@ -124,11 +118,10 @@ async function approveViaOpenClawCli(requestId: string, _port: number): Promise<
   const token = await getSetting('gatewayToken');
   const args = ['devices', 'approve', requestId, '--token', token, '--timeout', String(CLI_APPROVE_TIMEOUT_MS)];
 
-  const binPath = getBundledBinPath();
-  const binPathExists = existsSync(binPath);
-  const baseEnv = (binPathExists
-    ? prependPathEntry(process.env as Record<string, string | undefined>, binPath).env
-    : process.env) as Record<string, string | undefined>;
+  const baseEnv = withBundledBinPath(
+    process.env as Record<string, string | undefined>,
+    prependPathEntry,
+  );
   const uvEnv = await getUvMirrorEnv();
 
   return await new Promise<boolean>((resolve) => {

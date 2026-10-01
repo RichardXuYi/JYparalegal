@@ -20,11 +20,21 @@
  */
 
 const { cpSync, existsSync, readdirSync, rmSync, statSync, mkdirSync, realpathSync, readFileSync, writeFileSync } = require('fs');
-const { join, dirname, basename, relative } = require('path');
+const { join, dirname, basename, relative, sep } = require('path');
+const AdmZip = require('adm-zip');
 const { ELECTRON_MAIN_RUNTIME_PACKAGES } = require('./openclaw-bundle-config.mjs');
 const { patchNsisExtractTemplate } = require('./patch-nsis-extract.mjs');
 const { patchNsisInstallSectionTemplate } = require('./patch-nsis-install-section.mjs');
 const { patchNsisUninstallTemplate } = require('./patch-nsis-uninstall.mjs');
+
+/**
+ * Directory (relative to the packaged `resources/`) holding archives that the
+ * app extracts on first use. Keep in sync with electron/utils/lazy-asset.ts.
+ */
+const LAZY_ASSETS_DIR = 'lazy-assets';
+
+/** Electron locales worth keeping: Chinese UI plus the English fallback. */
+const KEEP_ELECTRON_LOCALES = new Set(['en-US.pak', 'zh-CN.pak']);
 
 // On Windows, paths in pnpm's virtual store can exceed the default MAX_PATH
 // limit (260 chars). Node.js 18.17+ respects the system LongPathsEnabled
@@ -159,6 +169,10 @@ const PLATFORM_NATIVE_SCOPES = {
   '@node-llama-cpp': /^(mac|linux|win)-(arm64|x64|armv7l)(-metal|-cuda|-cuda-ext|-vulkan)?$/,
   '@esbuild': /^(darwin|linux|win32|android|freebsd|netbsd|openbsd|sunos|aix|openharmony)-(x64|arm64|arm|ia32|loong64|mips64el|ppc64|riscv64|s390x)/,
   '@openai': /^codex-(darwin|linux|win32)-(x64|arm64)$/,
+  // @trycua ships the CUA driver for every supported platform (~203 MB across
+  // 5 foreign-platform directories). The unscoped `cua-driver` package itself
+  // has no platform suffix and must NOT match this pattern.
+  '@trycua': /^cua-driver-(darwin|linux|win32)-(x64|arm64)(?:-[a-z]+)?$/,
 };
 
 // Unscoped packages that follow a <name>-<platform>-<arch> convention.
@@ -307,7 +321,197 @@ function cleanupKnownRuntimeJunk(rootDir, platform, arch) {
 exports.__test = {
   cleanupNativePlatformPackages,
   cleanupNodeModulesRuntimeJunk,
+  pruneRuntimeDocsAndTypes,
+  pruneElectronLocales,
+  archiveBundledPlugins,
+  archiveBundledBinTools,
 };
+
+/** Recursively count files under a directory (best effort). */
+function countFiles(dir) {
+  let count = 0;
+  const stack = [dir];
+  while (stack.length > 0) {
+    const current = stack.pop();
+    let entries;
+    try { entries = readdirSync(normWin(current), { withFileTypes: true }); } catch { continue; }
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        stack.push(join(current, entry.name));
+      } else {
+        count += 1;
+      }
+    }
+  }
+  return count;
+}
+
+// ── Runtime-noise pruning (docs / TypeScript sources / locales) ──────────────
+// File *count* is what antivirus real-time protection charges for, and the
+// packaged tree carries thousands of files that no code path can ever read:
+// markdown docs next to modules, and raw .ts sources shipped alongside the
+// compiled output. See docs/startup-performance-plan.md (scheme 2.4).
+
+function pruneRuntimeDocsAndTypes(rootDir, { removeTypes = false } = {}) {  let removedMd = 0;
+  let removedTs = 0;
+  let candidateTs = 0;
+  let freedBytes = 0;
+
+  const stack = [rootDir];
+  while (stack.length > 0) {
+    const dir = stack.pop();
+    let entries;
+    try { entries = readdirSync(normWin(dir), { withFileTypes: true }); } catch { continue; }
+
+    // Only prune inside module/build trees. Skill content (skills/,
+    // custodian-skills/, context/) is product data and must survive.
+    const inRuntimeTree = dir.includes(`${sep}node_modules`) || dir.includes(`${sep}dist`);
+
+    for (const entry of entries) {
+      const fullPath = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        stack.push(fullPath);
+        continue;
+      }
+      if (!inRuntimeTree) continue;
+
+      const lower = entry.name.toLowerCase();
+      if (lower.endsWith('.md') || lower.endsWith('.markdown')) {
+        try {
+          const size = statSync(normWin(fullPath)).size;
+          rmSync(normWin(fullPath), { force: true });
+          removedMd += 1;
+          freedBytes += size;
+        } catch { /* ignore */ }
+        continue;
+      }
+
+      // Raw TypeScript sources (never declarations — those are pruned earlier).
+      const isTsSource = /\.(ts|mts|cts)$/.test(lower) && !/\.d\.(ts|mts|cts)$/.test(lower);
+      if (isTsSource) {
+        candidateTs += 1;
+        if (removeTypes) {
+          try {
+            const size = statSync(normWin(fullPath)).size;
+            rmSync(normWin(fullPath), { force: true });
+            removedTs += 1;
+            freedBytes += size;
+          } catch { /* ignore */ }
+        }
+      }
+    }
+  }
+
+  return { removedMd, removedTs, candidateTs, freedBytes };
+}
+
+/**
+ * Keep only the locales the app can actually display. Chromium's UI strings are
+ * not the app's i18n (that lives in shared/i18n), so dropping the other ~53
+ * `.pak` files only affects Chromium-internal UI, which falls back to en-US.
+ */
+function pruneElectronLocales(appOutDir) {
+  const localesDir = join(appOutDir, 'locales');
+  if (!existsSync(localesDir)) return 0;
+
+  let removed = 0;
+  for (const entry of readdirSync(normWin(localesDir), { withFileTypes: true })) {
+    if (!entry.isFile()) continue;
+    if (KEEP_ELECTRON_LOCALES.has(entry.name)) continue;
+    try {
+      rmSync(join(localesDir, entry.name), { force: true });
+      removed += 1;
+    } catch { /* ignore */ }
+  }
+  return removed;
+}
+
+// ── Lazy asset archiving ────────────────────────────────────────────────────
+// Bundled plugins and the on-demand native tools are shipped as single archives
+// and extracted on first use by electron/utils/lazy-asset.ts. Together they are
+// ~9.8k files and ~335 MB that the app never needs in order to start, but that
+// antivirus has to inspect on the first launch after installation.
+
+function writeZipFromDirectory(sourceDir, archivePath) {
+  mkdirSync(normWin(dirname(archivePath)), { recursive: true });
+  rmSync(normWin(archivePath), { force: true });
+  const zip = new AdmZip();
+  zip.addLocalFolder(sourceDir, '');
+  zip.writeZip(archivePath);
+  return statSync(normWin(archivePath)).size;
+}
+
+function writeZipFromFiles(filePaths, archivePath) {
+  mkdirSync(normWin(dirname(archivePath)), { recursive: true });
+  rmSync(normWin(archivePath), { force: true });
+  const zip = new AdmZip();
+  for (const filePath of filePaths) {
+    zip.addLocalFile(filePath, '');
+  }
+  zip.writeZip(archivePath);
+  return statSync(normWin(archivePath)).size;
+}
+
+function archiveBundledPlugins(resourcesDir) {
+  const pluginsRoot = join(resourcesDir, 'openclaw-plugins');
+  if (!existsSync(pluginsRoot)) return { archived: 0, bytes: 0 };
+
+  let archived = 0;
+  let bytes = 0;
+
+  for (const entry of readdirSync(normWin(pluginsRoot), { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const sourceDir = join(pluginsRoot, entry.name);
+    const archivePath = join(resourcesDir, LAZY_ASSETS_DIR, 'openclaw-plugins', `${entry.name}.zip`);
+    try {
+      const size = writeZipFromDirectory(sourceDir, archivePath);
+      rmSync(normWin(sourceDir), { recursive: true, force: true });
+      archived += 1;
+      bytes += size;
+      console.log(`[after-pack]  ${entry.name} -> lazy-assets/openclaw-plugins/${entry.name}.zip (${(size / 1024 / 1024).toFixed(1)} MB)`);
+    } catch (err) {
+      console.warn(`[after-pack]  Failed to archive plugin ${entry.name}; keeping the expanded directory:`, err.message);
+    }
+  }
+
+  // Drop the now-empty container so the install tree has no leftover directory.
+  try {
+    if (readdirSync(normWin(pluginsRoot)).length === 0) {
+      rmSync(normWin(pluginsRoot), { recursive: true, force: true });
+    }
+  } catch { /* ignore */ }
+
+  return { archived, bytes };
+}
+
+/**
+ * `uv` and `agent-browser` are only needed once a skill actually shells out to
+ * them, so they travel as one archive. `node` stays unpacked: the Gateway needs
+ * it on the first spawn.
+ */
+function archiveBundledBinTools(resourcesDir) {
+  const binDir = join(resourcesDir, 'bin');
+  if (!existsSync(binDir)) return null;
+
+  const names = process.platform === 'win32'
+    ? ['uv.exe', 'agent-browser.exe']
+    : ['uv', 'agent-browser'];
+  const present = names.map((name) => join(binDir, name)).filter((filePath) => existsSync(filePath));
+  if (present.length === 0) return null;
+
+  const archivePath = join(resourcesDir, LAZY_ASSETS_DIR, 'bin', 'tools.zip');
+  try {
+    const size = writeZipFromFiles(present, archivePath);
+    for (const filePath of present) {
+      rmSync(normWin(filePath), { force: true });
+    }
+    console.log(`[after-pack]  ${present.map((p) => basename(p)).join(', ')} -> lazy-assets/bin/tools.zip (${(size / 1024 / 1024).toFixed(1)} MB)`);
+    return { archived: present.length, bytes: size };
+  } catch (err) {
+    console.warn('[after-pack]  Failed to archive bundled bin tools; leaving them unpacked:', err.message);
+    return null;
+  }
+}
 
 // ???? Broken module patcher ??????????????????????????????????????????????????????????????????????????????????????????????????????????
 // Some bundled packages have transpiled CJS that sets `module.exports = exports.default`
@@ -961,4 +1165,45 @@ exports.default = async function afterPack(context) {
       console.log('[after-pack] ??NSIS install templates ready (overwrite upgrade).');
     }
   }
+
+  // 7. Prune runtime noise: bundled docs, plus markdown / TypeScript sources
+  //    inside node_modules and dist (see docs/startup-performance-plan.md 2.4).
+  const openclawDocsDir = join(openclawRoot, 'docs');
+  if (existsSync(openclawDocsDir)) {
+    const docCount = countFiles(openclawDocsDir);
+    try {
+      rmSync(normWin(openclawDocsDir), { recursive: true, force: true });
+      console.log(`[after-pack]  Removed bundled openclaw docs (${docCount} file(s)).`);
+    } catch (err) {
+      console.warn('[after-pack]  Failed to remove bundled openclaw docs:', err.message);
+    }
+  }
+
+  const removeTypes = process.env.GRANDPOEM_PRUNE_TS === '1';
+  const pruneResult = pruneRuntimeDocsAndTypes(openclawRoot, { removeTypes });
+  console.log(
+    `[after-pack]  Pruned ${pruneResult.removedMd} markdown file(s); TypeScript sources removed ${pruneResult.removedTs}/${pruneResult.candidateTs} (${(pruneResult.freedBytes / 1024 / 1024).toFixed(1)} MB).`,
+  );
+  if (!removeTypes && pruneResult.candidateTs > 0) {
+    console.log('[after-pack]  TypeScript sources were counted only. Set GRANDPOEM_PRUNE_TS=1 to remove them (run a doctor/gateway smoke test first).');
+  }
+
+  // 8. Keep only the Electron locales we ship.
+  if (platform !== 'darwin') {
+    const removedLocales = pruneElectronLocales(appOutDir);
+    if (removedLocales > 0) {
+      console.log(`[after-pack]  Removed ${removedLocales} unused Electron locale file(s).`);
+    }
+  }
+
+  // 9. Ship bundled plugins as lazy archives (extracted on first channel setup).
+  const pluginArchive = archiveBundledPlugins(resourcesDir);
+  if (pluginArchive.archived > 0) {
+    console.log(
+      `[after-pack]  Archived ${pluginArchive.archived} bundled plugin(s) into ${LAZY_ASSETS_DIR}/openclaw-plugins (${(pluginArchive.bytes / 1024 / 1024).toFixed(1)} MB packed).`,
+    );
+  }
+
+  // 10. Ship uv / agent-browser as one lazy archive (extracted on first use).
+  archiveBundledBinTools(resourcesDir);
 };

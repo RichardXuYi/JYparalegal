@@ -21,6 +21,42 @@ export type OpenClawDoctorResult = HostSuccess & {
 };
 export type OpenClawDoctorPayload = { mode: OpenClawDoctorMode };
 
+/**
+ * Windows-only startup acceleration.
+ *
+ * Registers the install directory (plus the app's runtime data directories) with
+ * Windows Defender. Real-time scanning of a freshly installed, unsigned, ~50k
+ * file application is the dominant cost of the first launch — see
+ * docs/startup-performance-plan.md (scheme 1).
+ */
+export type StartupAccelerationState = 'applied' | 'not-applied';
+
+export type StartupAccelerationErrorCode =
+  | 'UNSUPPORTED'
+  | 'NOT_ELEVATED'
+  | 'BLOCKED'
+  | 'INTERNAL';
+
+export type StartupAccelerationStatus = {
+  /** True only on Windows packaged builds. */
+  supported: boolean;
+  state: StartupAccelerationState;
+  /** Paths the app asks Defender to exclude. */
+  targets: string[];
+  /** ISO timestamp of the last run that verified the exclusion. */
+  lastVerifiedAt?: string;
+  /** True when the last attempt was blocked (e.g. Tamper Protection). */
+  blocked?: boolean;
+  /** True when the last attempt could not elevate. */
+  needsElevation?: boolean;
+  installDir?: string;
+};
+
+export type StartupAccelerationResult = HostSuccess & {
+  status: StartupAccelerationStatus;
+  code?: StartupAccelerationErrorCode;
+};
+
 export type OpenClawStatusResult = {
   packageExists: boolean;
   isBuilt: boolean;
@@ -886,6 +922,10 @@ export type DeliveryTargetsResult = HostSuccess & { targets: DeliveryChannelGrou
 export type HostApiContract = {
   app: {
     openClawDoctor: (payload: OpenClawDoctorPayload) => Omit<OpenClawDoctorResult, 'mode'>;
+    startupAccelerationStatus: () => StartupAccelerationStatus;
+    applyStartupAcceleration: () => StartupAccelerationResult;
+    removeStartupAcceleration: () => StartupAccelerationResult;
+    openDefenderSettings: () => HostSuccess;
   };
   openclaw: {
     status: () => OpenClawStatusResult;

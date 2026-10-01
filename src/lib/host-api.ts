@@ -91,6 +91,8 @@ export type {
   SkillSyncResult,
   SkillSyncStatusResult,
   StagedFileResult,
+  StartupAccelerationResult,
+  StartupAccelerationStatus,
   SyncRunResult,
   SyncScope,
   SyncScopeOutcome,
@@ -105,6 +107,13 @@ export const hostApi = {
       ...(await invokeHost('app', 'openClawDoctor', { mode })),
       mode,
     }),
+    // Windows-only: register the install directory with Windows Defender so the
+    // first launch is not dominated by real-time scanning. See
+    // docs/startup-performance-plan.md (scheme 1).
+    startupAccelerationStatus: () => invokeHost('app', 'startupAccelerationStatus'),
+    applyStartupAcceleration: () => invokeHost('app', 'applyStartupAcceleration'),
+    removeStartupAcceleration: () => invokeHost('app', 'removeStartupAcceleration'),
+    openDefenderSettings: () => invokeHost('app', 'openDefenderSettings'),
   },
   openclaw: {
     status: () => invokeHost('openclaw', 'status'),

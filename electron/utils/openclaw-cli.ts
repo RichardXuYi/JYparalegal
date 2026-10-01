@@ -1,4 +1,4 @@
-﻿/**
+/**
  * OpenClaw CLI utilities —cross-platform auto-install
  */
 import { app } from 'electron';
@@ -16,6 +16,7 @@ import { homedir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { getOpenClawDir, getOpenClawEntryPath } from './paths';
 import { logger } from './logger';
+import { resolveBundledTool } from './bundled-tool';
 
 // 鈹€鈹€ Quoting helpers 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
@@ -33,8 +34,8 @@ function quoteForPowerShell(value: string): string {
 
 function getPackagedWindowsNodePath(): string | null {
   if (!app.isPackaged || process.platform !== 'win32') return null;
-  const nodePath = join(process.resourcesPath, 'bin', 'node.exe');
-  return existsSync(nodePath) ? nodePath : null;
+  // Bundled node is always unpacked in resources/bin (see utils/bundled-tool.ts).
+  return resolveBundledTool('node');
 }
 
 // 鈹€鈹€ CLI command string (for display / copy) 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€

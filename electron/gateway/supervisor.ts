@@ -1,4 +1,4 @@
-import { app, utilityProcess } from 'electron';
+import { utilityProcess } from 'electron';
 import path from 'path';
 import { existsSync } from 'fs';
 import { getOpenClawDir, getOpenClawEntryPath } from '../utils/paths';
@@ -6,6 +6,7 @@ import { getUvMirrorEnv } from '../utils/uv-env';
 import { isPythonReady, setupManagedPython } from '../utils/uv-setup';
 import { logger } from '../utils/logger';
 import { prependPathEntry } from '../utils/env-path';
+import { getBundledBinDirs, withBundledBinPath } from '../utils/bundled-tool';
 import { probeGatewayReady } from './ws-client';
 
 export function warmupManagedPythonReadiness(): void {
@@ -270,17 +271,10 @@ export async function runOpenClawDoctorRepair(): Promise<boolean> {
     return false;
   }
 
-  const platform = process.platform;
-  const arch = process.arch;
-  const target = `${platform}-${arch}`;
-  const binPath = app.isPackaged
-    ? path.join(process.resourcesPath, 'bin')
-    : path.join(process.cwd(), 'resources', 'bin', target);
-  const binPathExists = existsSync(binPath);
+  const binDirs = getBundledBinDirs();
+  const binPathExists = binDirs.length > 0;
   const baseProcessEnv = process.env as Record<string, string | undefined>;
-  const baseEnvPatched = binPathExists
-    ? prependPathEntry(baseProcessEnv, binPath).env
-    : baseProcessEnv;
+  const baseEnvPatched = withBundledBinPath(baseProcessEnv, prependPathEntry);
 
   const uvEnv = await getUvMirrorEnv();
   const doctorArgs = ['doctor', '--fix', '--yes', '--non-interactive'];

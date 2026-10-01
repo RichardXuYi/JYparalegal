@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Shared OpenClaw Plugin Install Utilities
  *
  * Provides version-aware install/upgrade logic for bundled OpenClaw plugins
@@ -12,6 +12,7 @@ import { readdir, stat, copyFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { logger } from './logger';
 import { getOpenClawConfigDir } from './paths';
+import { ensureLazyAssetExtracted } from './lazy-asset';
 import { upsertPluginInstallRecordsIntoSqlite, ensureOpenClawStateDirExists } from './plugin-install-index';
 
 function normalizeFsPathForWindows(filePath: string): string {
@@ -655,7 +656,27 @@ export function ensurePluginInstalled(
 
 // 鈹€鈹€ Candidate source path builder 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
+/**
+ * Packaged builds ship every bundled plugin as a single archive under
+ * `resources/lazy-assets/openclaw-plugins/<pluginId>.zip` instead of an expanded
+ * directory tree. The 7 bundled plugins are ~9.8k files / 263 MB that the app
+ * never touches during startup, and every one of those files is something
+ * Windows Defender has to inspect on the first launch after installation.
+ *
+ * The archive is extracted into the per-user cache on first use — i.e. when the
+ * user actually adds that messaging channel.
+ *
+ * @returns the extracted plugin directory, or null when the plugin is not
+ *          shipped as an archive (dev builds, or a build without the archives).
+ */
+function resolveLazyPluginDir(pluginDirName: string): string | null {
+  return ensureLazyAssetExtracted(`openclaw-plugins/${pluginDirName}`);
+}
+
 export function buildCandidateSources(pluginDirName: string): string[] {
+  const lazyDir = resolveLazyPluginDir(pluginDirName);
+  if (lazyDir) return [lazyDir];
+
   return app.isPackaged
     ? [
       join(process.resourcesPath, 'openclaw-plugins', pluginDirName),

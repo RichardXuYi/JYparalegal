@@ -3,7 +3,7 @@
  * Gateway proxy, gateway token, OpenClaw CLI, doctor, and telemetry viewer.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { RefreshCw, Copy, Terminal, Globe, Key, Wrench, Activity } from 'lucide-react';
+import { RefreshCw, Copy, Terminal, Globe, Key, Wrench, Activity, Gauge } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -21,7 +21,7 @@ import {
   type UiTelemetryEntry,
 } from '@/lib/telemetry';
 import { useTranslation } from 'react-i18next';
-import { hostApi, type OpenClawDoctorResult } from '@/lib/host-api';
+import { hostApi, type OpenClawDoctorResult, type StartupAccelerationStatus } from '@/lib/host-api';
 import { hostEvents } from '@/lib/host-events';
 import { cn } from '@/lib/utils';
 import { SettingsGroup } from '@/components/settings/primitives';
@@ -99,8 +99,64 @@ export function DeveloperSection({ gradientClass }: DeveloperSectionProps) {
     }
   };
 
-  const handleCopyDoctorOutput = async () => {
-    if (!doctorResult) return;
+  // ── Startup acceleration (Windows Defender exclusions) ──────────────────────
+  // The packaged app is ~50k files and unsigned, so real-time scanning is the
+  // dominant cost of the first launch. See docs/startup-performance-plan.md.
+  const [startupAcceleration, setStartupAcceleration] = useState<StartupAccelerationStatus | null>(null);
+  const [startupAccelerationBusy, setStartupAccelerationBusy] = useState(false);
+
+  useEffect(() => {
+    if (!isWindows) return;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const status = await hostApi.app.startupAccelerationStatus();
+        if (cancelled) return;
+        setStartupAcceleration(status);
+      } catch {
+        // Status is best-effort; the section simply stays in its unknown state.
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [isWindows]);
+
+  const handleStartupAcceleration = async (action: 'apply' | 'remove') => {
+    setStartupAccelerationBusy(true);
+    try {
+      const result = action === 'apply'
+        ? await hostApi.app.applyStartupAcceleration()
+        : await hostApi.app.removeStartupAcceleration();
+      setStartupAcceleration(result.status);
+      if (result.success) {
+        reportSuccess(
+          action === 'apply'
+            ? t('developer.startupAccelerationApplied')
+            : t('developer.startupAccelerationRemoved'),
+        );
+      } else {
+        reportFailure(result.error || t('developer.startupAccelerationFailed'));
+      }
+    } catch (error) {
+      reportFailure(toUserMessage(error) || t('developer.startupAccelerationFailed'));
+    } finally {
+      setStartupAccelerationBusy(false);
+    }
+  };
+
+  const handleOpenDefenderSettings = async () => {
+    try {
+      const result = await hostApi.app.openDefenderSettings();
+      if (!result.success) {
+        reportFailure(result.error || t('developer.startupAccelerationManualFailed'));
+      }
+    } catch (error) {
+      reportFailure(toUserMessage(error) || t('developer.startupAccelerationManualFailed'));
+    }
+  };
+
+  const handleCopyDoctorOutput = async () => {    if (!doctorResult) return;
     const payload = [
       `command: ${doctorResult.command}`,
       `cwd: ${doctorResult.cwd}`,
@@ -652,6 +708,96 @@ export function DeveloperSection({ gradientClass }: DeveloperSectionProps) {
           )}
         </div>
         </SettingsGroup>
+
+        {isWindows && (
+          <SettingsGroup padded gradientClass={gradientClass} icon={Gauge}>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <Label className="text-sm font-medium text-foreground">{t('developer.startupAcceleration')}</Label>
+                <p className="text-meta text-muted-foreground mt-1">
+                  {t('developer.startupAccelerationDesc')}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => void handleStartupAcceleration('apply')}
+                  disabled={startupAccelerationBusy || !startupAcceleration?.supported || startupAcceleration?.state === 'applied'}
+                  className="rounded-xl h-10 px-4 bg-transparent border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5"
+                >
+                  <Gauge className={`h-4 w-4 mr-2${startupAccelerationBusy ? ' animate-pulse' : ''}`} />
+                  {startupAccelerationBusy
+                    ? t('common:status.running')
+                    : t('developer.startupAccelerationApply')}
+                </Button>
+                {startupAcceleration?.state === 'applied' && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => void handleStartupAcceleration('remove')}
+                    disabled={startupAccelerationBusy}
+                    className="rounded-xl h-10 px-4 bg-transparent border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5"
+                  >
+                    {t('developer.startupAccelerationRemove')}
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <Badge
+                variant={startupAcceleration?.state === 'applied' ? 'secondary' : 'outline'}
+                className="rounded-full px-3 py-1"
+              >
+                {startupAcceleration?.state === 'applied'
+                  ? t('developer.startupAccelerationOn')
+                  : t('developer.startupAccelerationOff')}
+              </Badge>
+              {startupAcceleration?.lastVerifiedAt && (
+                <Badge variant="outline" className="rounded-full px-3 py-1">
+                  {t('developer.startupAccelerationVerifiedAt')}: {new Date(startupAcceleration.lastVerifiedAt).toLocaleString()}
+                </Badge>
+              )}
+              {startupAcceleration?.blocked && (
+                <Badge variant="destructive" className="rounded-full px-3 py-1">
+                  {t('developer.startupAccelerationBlocked')}
+                </Badge>
+              )}
+              {startupAcceleration?.needsElevation && (
+                <Badge variant="destructive" className="rounded-full px-3 py-1">
+                  {t('developer.startupAccelerationNeedsElevation')}
+                </Badge>
+              )}
+            </div>
+
+            {startupAcceleration && !startupAcceleration.supported && (
+              <p className="text-meta text-muted-foreground">
+                {t('developer.startupAccelerationUnsupported')}
+              </p>
+            )}
+
+            {startupAcceleration && startupAcceleration.targets.length > 0 && (
+              <div className="space-y-1 text-xs text-muted-foreground font-mono break-all">
+                {startupAcceleration.targets.map((target) => (
+                  <p key={target}>{target}</p>
+                ))}
+              </div>
+            )}
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void handleOpenDefenderSettings()}
+              className="rounded-full px-5 h-9 bg-transparent border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5"
+            >
+              {t('developer.startupAccelerationManual')}
+            </Button>
+          </div>
+          </SettingsGroup>
+        )}
 
         <SettingsGroup padded gradientClass={gradientClass} icon={Activity}>
         <div className="space-y-4">

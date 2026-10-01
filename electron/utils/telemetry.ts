@@ -1,5 +1,5 @@
 import { PostHog } from 'posthog-node';
-import { machineIdSync } from 'node-machine-id';
+import { machineId, machineIdSync } from 'node-machine-id';
 import { app } from 'electron';
 import { getSetting, setSetting } from './store';
 import { logger } from './logger';
@@ -7,6 +7,24 @@ import { logger } from './logger';
 const POSTHOG_API_KEY = 'phc_aGNegeJQP5FzNiF2rEoKqQbkuCpiiETMttplibXpB0n';
 const POSTHOG_HOST = 'https://us.i.posthog.com';
 const TELEMETRY_SHUTDOWN_TIMEOUT_MS = 1500;
+
+/**
+ * Resolve the machine id without blocking the main process.
+ *
+ * `machineIdSync()` shells out to REG.exe through `execSync`, which blocks the
+ * Electron main thread — including the first paint — for the duration of the
+ * child process. That cost lands on the very first launch, which is exactly
+ * when startup is already at its worst. The async variant is a plain `exec`,
+ * so the event loop stays free; the sync call is kept only as a fallback.
+ */
+async function resolveMachineId(): Promise<string> {
+    try {
+        return await machineId();
+    } catch (error) {
+        logger.warn('Async machine id lookup failed, falling back to sync:', error);
+        return machineIdSync();
+    }
+}
 
 let posthogClient: PostHog | null = null;
 let distinctId: string = '';
@@ -58,7 +76,7 @@ export async function initTelemetry(): Promise<void> {
         // Get or generate machine ID
         distinctId = await getSetting('machineId');
         if (!distinctId) {
-            distinctId = machineIdSync();
+            distinctId = await resolveMachineId();
             await setSetting('machineId', distinctId);
             logger.debug(`Generated new machine ID for telemetry: ${distinctId}`);
         }

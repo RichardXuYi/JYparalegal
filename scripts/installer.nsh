@@ -1,4 +1,4 @@
-﻿; GrandPoem Studio Custom NSIS Installer/Uninstaller Script
+; GrandPoem Studio Custom NSIS Installer/Uninstaller Script
 ;
 ; Install: enables long paths, adds resources\cli to user PATH for openclaw CLI.
 ; Uninstall: removes the PATH entry and optionally deletes user data.
@@ -361,14 +361,29 @@ FunctionEnd
   DetailPrint "Enabling long-path support (if permissions allow)..."
   WriteRegDWORD HKLM "SYSTEM\CurrentControlSet\Control\FileSystem" "LongPathsEnabled" 1
 
-  ; Add $INSTDIR to Windows Defender exclusion list so that real-time scanning
-  ; doesn't block the first app launch (Defender scans every newly-created file,
-  ; causing 10-30s startup delay on a fresh install).  Requires elevation;
-  ; silently fails on non-admin per-user installs (no harm done).
-  DetailPrint "Configuring Windows Defender exclusion..."
-  nsExec::ExecToStack `"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "Add-MpPreference -ExclusionPath '$INSTDIR' -ErrorAction SilentlyContinue"`
+  ; Add the install directory (plus the app's runtime data directories) to the
+  ; Windows Defender exclusion list.
+  ;
+  ; Why: the packaged app is ~50k files and unsigned, so on a freshly installed
+  ; machine the first launch is dominated by Defender inspecting every new file
+  ; and by the cloud reputation lookup for an unknown binary.
+  ;
+  ; The helper script needs administrator rights. A per-user install runs
+  ; unelevated, so we call it with -NonElevated: instead of prompting it exits
+  ; with code 3, and the user can opt in from the finish page or later from
+  ; Settings -> Developer. See docs/startup-performance-plan.md (scheme 1).
+  DetailPrint "Configuring Windows Defender exclusion (optional)..."
+  InitPluginsDir
+  ClearErrors
+  File "/oname=$PLUGINSDIR\set-defender-exclusion.ps1" "${PROJECT_DIR}\resources\cli\win32\set-defender-exclusion.ps1"
+  nsExec::ExecToStack '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\set-defender-exclusion.ps1" -Action add -InstallDir "$INSTDIR" -NonElevated'
   Pop $0
   Pop $1
+  ${if} $0 == "0"
+    DetailPrint "Windows Defender exclusion added."
+  ${else}
+    DetailPrint "Windows Defender exclusion skipped (administrator approval required)."
+  ${endIf}
 
   ; Use PowerShell to update the current user's PATH.
   ; This avoids NSIS string-buffer limits and preserves long PATH values.
@@ -388,14 +403,111 @@ FunctionEnd
   DetailPrint "Warning: PowerShell PATH update exited with code $0."
 
   _ci_done:
+
+  ; Repoint the shortcuts at the splash launcher when it was built.
+  ;
+  ; The launcher paints instantly, while the ~200 MB unsigned main executable is
+  ; still being scanned and loaded - a period in which the app itself cannot draw
+  ; anything. electron-builder creates the shortcuts earlier in this section, so
+  ; overwriting them here is safe. Absent launcher (non-Windows build, or the
+  ; in-box C# compiler was unavailable) => shortcuts stay as-is.
+  ; See docs/startup-performance-plan.md (scheme 3b).
+  ${if} ${FileExists} "$INSTDIR\resources\bin\grandpoem-launcher.exe"
+    DetailPrint "Pointing shortcuts at the splash launcher..."
+    ${if} ${FileExists} "$DESKTOP\${SHORTCUT_NAME}.lnk"
+      CreateShortCut "$DESKTOP\${SHORTCUT_NAME}.lnk" "$INSTDIR\resources\bin\grandpoem-launcher.exe" "" "$INSTDIR\resources\bin\grandpoem-launcher.exe" 0
+    ${endIf}
+    !ifdef MENU_FILENAME
+      ${if} ${FileExists} "$SMPROGRAMS\${MENU_FILENAME}\${SHORTCUT_NAME}.lnk"
+        CreateShortCut "$SMPROGRAMS\${MENU_FILENAME}\${SHORTCUT_NAME}.lnk" "$INSTDIR\resources\bin\grandpoem-launcher.exe" "" "$INSTDIR\resources\bin\grandpoem-launcher.exe" 0
+      ${endIf}
+    !endif
+    ${if} ${FileExists} "$SMPROGRAMS\${SHORTCUT_NAME}.lnk"
+      CreateShortCut "$SMPROGRAMS\${SHORTCUT_NAME}.lnk" "$INSTDIR\resources\bin\grandpoem-launcher.exe" "" "$INSTDIR\resources\bin\grandpoem-launcher.exe" 0
+    ${endIf}
+  ${endIf}
+
+  ; Pre-warm the OpenClaw runtime in the background.
+  ;
+  ; The first Gateway boot compiles ~10k loose modules unless
+  ; NODE_COMPILE_CACHE is already populated (see electron/gateway/
+  ; process-launcher.ts), and Defender still has to make its first pass over
+  ; the whole runtime tree. Paying that here - while the installer window is
+  ; still open - removes it from the user's first click.
+  ;
+  ; Deliberately a detached process: it must not delay the installer, and the
+  ; app's own pre-warm mode never takes the single-instance lock, so a launch
+  ; during or after it is unaffected. See docs/startup-performance-plan.md
+  ; (scheme 5).
+  IfFileExists "$INSTDIR\resources\openclaw\openclaw.mjs" 0 _ci_prewarm_done
+  IfFileExists "$INSTDIR\resources\bin\node.exe" 0 _ci_prewarm_done
+    DetailPrint "Pre-warming the OpenClaw runtime cache in the background..."
+    ExecShell "" "cmd.exe" `/c set "NODE_COMPILE_CACHE=$APPDATA\grandpoem-studio\openclaw-compile-cache" & "$INSTDIR\resources\bin\node.exe" "$INSTDIR\resources\openclaw\openclaw.mjs" doctor --json >nul 2>&1` SW_HIDE
+  _ci_prewarm_done:
+
   DetailPrint "Installation steps complete."
 !macroend
 
+; Finish page.
+;
+; electron-builder's assisted installer adds a "run the app" checkbox only when
+; `customFinishPage` is NOT defined (see app-builder-lib/templates/nsis/
+; assistedInstaller.nsh), so redefining the page means re-declaring
+; MUI_FINISHPAGE_RUN ourselves.
+;
+; The readme checkbox slot is reused as an opt-in for the Defender exclusion:
+; this is the one moment where an extra UAC prompt is expected and welcome, and
+; it is the only way for a per-user (unelevated) install to register the
+; exclusion.
+!macro customFinishPage
+  Function StartApp
+    ${if} ${isUpdated}
+      StrCpy $1 "--updated"
+    ${else}
+      StrCpy $1 ""
+    ${endif}
+    ${StdUtils.ExecShellAsUser} $0 "$launchLink" "open" "$1"
+  FunctionEnd
+
+  Function GrandPoemStudioAddDefenderExclusion
+    IfFileExists "$PLUGINSDIR\set-defender-exclusion.ps1" 0 _gp_defender_missing
+      DetailPrint "Adding the Windows Defender exclusion (administrator approval required)..."
+      nsExec::ExecToStack '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\set-defender-exclusion.ps1" -Action add -InstallDir "$INSTDIR"'
+      Pop $0
+      Pop $1
+      ${if} $0 == "0"
+        DetailPrint "Windows Defender exclusion added."
+      ${else}
+        DetailPrint "Windows Defender exclusion was not applied (exit code $0). It can be added later from Settings -> Developer."
+      ${endIf}
+      Return
+    _gp_defender_missing:
+      DetailPrint "Defender helper script missing; skipping."
+  FunctionEnd
+
+  !define MUI_FINISHPAGE_RUN
+  !define MUI_FINISHPAGE_RUN_FUNCTION "StartApp"
+  ; The checkbox itself is narrow (195u in MUI2's finish page), so keep the label
+  ; short and put the explanation in the page body text.
+  !define MUI_FINISHPAGE_TEXT "Setup has finished installing GrandPoem Studio.$\r$\n$\r$\nOptional: tick the box below to add the installation folder to the Windows Defender exclusion list. Real-time scanning of a freshly installed app is what makes the very first launch slow. This requires administrator rights, and you can also enable or remove it later in Settings > Developer."
+  !define MUI_FINISHPAGE_SHOWREADME ""
+  !define MUI_FINISHPAGE_SHOWREADME_TEXT "Faster startup (Defender exclusion)"
+  !define MUI_FINISHPAGE_SHOWREADME_FUNCTION GrandPoemStudioAddDefenderExclusion
+  !insertmacro MUI_PAGE_FINISH
+!macroend
+
 !macro customUnInstall
-  ; Remove Windows Defender exclusion added during install
-  nsExec::ExecToStack `"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "Remove-MpPreference -ExclusionPath '$INSTDIR' -ErrorAction SilentlyContinue"`
-  Pop $0
-  Pop $1
+  ; Remove the Windows Defender exclusion(s) added at install time.
+  ; Uses the shared helper so only the three known paths are removed — a user's
+  ; pre-existing exclusions are never touched.
+  InitPluginsDir
+  ClearErrors
+  File "/oname=$PLUGINSDIR\set-defender-exclusion.ps1" "${PROJECT_DIR}\resources\cli\win32\set-defender-exclusion.ps1"
+  IfFileExists "$PLUGINSDIR\set-defender-exclusion.ps1" 0 _cu_defender_done
+    nsExec::ExecToStack '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\set-defender-exclusion.ps1" -Action remove -InstallDir "$INSTDIR"'
+    Pop $0
+    Pop $1
+  _cu_defender_done:
 
   ; Remove resources\cli from user PATH via PowerShell so long PATH values are handled safely
   InitPluginsDir

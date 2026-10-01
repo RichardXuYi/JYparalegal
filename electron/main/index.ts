@@ -2,7 +2,7 @@
  * Electron Main Process Entry
  * Manages window creation, system tray, and IPC handlers
  */
-import { app, BrowserWindow, nativeImage, session, shell } from 'electron';
+import { app, BrowserWindow, nativeImage, nativeTheme, session, shell } from 'electron';
 import { join } from 'path';
 import { GatewayManager } from '../gateway/manager';
 import { registerIpcHandlers } from './ipc-handlers';
@@ -14,6 +14,7 @@ import { getWindowState, trackWindowState } from './window';
 
 import { appUpdater, registerUpdateHandlers } from './updater';
 import { logger } from '../utils/logger';
+import { markStartup, logStartupSummary } from '../utils/startup-timeline';
 import { warmupNetworkOptimization } from '../utils/uv-env';
 import { initTelemetry } from '../utils/telemetry';
 
@@ -51,11 +52,26 @@ import { ensureBuiltinSkillsInstalled, ensurePreinstalledSkillsInstalled, trimBu
 import { deviceOAuthManager } from '../utils/device-oauth';
 import { browserOAuthManager } from '../utils/browser-oauth';
 import { syncAllProviderAuthToRuntime } from '../services/providers/provider-runtime-sync';
+import { validateSessionForBoot, peekCachedAuthState } from '../services/backend-auth-api';
 
 const WINDOWS_APP_USER_MODEL_ID = 'app.grandpoem-studio.desktop';
 const isE2EMode = process.env.CLAWX_E2E === '1';
 const requestedUserDataDir = process.env.CLAWX_USER_DATA_DIR?.trim();
 const requestedRemoteDebuggingPort = process.env.CLAWX_REMOTE_DEBUGGING_PORT?.trim();
+
+// Installer-driven pre-warm mode.
+//
+// Goal: pay the one-time cold-start cost (V8 compile-cache population for the
+// ~10k-module OpenClaw tree, plus the OS/antivirus first pass over the install
+// directory) during installation instead of on the user's first click.
+//
+// Contract, because a user may launch the app while pre-warm is still running:
+//   - it never takes the Electron single-instance lock or the userData file lock
+//   - it never creates a window, tray, menu or IPC surface
+//   - it stops the Gateway before exiting
+// See docs/startup-performance-plan.md (scheme 5).
+const isPrewarmMode = process.env.GRANDPOEM_PREWARM === '1'
+  || process.argv.includes('--grandpoem-prewarm');
 
 // Dev only: the bundled OpenClaw binary may be older than whatever last wrote
 // the shared ~/.openclaw state dir (e.g. a newer global OpenClaw). The older
@@ -112,14 +128,17 @@ if (process.platform === 'linux') {
 // same port, then each treats the other's gateway as "orphaned" and kills
 // it —creating an infinite kill/restart loop on Windows.
 // The losing process must exit immediately so it never reaches Gateway startup.
-const gotElectronLock = isE2EMode ? true : app.requestSingleInstanceLock();
+//
+// Pre-warm deliberately opts out: it must never be able to block (or be blocked
+// by) the user's real launch, so it neither reads nor writes the instance locks.
+const gotElectronLock = (isE2EMode || isPrewarmMode) ? true : app.requestSingleInstanceLock();
 if (!gotElectronLock) {
   console.info('[GrandPoem Studio] Another instance already holds the single-instance lock; exiting duplicate process');
   app.exit(0);
 }
 let releaseProcessInstanceFileLock: () => void = () => {};
 let gotFileLock = true;
-if (gotElectronLock && !isE2EMode) {
+if (gotElectronLock && !isE2EMode && !isPrewarmMode) {
   try {
     const fileLock = acquireProcessInstanceFileLock({
       userDataDir: app.getPath('userData'),
@@ -157,6 +176,30 @@ function sendMainWindowEvent(channel: string, payload: unknown): void {
   const win = mainWindow;
   if (!win || win.isDestroyed()) return;
   win.webContents.send(channel, payload);
+}
+
+// Spawn the Gateway concurrently with the boot session validation by default.
+// Set to false to restore the strict "validate the session, THEN spawn" order if
+// a stale-scope double-boot is ever observed in the field. See `initialize()`.
+const PARALLEL_SESSION_VALIDATION_AT_BOOT = true;
+
+/**
+ * Sync provider credentials into the OpenClaw runtime and start the Gateway.
+ * Shared by both the parallel and serial auto-start paths so the failure
+ * handling stays identical. Resolves once the Gateway reports readiness; the
+ * boot session validation runs independently alongside it.
+ */
+async function startGatewayAuto(): Promise<void> {
+  try {
+    markStartup('gateway-spawn-requested');
+    await syncAllProviderAuthToRuntime();
+    logger.debug('Auto-starting Gateway...');
+    await gatewayManager.start();
+    logger.info('Gateway auto-start succeeded');
+  } catch (error) {
+    logger.error('Gateway auto-start failed:', error);
+    sendMainWindowEvent('gateway:error', String(error));
+  }
 }
 
 /**
@@ -223,7 +266,18 @@ async function createWindow(): Promise<BrowserWindow> {
       ? getMacTrafficLightPosition(false)
       : undefined,
     frame: isMac || !useCustomTitleBar,
-    show: false,
+    // Show immediately instead of waiting for `ready-to-show`.
+    //
+    // The main-process path to "window created" is ~200ms, but everything that
+    // still has to happen before a first paint (IPC registration, extension
+    // init, Gateway prelaunch) used to be invisible to the user. index.html
+    // ships a static `.app-init-loading` placeholder (public/bootstrap/
+    // loading.css), so an early window shows the branded loading screen rather
+    // than a blank frame. The background colour matches that placeholder to
+    // avoid a flash between window creation and first paint.
+    show: true,
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#0f0f23' : '#f8fafc',
+    paintWhenInitiallyHidden: true,
   });
 
   if (windowState.isMaximized) {
@@ -296,11 +350,18 @@ function focusMainWindow(): void {
 
 async function createMainWindow(): Promise<BrowserWindow> {
   const win = await createWindow();
+  markStartup('window-created');
+
+  win.webContents.on('did-finish-load', () => {
+    markStartup('renderer-loaded');
+  });
 
   win.once('ready-to-show', () => {
     if (mainWindow !== win) {
       return;
     }
+
+    markStartup('window-shown');
 
     if (process.platform === 'darwin') {
       void getSetting('sidebarCollapsed').then((sidebarCollapsed) => {
@@ -335,39 +396,166 @@ async function createMainWindow(): Promise<BrowserWindow> {
 }
 
 /**
+ * First-run / periodic maintenance that used to run at the same instant as the
+ * first frame and the Gateway cold boot. It is idempotent housekeeping, so it is
+ * safe to move behind the first paint and a short settle delay: doing so keeps
+ * disk I/O (and any antivirus scan it triggers) off the critical path to a
+ * usable UI.
+ */
+function scheduleDeferredStartupTasks(window: BrowserWindow, delayMs = 2500): void {
+  const run = (): void => {
+    markStartup('deferred-tasks-start');
+    void ensureGrandPoemStudioDefaultIdentity().catch((error) => {
+      logger.warn('Failed to seed default GrandPoem Studio identity:', error);
+    });
+    void repairGrandPoemStudioOnlyBootstrapFiles().catch((error) => {
+      logger.warn('Failed to repair bootstrap files:', error);
+    });
+    void ensureBuiltinSkillsInstalled().catch((error) => {
+      logger.warn('Failed to install built-in skills:', error);
+    });
+    void ensurePreinstalledSkillsInstalled().catch((error) => {
+      logger.warn('Failed to install preinstalled skills:', error);
+    });
+    void trimBundledOpenClawSkillsAndConfigs().then(({ removed, removedConfigs, kept }) => {
+      if (removed > 0 || removedConfigs > 0) {
+        logger.info(
+          `Trimmed bundled OpenClaw skills: removed ${removed}, pruned configs ${removedConfigs}, kept ${kept.join(', ')}`,
+        );
+      }
+    });
+  };
+
+  const schedule = (): void => {
+    const timer = setTimeout(run, delayMs);
+    timer.unref?.();
+  };
+
+  if (window.isDestroyed()) {
+    return;
+  }
+  if (window.webContents.isLoadingMainFrame()) {
+    window.webContents.once('did-finish-load', schedule);
+  } else {
+    schedule();
+  }
+}
+
+/**
+ * Pre-warm mode (installer driven, `--grandpoem-prewarm` or
+ * `GRANDPOEM_PREWARM=1`).
+ *
+ * Populates the Gateway's V8 compile cache (NODE_COMPILE_CACHE -> userData/
+ * openclaw-compile-cache, see gateway/process-launcher.ts) so the user's first
+ * real launch does not pay for compiling ~10k loose modules, and lets the OS /
+ * antivirus finish its first pass over the install tree.
+ *
+ * Never creates a window, never takes the single-instance lock, and stops the
+ * Gateway before exiting so a concurrent user launch is unaffected.
+ */
+async function runPrewarm(): Promise<void> {
+  const startedAt = Date.now();
+  markStartup('prewarm-start');
+  logger.info(`[prewarm] starting (pid=${process.pid}, userData=${app.getPath('userData')})`);
+
+  const timeoutMs = 90_000;
+
+  try {
+    await applyProxySettings();
+    await syncAllProviderAuthToRuntime();
+    await gatewayManager.start();
+    await Promise.race([
+      waitForGatewayReadyOnce(60_000),
+      new Promise<void>((resolve) => {
+        const timer = setTimeout(resolve, timeoutMs);
+        timer.unref?.();
+      }),
+    ]);
+    markStartup('prewarm-gateway-ready');
+  } catch (error) {
+    logger.warn('[prewarm] gateway warm-up failed (ignored):', error);
+  }
+
+  try {
+    await gatewayManager.stop();
+  } catch (error) {
+    logger.warn('[prewarm] failed to stop Gateway:', error);
+  }
+
+  logger.info(`[prewarm] done in ${Date.now() - startedAt}ms`);
+  markStartup('prewarm-done');
+
+  // Exit without running the normal quit lifecycle: pre-warm owns no window and
+  // no locks, and before-quit would block on Gateway cleanup it already did.
+  app.exit(0);
+}
+
+/**
  * Initialize the application
  */
 async function initialize(): Promise<void> {
   // Initialize logger first
   logger.init();
+
+  // First milestone: `uptime` here is the authoritative segment A measurement
+  // (real process start -> app.whenReady()). It is the only log line that can
+  // see the pre-whenReady cost, because everything before it has no logger.
+  // See docs/startup-performance-plan.md.
+  markStartup('whenReady');
   logger.info('=== GrandPoem Studio Application Starting ===');
   logger.debug(
     `Runtime: platform=${process.platform}/${process.arch}, electron=${process.versions.electron}, node=${process.versions.node}, packaged=${app.isPackaged}, pid=${process.pid}, ppid=${process.ppid}`
   );
 
+  // Installer-driven pre-warm: compile/cache the OpenClaw module graph and exit.
+  // Never creates a window and never touches the instance locks.
+  if (isPrewarmMode) {
+    await runPrewarm();
+    return;
+  }
+
   if (!isE2EMode) {
     // Warm up network optimization (non-blocking)
     void warmupNetworkOptimization();
-
-    // Initialize Telemetry early
-    await initTelemetry();
-
-    // Apply persisted proxy settings before creating windows or network requests.
-    await applyProxySettings();
-    await syncLaunchAtStartupSettingFromStore();
   } else {
     logger.info('Running in E2E mode: startup side effects minimized');
   }
 
   // Set application menu
   await createMenu();
+  markStartup('menu-ready');
 
-  // Create the main window
+  // Create the main window before any remaining side effect.
+  //
+  // Previously initTelemetry() / applyProxySettings() /
+  // syncLaunchAtStartupSettingFromStore() were awaited before the window
+  // existed, which delayed the first visible pixel by the sum of their
+  // latencies — including a synchronous REG.exe spawn on a first run
+  // (machineIdSync() in utils/telemetry.ts). The window now comes first; the
+  // renderer ships its own loading placeholder (index.html `.app-init-loading`).
   const window = await createMainWindow();
+
+  if (!isE2EMode) {
+    // Proxy settings must be applied before any network request. The window has
+    // only loaded local file:// content at this point, and the Gateway has not
+    // been spawned yet, so awaiting here is still early enough.
+    await applyProxySettings();
+
+    // These no longer gate the window.
+    void initTelemetry();
+    void syncLaunchAtStartupSettingFromStore();
+  }
 
   // Create system tray
   if (!isE2EMode) {
     createTray(window);
+  }
+
+  // First-run workspace/skill maintenance is deferred until after the first
+  // paint. It is pure housekeeping, but it used to start at the same instant as
+  // the first frame and the Gateway cold boot, competing for the same disk.
+  if (!isE2EMode) {
+    scheduleDeferredStartupTasks(window);
   }
 
   // Override security headers ONLY for the OpenClaw Gateway Control UI.
@@ -399,6 +587,7 @@ async function initialize(): Promise<void> {
 
   // Register IPC handlers
   registerIpcHandlers(gatewayManager, clawHubService, window, hostApiRegistry);
+  markStartup('ipc-ready');
 
   // Initialize extension system
   await extensionRegistry.initialize({
@@ -410,6 +599,7 @@ async function initialize(): Promise<void> {
       ),
     },
   });
+  markStartup('extensions-ready');
 
   // Wire marketplace provider to ClawHubService if an extension provides one
   const marketplaceProvider = extensionRegistry.getMarketplaceProvider();
@@ -423,54 +613,9 @@ async function initialize(): Promise<void> {
   // Note: Auto-check for updates is driven by the renderer (update store init)
   // so it respects the user's "Auto-check for updates" setting.
 
-  // Seed a stable default IDENTITY.md before the Gateway initializes the
-  // workspace so GrandPoem Studio desktop sessions skip OpenClaw's chat-first bootstrap.
-  if (!isE2EMode) {
-    void ensureGrandPoemStudioDefaultIdentity().catch((error) => {
-      logger.warn('Failed to seed default GrandPoem Studio identity:', error);
-    });
-  }
-
-  // Repair any bootstrap files that only contain GrandPoem Studio markers (no OpenClaw
-  // template content). This fixes a race condition where ensureGrandPoemStudioContext()
-  // previously created the file before the gateway could seed the full template.
-  if (!isE2EMode) {
-    void repairGrandPoemStudioOnlyBootstrapFiles().catch((error) => {
-      logger.warn('Failed to repair bootstrap files:', error);
-    });
-  }
-
-  // Pre-deploy built-in skills (feishu-doc, feishu-drive, feishu-perm, feishu-wiki)
-  // to ~/.openclaw/skills/ so they are immediately available without manual install.
-  if (!isE2EMode) {
-    void ensureBuiltinSkillsInstalled().catch((error) => {
-      logger.warn('Failed to install built-in skills:', error);
-    });
-  }
-
-  // Keep community builds aligned with GrandPoem-biz by physically trimming
-  // bundled OpenClaw consumer skills on startup (dev + packaged), keeping only
-  // `skill-creator`. This also prunes stale openclaw.json entries for trimmed
-  // bundled skills so we do not keep `enabled: false` config for skills that no
-  // longer exist.
-  if (!isE2EMode) {
-    void trimBundledOpenClawSkillsAndConfigs().then(({ removed, removedConfigs, kept }) => {
-      if (removed > 0 || removedConfigs > 0) {
-        logger.info(
-          `Trimmed bundled OpenClaw skills: removed ${removed}, pruned configs ${removedConfigs}, kept ${kept.join(', ')}`,
-        );
-      }
-    });
-  }
-
-  // Pre-deploy bundled third-party skills from resources/preinstalled-skills.
-  // This installs full skill directories (not only SKILL.md) in an idempotent,
-  // non-destructive way and never blocks startup.
-  if (!isE2EMode) {
-    void ensurePreinstalledSkillsInstalled().catch((error) => {
-      logger.warn('Failed to install preinstalled skills:', error);
-    });
-  }
+  // First-run workspace/skill maintenance now runs from
+  // scheduleDeferredStartupTasks() (after the first paint) instead of here —
+  // see the call site above and docs/startup-performance-plan.md (scheme 4.3).
 
   // Plugin installation is now configuration-driven:
   // - When a channel is added via UI: ensureXxxPluginInstalled() in IPC handlers
@@ -479,8 +624,14 @@ async function initialize(): Promise<void> {
 
   // Bridge gateway and host-side events before any auto-start logic runs, so
   // renderer subscribers observe the full startup lifecycle.
-  gatewayManager.on('status', (status: { state: string }) => {
+  let gatewayReadyMarked = false;
+  gatewayManager.on('status', (status: { state: string; gatewayReady?: boolean }) => {
     sendMainWindowEvent('gateway:status-changed', status);
+    if (!gatewayReadyMarked && status.state === 'running' && status.gatewayReady) {
+      gatewayReadyMarked = true;
+      markStartup('gateway-ready');
+      logStartupSummary('gateway-ready');
+    }
     if (status.state === 'running' && !isE2EMode) {
       void ensureGrandPoemStudioContext().catch((error) => {
         logger.warn('Failed to re-merge GrandPoem Studio context after gateway reconnect:', error);
@@ -548,22 +699,62 @@ async function initialize(): Promise<void> {
   // registerWhatsAppHandlers() (ipc-handlers.ts) with isDestroyed() guards.
   // Do NOT register duplicate listeners here.
 
-  // Start Gateway automatically (this seeds missing bootstrap files with full templates)
+  // Start Gateway automatically (this seeds missing bootstrap files with full templates).
+  //
+  // The Gateway cold boot (~15-25s) is the long pole on the path to "usable", so
+  // we begin it as early as safely possible. Two orderings:
+  //
+  //  - PARALLEL (default): decide auto-start from the persisted (cached) session
+  //    and spawn immediately, running the authoritative `validateSessionForBoot()`
+  //    round trip concurrently. If that check hits a DEFINITIVE 401 it already
+  //    clears auth and flips the OpenClaw scope via `applyScopeChange` (see
+  //    `resolveSessionState`), which the restart governor coalesces into a single
+  //    reboot. A merely-slow/erroring backend never logs us out (Phase 1.2), so
+  //    the common case boots the Gateway exactly once — just ~1-3s sooner, because
+  //    the backend round trip overlaps the boot instead of preceding it.
+  //
+  //  - SERIAL (fallback): validate BEFORE spawning so a stale scope is corrected
+  //    pre-flight. Flip PARALLEL_SESSION_VALIDATION_AT_BOOT to false to restore
+  //    this strict order if a stale-scope double-boot is ever observed.
   const gatewayAutoStart = await getSetting('gatewayAutoStart');
-  if (!isE2EMode && gatewayAutoStart) {
-    try {
-      await syncAllProviderAuthToRuntime();
-      logger.debug('Auto-starting Gateway...');
-      await gatewayManager.start();
-      logger.info('Gateway auto-start succeeded');
-    } catch (error) {
-      logger.error('Gateway auto-start failed:', error);
-      mainWindow?.webContents.send('gateway:error', String(error));
-    }
-  } else if (isE2EMode) {
+  if (isE2EMode) {
     logger.info('Gateway auto-start skipped in E2E mode');
-  } else {
+  } else if (!gatewayAutoStart) {
     logger.info('Gateway auto-start disabled in settings');
+  } else if (PARALLEL_SESSION_VALIDATION_AT_BOOT) {
+    // Kick the authoritative check (cached for the renderer's me() reuse) but do
+    // NOT await it before spawning: decide from the persisted session and start.
+    const validation = validateSessionForBoot();
+    const cachedSession = await peekCachedAuthState();
+    if (cachedSession.isAuthenticated) {
+      await startGatewayAuto();
+      // The boot-time check calls resolveSessionState(undefined) with no ctx, so
+      // a definitive 401 clears auth + flips the scope but cannot restart the
+      // Gateway itself. If it concluded logged-out, we optimistically spawned
+      // into a now-stale scope — reconcile by stopping it (mirrors the serial
+      // path's "don't run the Gateway while logged out"); login starts it fresh.
+      // The common authenticated case awaits the already-settled check and skips
+      // this, so we still save the pre-spawn round trip.
+      const authoritative = await validation;
+      if (!authoritative.isAuthenticated) {
+        logger.warn(
+          '[startup] boot session logged out during parallel spawn; stopping the optimistically-started Gateway',
+        );
+        await gatewayManager.stop().catch((error) => {
+          logger.warn('[startup] failed to stop Gateway after boot logout reconciliation:', error);
+        });
+      }
+    } else {
+      logger.info('Gateway auto-start deferred until login (no cached session at boot)');
+      await validation;
+    }
+  } else {
+    const bootSession = await validateSessionForBoot();
+    if (bootSession.isAuthenticated) {
+      await startGatewayAuto();
+    } else {
+      logger.info('Gateway auto-start deferred until login (no authenticated session at boot)');
+    }
   }
 
   // Merge GrandPoem Studio context snippets into the workspace bootstrap files.
@@ -575,17 +766,47 @@ async function initialize(): Promise<void> {
     });
   }
 
-  // Auto-install openclaw CLI and shell completions (non-blocking).
+  // Auto-install openclaw CLI and shell completions. Deferred until the Gateway
+  // is fully ready: generateCompletionCache() spawns a second full OpenClaw
+  // process that competes with the Gateway cold boot for disk/CPU (and, on
+  // Windows, antivirus scanning of the module tree), measurably slowing it down.
   if (!isE2EMode) {
-    void autoInstallCliIfNeeded((installedPath) => {
-      mainWindow?.webContents.send('openclaw:cli-installed', installedPath);
-    }).then(() => {
-      generateCompletionCache();
-      installCompletionToProfile();
-    }).catch((error) => {
-      logger.warn('CLI auto-install failed:', error);
+    void waitForGatewayReadyOnce().then(() => {
+      void autoInstallCliIfNeeded((installedPath) => {
+        mainWindow?.webContents.send('openclaw:cli-installed', installedPath);
+      }).then(() => {
+        generateCompletionCache();
+        installCompletionToProfile();
+      }).catch((error) => {
+        logger.warn('CLI auto-install failed:', error);
+      });
     });
   }
+}
+
+/**
+ * Resolves the first time the Gateway reaches running with subsystems ready
+ * (or after a safety timeout, so background setup is never blocked forever —
+ * e.g. when the user stays logged out and the Gateway never starts).
+ */
+function waitForGatewayReadyOnce(timeoutMs = 90_000): Promise<void> {
+  return new Promise<void>((resolve) => {
+    let settled = false;
+    const done = (): void => {
+      if (settled) return;
+      settled = true;
+      gatewayManager.off('status', onStatus);
+      clearTimeout(timer);
+      resolve();
+    };
+    const onStatus = (status: { state: string; gatewayReady?: boolean }): void => {
+      if (status.state === 'running' && status.gatewayReady) done();
+    };
+    const timer = setTimeout(done, timeoutMs);
+    gatewayManager.on('status', onStatus);
+    const current = gatewayManager.getStatus();
+    if (current.state === 'running' && current.gatewayReady) done();
+  });
 }
 
 if (gotTheLock) {

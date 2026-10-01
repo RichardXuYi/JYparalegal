@@ -1,9 +1,10 @@
-import { app, utilityProcess } from 'electron';
+import { utilityProcess } from 'electron';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { getOpenClawDir, getOpenClawEntryPath } from './paths';
 import { logger } from './logger';
 import { getUvMirrorEnv } from './uv-env';
+import { getBundledBinDirs } from './bundled-tool';
 
 const OPENCLAW_DOCTOR_TIMEOUT_MS = 60_000;
 const MAX_DOCTOR_OUTPUT_BYTES = 10 * 1024 * 1024;
@@ -58,13 +59,6 @@ function appendDoctorOutput(
   };
 }
 
-function getBundledBinPath(): string {
-  const target = `${process.platform}-${process.arch}`;
-  return app.isPackaged
-    ? path.join(process.resourcesPath, 'bin')
-    : path.join(process.cwd(), 'resources', 'bin', target);
-}
-
 async function runDoctorCommandWithArgs(
   mode: OpenClawDoctorMode,
   args: string[],
@@ -90,10 +84,10 @@ async function runDoctorCommandWithArgs(
     };
   }
 
-  const binPath = getBundledBinPath();
-  const binPathExists = existsSync(binPath);
+  const binDirs = getBundledBinDirs();
+  const binPathExists = binDirs.length > 0;
   const finalPath = binPathExists
-    ? `${binPath}${path.delimiter}${process.env.PATH || ''}`
+    ? `${binDirs.join(path.delimiter)}${path.delimiter}${process.env.PATH || ''}`
     : process.env.PATH || '';
   const uvEnv = await getUvMirrorEnv();
 

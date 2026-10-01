@@ -5,21 +5,20 @@ import { join } from 'path';
 import { getUvMirrorEnv } from './uv-env';
 import { logger } from './logger';
 import { quoteForCmd, needsWinShell } from './paths';
+import { getBundledBinDir, resolveBundledTool } from './bundled-tool';
 
 /**
- * Get the path to the bundled uv binary
+ * Get the path to the bundled uv binary.
+ *
+ * Packaged builds ship `uv` inside the lazy `bin/tools` archive
+ * (see utils/lazy-asset.ts and docs/startup-performance-plan.md, scheme 2.3),
+ * so resolving it may extract that archive on first use. The plain
+ * `resources/bin` layout is still the fallback for dev builds.
  */
 function getBundledUvPath(): string {
-  const platform = process.platform;
-  const arch = process.arch;
-  const target = `${platform}-${arch}`;
-  const binName = platform === 'win32' ? 'uv.exe' : 'uv';
-
-  if (app.isPackaged) {
-    return join(process.resourcesPath, 'bin', binName);
-  } else {
-    return join(process.cwd(), 'resources', 'bin', target, binName);
-  }
+  const binName = process.platform === 'win32' ? 'uv.exe' : 'uv';
+  const resolved = resolveBundledTool('uv');
+  return resolved ?? join(getBundledBinDir(), binName);
 }
 
 /**

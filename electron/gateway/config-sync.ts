@@ -1,4 +1,4 @@
-﻿import { app } from 'electron';
+import { app } from 'electron';
 import path from 'path';
 import { existsSync, readFileSync, mkdirSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'fs';
 import { join } from 'path';
@@ -40,6 +40,7 @@ import { buildProxyEnv, resolveProxySettings } from '../utils/proxy';
 import { syncProxyConfigToOpenClaw } from '../utils/openclaw-proxy';
 import { logger } from '../utils/logger';
 import { prependPathEntry } from '../utils/env-path';
+import { getBundledBinDirs, withBundledBinPath } from '../utils/bundled-tool';
 import { copyPluginFromNodeModules, fixupPluginManifest, cpSyncSafe, buildCandidateSources, repairTrustedOfficialPluginInstallRecords, syncTrustedOfficialPluginInstallRecord, resolvePluginNpmPackagePath } from '../utils/plugin-install';
 import { CLAWX_OPENAI_IMAGE_PROVIDER_KEY } from '../utils/openclaw-image-relay-constants';
 import { stripSystemdSupervisorEnv } from './config-sync-env';
@@ -683,13 +684,11 @@ export async function prepareGatewayLaunchContext(port: number): Promise<Gateway
   const gatewayArgs = ['gateway', '--port', String(port), '--token', appSettings.gatewayToken, '--allow-unconfigured'];
   const mode = app.isPackaged ? 'packaged' : 'dev';
 
-  const platform = process.platform;
-  const arch = process.arch;
-  const target = `${platform}-${arch}`;
-  const binPath = app.isPackaged
-    ? path.join(process.resourcesPath, 'bin')
-    : path.join(process.cwd(), 'resources', 'bin', target);
-  const binPathExists = existsSync(binPath);
+  // Bundled tools (node is always unpacked; uv / agent-browser may come from the
+  // lazy `bin/tools` archive once extracted). Resolve through the shared helper
+  // so the Gateway PATH never silently loses uv after the archive change.
+  const binDirs = getBundledBinDirs();
+  const binPathExists = binDirs.length > 0;
 
   const { providerEnv, loadedProviderKeyCount } = await measureAsync(timingsMs, 'providerEnvMs', loadProviderEnv);
   const { skipChannels, channelStartupSummary } = await measureAsync(
@@ -706,9 +705,7 @@ export async function prepareGatewayLaunchContext(port: number): Promise<Gateway
 
   const { NODE_OPTIONS: _nodeOptions, ...baseEnv } = process.env;
   const baseEnvRecord = baseEnv as Record<string, string | undefined>;
-  const baseEnvPatched = binPathExists
-    ? prependPathEntry(baseEnvRecord, binPath).env
-    : baseEnvRecord;
+  const baseEnvPatched = withBundledBinPath(baseEnvRecord, prependPathEntry);
   const forkEnv: Record<string, string | undefined> = {
     ...stripSystemdSupervisorEnv(baseEnvPatched),
     ...providerEnv,
