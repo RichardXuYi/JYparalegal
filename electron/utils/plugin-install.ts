@@ -12,7 +12,8 @@ import { readdir, stat, copyFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { logger } from './logger';
 import { getOpenClawConfigDir } from './paths';
-import { ensureLazyAssetExtracted } from './lazy-asset';
+import { extractAvailablePluginArchive } from '../services/plugin-archive-service';
+import { auditAndRepairSharedDeps, provisionSharedDeps } from './plugin-shared-deps';
 import { upsertPluginInstallRecordsIntoSqlite, ensureOpenClawStateDirExists } from './plugin-install-index';
 
 function normalizeFsPathForWindows(filePath: string): string {
@@ -575,6 +576,18 @@ export function ensurePluginInstalled(
         }
         fixupPluginManifest(targetDir);
         syncTrustedOfficialPluginInstallRecord(pluginDirName, targetDir);
+
+        // Build-time dedup stripped the packages the runtime already bundles;
+        // put them back where this mirror can resolve them (the shared
+        // ~/.openclaw/extensions/node_modules root).
+        const provisioned = provisionSharedDeps(targetDir, extensionsRoot);
+        if (provisioned.missing.length > 0) {
+          logger.warn(
+            `[plugin] ${pluginLabel} plugin is missing ${provisioned.missing.length} shared ` +
+            `dependencies that the runtime bundle does not provide: ${provisioned.missing.join(', ')}`,
+          );
+        }
+
         logger.info(`Installed ${pluginLabel} plugin from bundled mirror: ${sourceDir}`);
         return { installed: true };
       } catch (error) {
@@ -670,7 +683,8 @@ export function ensurePluginInstalled(
  *          shipped as an archive (dev builds, or a build without the archives).
  */
 function resolveLazyPluginDir(pluginDirName: string): string | null {
-  return ensureLazyAssetExtracted(`openclaw-plugins/${pluginDirName}`);
+  // Handles both shipped archives and downloaded ones (plugin-archive-service.ts).
+  return extractAvailablePluginArchive(pluginDirName);
 }
 
 export function buildCandidateSources(pluginDirName: string): string[] {
@@ -773,4 +787,13 @@ export async function ensureAllBundledPluginsInstalled(): Promise<void> {
     }
   }
   repairTrustedOfficialPluginInstallRecords();
+
+  // Safety net for the build-time forced dedup: make sure every installed mirror
+  // can still resolve the packages it no longer carries. See
+  // electron/utils/plugin-shared-deps.ts.
+  try {
+    auditAndRepairSharedDeps(join(getOpenClawConfigDir(), 'extensions'));
+  } catch (error) {
+    logger.warn('[plugin] Shared dependency audit failed:', error);
+  }
 }

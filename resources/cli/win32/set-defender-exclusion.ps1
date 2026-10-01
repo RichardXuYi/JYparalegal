@@ -112,11 +112,13 @@ if (-not (Test-IsAdministrator)) {
 
 try {
   # Keep the exclusion list as narrow as possible: the install directory, the
-  # per-user app data, and the OpenClaw state directory. Never the whole disk or
-  # the whole user profile.
+  # per-user app data (both Roaming and Local — the downloaded OpenClaw runtime
+  # and lazy archives live under %LOCALAPPDATA%), and the OpenClaw state
+  # directory. Never the whole disk or the whole user profile.
   $targets = @(
     $InstallDir,
     (Join-Path $env:APPDATA 'grandpoem-studio'),
+    (Join-Path $env:LOCALAPPDATA 'grandpoem-studio'),
     (Join-Path $env:USERPROFILE '.openclaw')
   ) | Where-Object { $_ -and (Test-Path -LiteralPath $_) }
 

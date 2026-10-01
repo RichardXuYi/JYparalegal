@@ -75,6 +75,23 @@
       "hintWarm": "The app will be ready as soon as the engine starts. Please hold on.",
       "skip": "Enter the app"
     },
+    "runtime": {
+      "preparing": "Preparing the runtime…",
+      "needsDownload": "The OpenClaw runtime needs to be downloaded (about {{size}})",
+      "downloading": "Downloading the runtime {{received}} / {{total}}",
+      "verifying": "Verifying the download…",
+      "extracting": "Extracting the runtime ({{count}} files so far)…",
+      "activating": "Activating the runtime…",
+      "consentAccept": "Download",
+      "consentDecline": "Later",
+      "cancel": "Cancel",
+      "retry": "Retry",
+      "import": "Choose a local archive",
+      "declined": "Download skipped. You can start it again later from Settings.",
+      "noManifest": "This build has no runtime download URL; install the runtime manually.",
+      "versionInfo": "Installed {{installed}} · needs {{desired}}",
+      "versionWanted": "Needs version {{desired}}"
+    },
     "popover": {
       "title": "Gateway status",
       "state": "State",

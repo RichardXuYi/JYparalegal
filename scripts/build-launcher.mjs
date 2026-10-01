@@ -53,6 +53,8 @@ const compiler = compilerCandidates.find((candidate) => existsSync(candidate));
 
 if (!compiler) {
   log('skipped: the in-box .NET Framework C# compiler (csc.exe) was not found');
+  log('         the installer will fall back to the PowerShell transition window');
+  log('         (resources/cli/win32/launch-transition-window.vbs + transition-window.ps1)');
   process.exit(0);
 }
 

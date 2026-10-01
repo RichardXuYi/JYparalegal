@@ -74,6 +74,23 @@
       "hintWarm": "L'application sera prête dès que le moteur sera lancé. Veuillez patienter.",
       "skip": "Ouvrir l'application"
     },
+    "runtime": {
+      "preparing": "Préparation de l'environnement d'exécution…",
+      "needsDownload": "L'environnement d'exécution OpenClaw doit être téléchargé (environ {{size}})",
+      "downloading": "Téléchargement de l'environnement {{received}} / {{total}}",
+      "verifying": "Vérification du téléchargement…",
+      "extracting": "Extraction de l'environnement ({{count}} fichiers jusqu'ici)…",
+      "activating": "Activation de l'environnement…",
+      "consentAccept": "Télécharger",
+      "consentDecline": "Plus tard",
+      "cancel": "Annuler",
+      "retry": "Réessayer",
+      "import": "Choisir une archive locale",
+      "declined": "Téléchargement ignoré. Vous pourrez le relancer plus tard dans les paramètres.",
+      "noManifest": "Cette version n'inclut pas d'URL de téléchargement ; installez l'environnement manuellement.",
+      "versionInfo": "Installé {{installed}} · requis {{desired}}",
+      "versionWanted": "Version requise {{desired}}"
+    },
     "popover": {
       "title": "État de la passerelle",
       "state": "État",

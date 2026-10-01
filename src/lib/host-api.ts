@@ -25,6 +25,9 @@ import type {
   ProviderValidationPayload,
   ReadAttachmentBinaryPayload,
   ResolveAttachmentPayload,
+  RuntimeImportPayload,
+  RuntimeInstallPayload,
+  RuntimeRollbackPayload,
   SaveImagePayload,
   SettingsKey,
   SettingsSnapshot,
@@ -78,6 +81,13 @@ export type {
   ProviderAccountKeyInfo,
   ProviderDefaultAccountResult,
   ProviderValidationResult,
+  RuntimeActionResult,
+  RuntimeConsent,
+  RuntimeManifestView,
+  RuntimePhase,
+  RuntimeProgress,
+  RuntimeState,
+  RuntimeStatus,
   SessionHistoryResult,
   SessionLabelSummary,
   SessionSummariesResult,
@@ -114,6 +124,29 @@ export const hostApi = {
     applyStartupAcceleration: () => invokeHost('app', 'applyStartupAcceleration'),
     removeStartupAcceleration: () => invokeHost('app', 'removeStartupAcceleration'),
     openDefenderSettings: () => invokeHost('app', 'openDefenderSettings'),
+  },
+  // OpenClaw runtime provisioning (download / import / rollback).
+  // See docs/startup-performance-plan.md.
+  runtime: {
+    status: () => invokeHost('runtime', 'status'),
+    manifest: () => invokeHost('runtime', 'manifest'),
+    install: (consent?: boolean) => invokeHost(
+      'runtime',
+      'install',
+      consent === undefined ? {} : ({ consent } satisfies RuntimeInstallPayload),
+    ),
+    cancel: () => invokeHost('runtime', 'cancel'),
+    rollback: (version?: string) => invokeHost(
+      'runtime',
+      'rollback',
+      version ? ({ version } satisfies RuntimeRollbackPayload) : {},
+    ),
+    importArchive: (path: string) => invokeHost(
+      'runtime',
+      'importArchive',
+      { path } satisfies RuntimeImportPayload,
+    ),
+    revealFolder: () => invokeHost('runtime', 'revealFolder'),
   },
   openclaw: {
     status: () => invokeHost('openclaw', 'status'),

@@ -61,6 +61,11 @@ const onAppEvent = <E extends HostEventName<'app'>>(
   handler: HostEventHandler<'app', E>,
 ) => onIpc(HOST_EVENT_CHANNELS.app[event], handler);
 
+const onRuntimeEvent = <E extends HostEventName<'runtime'>>(
+  event: E,
+  handler: HostEventHandler<'runtime', E>,
+) => onIpc(HOST_EVENT_CHANNELS.runtime[event], handler);
+
 export const hostEvents = {
   onGatewayStatus: (handler: HostEventHandler<'gateway', 'statusChanged'>) => (
     onGatewayEvent('statusChanged', handler)
@@ -115,4 +120,14 @@ export const hostEvents = {
   onOpenClawCliInstalled: (
     handler: HostEventHandler<'app', 'openClawCliInstalled'>,
   ) => onAppEvent('openClawCliInstalled', handler),
+  // OpenClaw runtime provisioning progress (see docs/startup-performance-plan.md).
+  onRuntimeProgress: (handler: HostEventHandler<'runtime', 'progress'>) => (
+    onRuntimeEvent('progress', handler)
+  ),
+  onRuntimeStateChanged: (handler: HostEventHandler<'runtime', 'stateChanged'>) => (
+    onRuntimeEvent('stateChanged', handler)
+  ),
+  onRuntimeLog: (handler: HostEventHandler<'runtime', 'log'>) => (
+    onRuntimeEvent('log', handler)
+  ),
 };

@@ -74,6 +74,23 @@
       "hintWarm": "Die App ist einsatzbereit, sobald die Engine läuft. Bitte kurz gedulden.",
       "skip": "App öffnen"
     },
+    "runtime": {
+      "preparing": "Laufzeitumgebung wird vorbereitet…",
+      "needsDownload": "Die OpenClaw-Laufzeitumgebung muss heruntergeladen werden (ca. {{size}})",
+      "downloading": "Laufzeitumgebung wird geladen {{received}} / {{total}}",
+      "verifying": "Download wird geprüft…",
+      "extracting": "Laufzeitumgebung wird entpackt ({{count}} Dateien bisher)…",
+      "activating": "Laufzeitumgebung wird aktiviert…",
+      "consentAccept": "Herunterladen",
+      "consentDecline": "Später",
+      "cancel": "Abbrechen",
+      "retry": "Erneut versuchen",
+      "import": "Lokales Archiv wählen",
+      "declined": "Download übersprungen. Sie können ihn später in den Einstellungen starten.",
+      "noManifest": "Dieser Build enthält keine Download-URL; installieren Sie die Laufzeitumgebung manuell.",
+      "versionInfo": "Installiert {{installed}} · benötigt {{desired}}",
+      "versionWanted": "Benötigt Version {{desired}}"
+    },
     "popover": {
       "title": "Gateway-Status",
       "state": "Zustand",

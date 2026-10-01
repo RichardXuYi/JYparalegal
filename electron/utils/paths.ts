@@ -5,7 +5,7 @@
 import { createRequire } from 'node:module';
 import { join } from 'path';
 import { homedir } from 'os';
-import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'fs';
 import { getScopedOpenClawDir } from './user-scope';
 
 const require = createRequire(import.meta.url);
@@ -141,16 +141,121 @@ export function getPreloadPath(): string {
 }
 
 /**
- * Get OpenClaw package directory
- * - Production (packaged): from resources/openclaw (copied by electron-builder extraResources)
- * - Development: from node_modules/openclaw
+ * Root directory for downloaded OpenClaw runtimes.
+ *
+ * Deliberately NOT under `userData`: on Windows `userData` is Roaming
+ * (`%APPDATA%`), and a ~850 MB runtime would be synchronised with the roaming
+ * profile. `%LOCALAPPDATA%` is machine-local, writable without elevation, and
+ * survives (or is cleaned by) the uninstaller's existing app-data handling.
  */
-export function getOpenClawDir(): string {
+export function getRuntimeRootDir(): string {
+  if (process.platform === 'win32') {
+    const localAppData = process.env.LOCALAPPDATA?.trim();
+    if (localAppData) {
+      return join(localAppData, 'grandpoem-studio', 'runtime');
+    }
+  }
+  return join(getElectronApp().getPath('userData'), 'runtime');
+}
+
+/** Pointer file recording which runtime version is active. */
+export function getActiveRuntimePointerPath(): string {
+  return join(getRuntimeRootDir(), 'current.json');
+}
+
+export interface ActiveRuntimePointer {
+  version: string;
+  dir: string;
+  sha256?: string;
+  installedAt?: string;
+  source?: 'download' | 'import' | 'bundled';
+}
+
+/** True when a directory looks like a usable OpenClaw runtime tree. */
+export function isRuntimeDirUsable(dir: string): boolean {
+  return existsSync(join(dir, 'package.json')) && existsSync(join(dir, 'openclaw.mjs'));
+}
+
+/**
+ * Read the active-runtime pointer, validating that the target directory is
+ * still a usable runtime tree. A stale pointer (uninstalled, half-extracted,
+ * user deleted the folder) resolves to null so callers fall back to the
+ * bundled runtime instead of failing the Gateway launch.
+ */
+export function readActiveRuntimePointer(): ActiveRuntimePointer | null {
+  try {
+    const raw = readFileSync(getActiveRuntimePointerPath(), 'utf-8');
+    const parsed = JSON.parse(raw) as Partial<ActiveRuntimePointer>;
+    if (typeof parsed?.dir !== 'string' || !parsed.dir) return null;
+    if (!isRuntimeDirUsable(parsed.dir)) return null;
+    return {
+      version: typeof parsed.version === 'string' ? parsed.version : '',
+      dir: parsed.dir,
+      sha256: typeof parsed.sha256 === 'string' ? parsed.sha256 : undefined,
+      installedAt: typeof parsed.installedAt === 'string' ? parsed.installedAt : undefined,
+      source: parsed.source,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Write the active-runtime pointer (used by the runtime installer service). */
+export function writeActiveRuntimePointer(pointer: ActiveRuntimePointer): void {
+  const target = getActiveRuntimePointerPath();
+  mkdirSync(getRuntimeRootDir(), { recursive: true });
+  writeFileSync(target, JSON.stringify(pointer, null, 2), 'utf-8');
+}
+
+/** Remove the active-runtime pointer (rollback to the bundled runtime). */
+export function clearActiveRuntimePointer(): void {
+  try {
+    rmSync(getActiveRuntimePointerPath(), { force: true });
+  } catch {
+    // best effort
+  }
+}
+
+/**
+ * The runtime shipped inside the application package.
+ * - Packaged: resources/openclaw (electron-builder extraResources)
+ * - Development: node_modules/openclaw
+ */
+export function getBundledOpenClawDir(): string {
   if (getElectronApp().isPackaged) {
     return join(process.resourcesPath, 'openclaw');
   }
-  // Development: use node_modules/openclaw
   return join(__dirname, '../../node_modules/openclaw');
+}
+
+export type OpenClawDirSource = 'override' | 'downloaded' | 'bundled';
+
+/**
+ * Resolve where the OpenClaw runtime lives, in priority order:
+ *
+ *   1. `GRANDPOEM_RUNTIME_DIR` — explicit override (tests, fleet workers,
+ *      mirrors of the existing `GP_GATEWAY_ENTRY_OVERRIDE` escape hatch)
+ *   2. the downloaded runtime recorded in `runtime/current.json`
+ *   3. the runtime bundled in the application package (today's behaviour)
+ *
+ * This stays a single chokepoint on purpose: every consumer
+ * (`getOpenClawEntryPath`, `getRuntimeModuleResolvers`, config-sync, doctor…)
+ * resolves through here, so switching runtime source never needs a second
+ * code path.
+ */
+export function getOpenClawDir(): string {
+  const override = process.env.GRANDPOEM_RUNTIME_DIR?.trim();
+  if (override) return override;
+  const active = readActiveRuntimePointer();
+  if (active) return active.dir;
+  return getBundledOpenClawDir();
+}
+
+/** Which of the three sources `getOpenClawDir()` resolves to right now. */
+export function getOpenClawDirSource(): OpenClawDirSource {
+  if (process.env.GRANDPOEM_RUNTIME_DIR?.trim()) return 'override';
+  if (readActiveRuntimePointer()) return 'downloaded';
+  return 'bundled';
 }
 
 /**
@@ -220,6 +325,8 @@ export interface OpenClawStatus {
   entryPath: string;
   dir: string;
   version?: string;
+  /** Where the runtime was resolved from (bundled package vs downloaded). */
+  source?: OpenClawDirSource;
 }
 
 export function getOpenClawStatus(): OpenClawStatus {
@@ -243,6 +350,7 @@ export function getOpenClawStatus(): OpenClawStatus {
     entryPath: getOpenClawEntryPath(),
     dir,
     version,
+    source: getOpenClawDirSource(),
   };
 
   try {

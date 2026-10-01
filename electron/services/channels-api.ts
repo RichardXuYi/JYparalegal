@@ -34,6 +34,7 @@ import {
   ensureWeComPluginInstalled,
   ensureWhatsAppPluginInstalled,
 } from '../utils/plugin-install';
+import { ensurePluginArchiveCached } from './plugin-archive-service';
 import {
   computeChannelRuntimeStatus,
   pickChannelRuntimeStatus,
@@ -1099,8 +1100,31 @@ async function ensureChannelPluginInstalled(storedChannelType: string): Promise<
     feishu: ensureFeishuPluginInstalled,
     [OPENCLAW_WECHAT_CHANNEL_TYPE]: ensureWeChatPluginInstalled,
   };
+  // Plugin archive ids as used by plugin-install.ts (the mirror directory names).
+  const archiveIds: Record<string, string> = {
+    dingtalk: 'dingtalk',
+    wecom: 'wecom',
+    discord: 'discord',
+    qqbot: 'qqbot',
+    whatsapp: 'whatsapp',
+    feishu: 'feishu-openclaw-plugin',
+    [OPENCLAW_WECHAT_CHANNEL_TYPE]: 'openclaw-weixin',
+  };
+
   const install = installers[storedChannelType];
   if (!install) return;
+
+  // A build may ship no plugin archives at all (download mode): fetch and verify
+  // the one this channel needs before the synchronous install/extract step.
+  // No-op when the archive is bundled or already cached.
+  const pluginId = archiveIds[storedChannelType];
+  if (pluginId) {
+    const archive = await ensurePluginArchiveCached(pluginId);
+    if (!archive.ok) {
+      throw new Error(archive.error || `${toUiChannelType(storedChannelType)} plugin archive is unavailable`);
+    }
+  }
+
   const result = await install();
   if (!result.installed) {
     throw new Error(result.warning || `${toUiChannelType(storedChannelType)} plugin install failed`);

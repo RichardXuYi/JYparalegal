@@ -47,6 +47,8 @@ import { appUpdater } from './updater';
 import { GatewayRpcBackpressure } from '../gateway/rpc-backpressure';
 import { HostApiRegistry, registerHostInvokeHandler } from './ipc/host-invoke';
 import { createAppApi } from '../services/app-api';
+import { createRuntimeApi } from '../services/runtime-api';
+import { HOST_EVENT_CHANNELS } from '@shared/host-events/contract';
 import { createOpenClawApi } from '../services/openclaw-api';
 import { createShellApi } from '../services/shell-api';
 import { createDialogApi } from '../services/dialog-api';
@@ -166,8 +168,33 @@ function registerTypedHostHandlers(
   // Stateless: the kit and managed Python are resolved lazily on first use.
   const skillHubService = new SkillHubService();
 
+  // Runtime provisioning emits progress/state events; the renderer's boot screen
+  // renders them. Channels are whitelisted in preload via HOST_EVENT_CHANNELS.
+  const sendRuntimeEvent = (channel: string, payload: unknown): void => {
+    if (mainWindow.isDestroyed()) return;
+    mainWindow.webContents.send(channel, payload);
+  };
+
   hostApiRegistry.registerCoreServices({
     app: createAppApi(),
+    runtime: createRuntimeApi({
+      progress: (payload) => sendRuntimeEvent(HOST_EVENT_CHANNELS.runtime.progress, payload),
+      stateChanged: (payload) => {
+        sendRuntimeEvent(HOST_EVENT_CHANNELS.runtime.stateChanged, payload);
+        // A usable runtime is exactly what the Gateway was waiting for: start it
+        // here so the boot screen's promise ("the app will be ready") completes
+        // without the user relaunching. Applies to download, import and rollback.
+        if (payload.state === 'ready') {
+          const current = gatewayManager.getStatus();
+          if (current.state === 'stopped' || current.state === 'failed') {
+            void gatewayManager.restart().catch((error) => {
+              logger.warn('[runtime] failed to start the gateway after runtime activation:', error);
+            });
+          }
+        }
+      },
+      log: (payload) => sendRuntimeEvent(HOST_EVENT_CHANNELS.runtime.log, payload),
+    }),
     openclaw: createOpenClawApi(),
     shell: createShellApi(),
     dialog: createDialogApi(),

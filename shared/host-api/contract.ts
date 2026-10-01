@@ -57,12 +57,96 @@ export type StartupAccelerationResult = HostSuccess & {
   code?: StartupAccelerationErrorCode;
 };
 
+/**
+ * OpenClaw runtime provisioning.
+ *
+ * The shell ships a build-time manifest pinning the runtime version it expects
+ * (`runtime-manifest.json`). The runtime itself can be bundled in the package or
+ * downloaded on demand into `%LOCALAPPDATA%\grandpoem-studio\runtime\<version>`.
+ * See docs/startup-performance-plan.md.
+ */
+export type RuntimeState =
+  | 'unknown'
+  | 'ready'
+  | 'missing'
+  | 'version-mismatch'
+  | 'downloading'
+  | 'verifying'
+  | 'extracting'
+  | 'activating'
+  | 'failed';
+
+export type RuntimeReadinessReason = 'ok' | 'missing' | 'version-mismatch' | 'no-manifest';
+export type RuntimeSource = 'override' | 'downloaded' | 'bundled';
+export type RuntimeConsent = 'granted' | 'denied' | 'unset';
+
+export type RuntimePhase =
+  | 'resolving'
+  | 'downloading'
+  | 'verifying'
+  | 'extracting'
+  | 'activating'
+  | 'done';
+
+export type RuntimeProgress = {
+  phase: RuntimePhase;
+  receivedBytes: number;
+  /** Null when the server did not announce a content length. */
+  totalBytes: number | null;
+  extractedEntries: number;
+  /** Expected file count from the manifest, when known. */
+  totalFiles: number | null;
+  bytesPerSecond?: number;
+  message?: string;
+};
+
+export type RuntimeStatus = {
+  state: RuntimeState;
+  ready: boolean;
+  reason: RuntimeReadinessReason;
+  source: RuntimeSource;
+  dir: string;
+  installedVersion: string | null;
+  desiredVersion: string | null;
+  manifestPresent: boolean;
+  consent: RuntimeConsent;
+  /** Versions present on disk, newest first. */
+  installedVersions: string[];
+  /** Present while a download/verify/extract run is in progress. */
+  progress?: RuntimeProgress;
+  error?: string;
+};
+
+/** Public view of the build-time manifest, for "約 XXX MB" style copy. */
+export type RuntimeManifestView = {
+  runtimeVersion: string;
+  platform?: string;
+  arch?: string;
+  archiveUrl?: string;
+  sha256?: string;
+  size?: number;
+  fileCount?: number;
+  minShellVersion?: string;
+};
+
+export type RuntimeInstallPayload = { consent?: boolean };
+export type RuntimeRollbackPayload = { version?: string };
+export type RuntimeImportPayload = { path: string };
+export type RuntimeActionResult = HostSuccess & { status: RuntimeStatus };
+export type RuntimeManifestResult = HostSuccess & { manifest: RuntimeManifestView | null };
+
 export type OpenClawStatusResult = {
   packageExists: boolean;
   isBuilt: boolean;
   entryPath: string;
   dir: string;
   version?: string;
+  /**
+   * Where the runtime was resolved from: the runtime bundled in the application
+   * package, a downloaded runtime, or an explicit env override.
+   * See docs/startup-performance-plan.md (runtime download plan).
+   */
+  source?: 'override' | 'downloaded' | 'bundled';
 };
 export type OpenClawCliCommandResult = HostSuccess & { command?: string };
 
@@ -926,6 +1010,15 @@ export type HostApiContract = {
     applyStartupAcceleration: () => StartupAccelerationResult;
     removeStartupAcceleration: () => StartupAccelerationResult;
     openDefenderSettings: () => HostSuccess;
+  };
+  runtime: {
+    status: () => RuntimeStatus;
+    manifest: () => RuntimeManifestResult;
+    install: (payload: RuntimeInstallPayload) => RuntimeActionResult;
+    cancel: () => RuntimeActionResult;
+    rollback: (payload: RuntimeRollbackPayload) => RuntimeActionResult;
+    importArchive: (payload: RuntimeImportPayload) => RuntimeActionResult;
+    revealFolder: () => HostSuccess;
   };
   openclaw: {
     status: () => OpenClawStatusResult;

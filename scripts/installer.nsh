@@ -404,26 +404,39 @@ FunctionEnd
 
   _ci_done:
 
-  ; Repoint the shortcuts at the splash launcher when it was built.
+  ; Repoint the shortcuts at a splash bootstrap when one is available.
   ;
-  ; The launcher paints instantly, while the ~200 MB unsigned main executable is
-  ; still being scanned and loaded - a period in which the app itself cannot draw
-  ; anything. electron-builder creates the shortcuts earlier in this section, so
-  ; overwriting them here is safe. Absent launcher (non-Windows build, or the
-  ; in-box C# compiler was unavailable) => shortcuts stay as-is.
+  ; Two implementations exist, in order of preference:
+  ;   1. resources\bin\grandpoem-launcher.exe — a ~430 KB compiled WinForms
+  ;      splash (scripts/build-launcher.mjs; needs the in-box C# compiler)
+  ;   2. a wscript relay + PowerShell WinForms window (the pattern WorkBuddy
+  ;      ships), used when the compiler was unavailable at build time
+  ; Both only make the wait visible; neither changes how long startup takes.
   ; See docs/startup-performance-plan.md (scheme 3b).
+  StrCpy $R5 ""
+  StrCpy $R4 ""
+  StrCpy $R3 "$INSTDIR\${APP_EXECUTABLE_FILENAME}"
+
   ${if} ${FileExists} "$INSTDIR\resources\bin\grandpoem-launcher.exe"
+    StrCpy $R5 "$INSTDIR\resources\bin\grandpoem-launcher.exe"
     DetailPrint "Pointing shortcuts at the splash launcher..."
+  ${elseIf} ${FileExists} "$INSTDIR\cli\launch-transition-window.vbs"
+    StrCpy $R5 "$SYSDIR\wscript.exe"
+    StrCpy $R4 '"$INSTDIR\cli\launch-transition-window.vbs" "$INSTDIR\cli\transition-window.ps1" "$INSTDIR\${APP_EXECUTABLE_FILENAME}"'
+    DetailPrint "Pointing shortcuts at the PowerShell transition window..."
+  ${endIf}
+
+  ${if} $R5 != ""
     ${if} ${FileExists} "$DESKTOP\${SHORTCUT_NAME}.lnk"
-      CreateShortCut "$DESKTOP\${SHORTCUT_NAME}.lnk" "$INSTDIR\resources\bin\grandpoem-launcher.exe" "" "$INSTDIR\resources\bin\grandpoem-launcher.exe" 0
+      CreateShortCut "$DESKTOP\${SHORTCUT_NAME}.lnk" "$R5" "$R4" "$R3" 0
     ${endIf}
     !ifdef MENU_FILENAME
       ${if} ${FileExists} "$SMPROGRAMS\${MENU_FILENAME}\${SHORTCUT_NAME}.lnk"
-        CreateShortCut "$SMPROGRAMS\${MENU_FILENAME}\${SHORTCUT_NAME}.lnk" "$INSTDIR\resources\bin\grandpoem-launcher.exe" "" "$INSTDIR\resources\bin\grandpoem-launcher.exe" 0
+        CreateShortCut "$SMPROGRAMS\${MENU_FILENAME}\${SHORTCUT_NAME}.lnk" "$R5" "$R4" "$R3" 0
       ${endIf}
     !endif
     ${if} ${FileExists} "$SMPROGRAMS\${SHORTCUT_NAME}.lnk"
-      CreateShortCut "$SMPROGRAMS\${SHORTCUT_NAME}.lnk" "$INSTDIR\resources\bin\grandpoem-launcher.exe" "" "$INSTDIR\resources\bin\grandpoem-launcher.exe" 0
+      CreateShortCut "$SMPROGRAMS\${SHORTCUT_NAME}.lnk" "$R5" "$R4" "$R3" 0
     ${endIf}
   ${endIf}
 
@@ -444,6 +457,66 @@ FunctionEnd
     DetailPrint "Pre-warming the OpenClaw runtime cache in the background..."
     ExecShell "" "cmd.exe" `/c set "NODE_COMPILE_CACHE=$APPDATA\grandpoem-studio\openclaw-compile-cache" & "$INSTDIR\resources\bin\node.exe" "$INSTDIR\resources\openclaw\openclaw.mjs" doctor --json >nul 2>&1` SW_HIDE
   _ci_prewarm_done:
+
+  ; --- OpenClaw runtime detection -------------------------------------------
+  ; The runtime is either bundled in the package (classic build) or downloaded on
+  ; demand. Only ask the user when this build pins a runtime version and the
+  ; machine has no matching copy.
+  ;
+  ; The download itself deliberately happens in the app on first launch: there it
+  ; can show progress, resume an interrupted transfer and verify a checksum.
+  ; Here we only detect and record the user's consent.
+  ; See docs/startup-performance-plan.md.
+  StrCpy $R8 ""
+  ClearErrors
+  FileOpen $R9 "$INSTDIR\resources\runtime-required.txt" r
+  IfErrors _ci_runtime_checked
+    FileRead $R9 $R8
+    FileClose $R9
+    ; The file holds the version plus a single trailing LF; drop it so the
+    ; string can be used as a directory name.
+    StrCpy $R8 $R8 -1
+  _ci_runtime_checked:
+
+  ${if} $R8 != ""
+    DetailPrint "Required OpenClaw runtime version: $R8"
+    StrCpy $R7 "missing"
+    ${if} ${FileExists} "$INSTDIR\resources\openclaw\package.json"
+      StrCpy $R7 "bundled"
+    ${elseIf} ${FileExists} "$LOCALAPPDATA\grandpoem-studio\runtime\$R8\.grandpoem-runtime.json"
+      StrCpy $R7 "installed"
+    ${endIf}
+
+    ${if} $R7 == "missing"
+      MessageBox MB_YESNO|MB_ICONQUESTION "The OpenClaw runtime for version $R8 is not installed (about 255 MB).$\r$\n$\r$\nDownload it automatically the first time GrandPoem Studio starts?" /SD IDYES IDYES _ci_runtime_consent_yes IDNO _ci_runtime_consent_no
+
+      _ci_runtime_consent_yes:
+        CreateDirectory "$LOCALAPPDATA\grandpoem-studio"
+        ClearErrors
+        FileOpen $R9 "$LOCALAPPDATA\grandpoem-studio\runtime-consent.json" w
+        IfErrors _ci_runtime_consent_yes_done
+          FileWrite $R9 '{"consent":true,"desiredVersion":"$R8","source":"installer"}'
+          FileClose $R9
+        _ci_runtime_consent_yes_done:
+        DetailPrint "Runtime download approved; it will start on first launch."
+        Goto _ci_runtime_consent_done
+
+      _ci_runtime_consent_no:
+        CreateDirectory "$LOCALAPPDATA\grandpoem-studio"
+        ClearErrors
+        FileOpen $R9 "$LOCALAPPDATA\grandpoem-studio\runtime-consent.json" w
+        IfErrors _ci_runtime_consent_no_done
+          FileWrite $R9 '{"consent":false,"desiredVersion":"$R8","source":"installer"}'
+          FileClose $R9
+        _ci_runtime_consent_no_done:
+        DetailPrint "Runtime download declined; it can be started later from Settings."
+        Goto _ci_runtime_consent_done
+
+      _ci_runtime_consent_done:
+    ${else}
+      DetailPrint "OpenClaw runtime already satisfied ($R7)."
+    ${endIf}
+  ${endIf}
 
   DetailPrint "Installation steps complete."
 !macroend

@@ -133,11 +133,19 @@ function extractArchive(archivePath: string, destDir: string): void {
 /**
  * Resolve the directory of a lazily shipped asset, extracting it on first use.
  *
- * @returns the extracted directory, or null when the asset is not shipped as a
- *          lazy archive — callers must then fall back to their normal lookup.
+ * @param name    asset name, e.g. `openclaw-plugins/dingtalk`
+ * @param options `archivePathOverride` lets a caller point at an archive that is
+ *                not in `resources/lazy-assets` — used by the plugin downloader,
+ *                which caches verified archives under the user data directory.
+ * @returns the extracted directory, or null when no archive is available —
+ *          callers must then fall back to their normal lookup.
  */
-export function ensureLazyAssetExtracted(name: string): string | null {
-  const archivePath = getLazyAssetArchivePath(name);
+export function ensureLazyAssetExtracted(
+  name: string,
+  options: { archivePathOverride?: string | null } = {},
+): string | null {
+  const override = options.archivePathOverride;
+  const archivePath = override && existsSync(override) ? override : getLazyAssetArchivePath(name);
   if (!archivePath) return null;
 
   const destDir = getLazyAssetCacheDir(name);

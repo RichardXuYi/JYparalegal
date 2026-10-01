@@ -87,6 +87,15 @@ export function getStartupAccelerationTargets(): string[] {
   } catch {
     // ignore
   }
+  // The downloaded OpenClaw runtime and the lazy archives live under
+  // %LOCALAPPDATA%; without this entry a freshly downloaded runtime would be
+  // scanned again on the first Gateway start.
+  if (process.platform === 'win32') {
+    const localAppData = process.env.LOCALAPPDATA?.trim();
+    if (localAppData) {
+      targets.push(join(localAppData, 'grandpoem-studio'));
+    }
+  }
   try {
     targets.push(join(app.getPath('home'), '.openclaw'));
   } catch {

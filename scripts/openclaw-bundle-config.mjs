@@ -38,3 +38,20 @@ export const ELECTRON_MAIN_RUNTIME_PACKAGES = [
   '@whiskeysockets/baileys',
   'qrcode-terminal',
 ];
+
+/**
+ * Packages that must keep a private copy inside each plugin mirror, even when the
+ * runtime already ships the same name.
+ *
+ * Forced deduplication (scripts/after-pack.cjs `deduplicatePluginAgainstRuntime`)
+ * drops every plugin dependency whose name also exists in the runtime bundle,
+ * regardless of version — the runtime's copy always wins, and it is copied into
+ * `~/.openclaw/extensions/node_modules` at channel-setup time.
+ *
+ * This list exists ONLY for packages where that substitution genuinely cannot
+ * work. Keep it empty unless a real, reproduced failure justifies an entry, and
+ * document the failure (error message + channel + repro) next to the entry.
+ */
+export const DEDUP_EXCEPTIONS = new Set([
+  // (empty by design — see docs/startup-performance-plan.md §11)
+]);

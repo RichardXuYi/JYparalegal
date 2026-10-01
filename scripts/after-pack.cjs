@@ -22,7 +22,7 @@
 const { cpSync, existsSync, readdirSync, rmSync, statSync, mkdirSync, realpathSync, readFileSync, writeFileSync } = require('fs');
 const { join, dirname, basename, relative, sep } = require('path');
 const AdmZip = require('adm-zip');
-const { ELECTRON_MAIN_RUNTIME_PACKAGES } = require('./openclaw-bundle-config.mjs');
+const { ELECTRON_MAIN_RUNTIME_PACKAGES, DEDUP_EXCEPTIONS } = require('./openclaw-bundle-config.mjs');
 const { patchNsisExtractTemplate } = require('./patch-nsis-extract.mjs');
 const { patchNsisInstallSectionTemplate } = require('./patch-nsis-install-section.mjs');
 const { patchNsisUninstallTemplate } = require('./patch-nsis-uninstall.mjs');
@@ -325,6 +325,8 @@ exports.__test = {
   pruneElectronLocales,
   archiveBundledPlugins,
   archiveBundledBinTools,
+  deduplicatePluginAgainstRuntime,
+  prunePackageJsonDependencies,
 };
 
 /** Recursively count files under a directory (best effort). */
@@ -763,6 +765,144 @@ function listPkgs(nodeModulesDir) {
   return result;
 }
 
+/**
+ * Forced deduplication of a plugin mirror against the bundled OpenClaw runtime.
+ *
+ * Every plugin mirror ships its own node_modules, and a large part of it is a
+ * second copy of packages the runtime already bundles. Deleting those copies
+ * unconditionally (name-based, version-agnostic — the runtime's copy always
+ * wins) is what makes "one physical copy per package name" hold.
+ *
+ * The mirror still has to be runnable: it is copied to
+ * `~/.openclaw/extensions/<pluginId>/` at channel-setup time, and Node resolution
+ * from that path walks up to `~/.openclaw/extensions/node_modules/`. So every
+ * dropped package is recorded in `shared-deps.json`, and
+ * `electron/utils/plugin-shared-deps.ts` copies those packages from the runtime
+ * bundle into that shared root when the channel is configured.
+ *
+ * Rewriting the mirror's package.json keeps the mirror honest: it no longer
+ * advertises dependencies it does not carry.
+ *
+ * @returns {{ dropped: string[], kept: string[], bytesDropped: number }}
+ */
+function deduplicatePluginAgainstRuntime(pluginDestDir, runtimeNodeModulesDir) {
+  const pluginNodeModules = join(pluginDestDir, 'node_modules');
+  const result = { dropped: [], kept: [], bytesDropped: 0 };
+
+  if (!existsSync(pluginNodeModules) || !existsSync(runtimeNodeModulesDir)) {
+    return result;
+  }
+
+  // Package names available in the runtime bundle (scoped packages are recorded
+  // as "scope/name", matching how Node resolves them).
+  const runtimeNames = new Set();
+  for (const entry of readdirSync(runtimeNodeModulesDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    if (entry.name.startsWith('@')) {
+      const scopeDir = join(runtimeNodeModulesDir, entry.name);
+      for (const scoped of readdirSync(scopeDir, { withFileTypes: true })) {
+        if (scoped.isDirectory()) runtimeNames.add(`${entry.name}/${scoped.name}`);
+      }
+    } else if (entry.name !== '.bin' && entry.name !== '.pnpm') {
+      runtimeNames.add(entry.name);
+    }
+  }
+
+  for (const entry of readdirSync(pluginNodeModules, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+
+    // Scoped packages: decide per inner package, never per scope.
+    const candidates = entry.name.startsWith('@')
+      ? readdirSync(join(pluginNodeModules, entry.name), { withFileTypes: true })
+        .filter((scoped) => scoped.isDirectory())
+        .map((scoped) => ({ name: `${entry.name}/${scoped.name}`, path: join(pluginNodeModules, entry.name, scoped.name) }))
+      : (entry.name === '.bin' || entry.name === '.pnpm'
+        ? []
+        : [{ name: entry.name, path: join(pluginNodeModules, entry.name) }]);
+
+    for (const candidate of candidates) {
+      if (!runtimeNames.has(candidate.name)) {
+        result.kept.push(candidate.name);
+        continue;
+      }
+      if (DEDUP_EXCEPTIONS.has(candidate.name)) {
+        result.kept.push(candidate.name);
+        continue;
+      }
+
+      result.bytesDropped += directorySize(candidate.path);
+      rmSync(normWin(candidate.path), { recursive: true, force: true });
+      result.dropped.push(candidate.name);
+    }
+  }
+
+  // Drop now-empty scope directories.
+  for (const entry of readdirSync(pluginNodeModules, { withFileTypes: true })) {
+    if (!entry.isDirectory() || !entry.name.startsWith('@')) continue;
+    const scopeDir = join(pluginNodeModules, entry.name);
+    if (readdirSync(scopeDir).length === 0) {
+      rmSync(normWin(scopeDir), { recursive: true, force: true });
+    }
+  }
+
+  prunePackageJsonDependencies(pluginDestDir, new Set(result.dropped));
+
+  if (result.dropped.length > 0) {
+    writeFileSync(
+      join(pluginDestDir, 'shared-deps.json'),
+      `${JSON.stringify({ schema: 1, sharedDeps: result.dropped.slice().sort() }, null, 2)}\n`,
+      'utf-8',
+    );
+  }
+
+  return result;
+}
+
+/** Remove the given dependency names from a package.json's dependency maps. */
+function prunePackageJsonDependencies(pluginDestDir, droppedNames) {
+  if (droppedNames.size === 0) return;
+
+  const pkgJsonPath = join(pluginDestDir, 'package.json');
+  if (!existsSync(pkgJsonPath)) return;
+
+  let pkg;
+  try {
+    pkg = JSON.parse(readFileSync(pkgJsonPath, 'utf-8').replace(/^\uFEFF/, ''));
+  } catch (error) {
+    console.warn(`[after-pack] ???  Could not rewrite ${pkgJsonPath}:`, error.message);
+    return;
+  }
+
+  for (const field of ['dependencies', 'optionalDependencies', 'peerDependencies']) {
+    if (!pkg[field] || typeof pkg[field] !== 'object') continue;
+    for (const name of droppedNames) {
+      delete pkg[field][name];
+    }
+  }
+
+  writeFileSync(pkgJsonPath, `${JSON.stringify(pkg, null, 2)}\n`, 'utf-8');
+}
+
+/** Best-effort recursive size in bytes. */
+function directorySize(dir) {
+  let bytes = 0;
+  const stack = [dir];
+  while (stack.length > 0) {
+    const current = stack.pop();
+    let entries;
+    try { entries = readdirSync(normWin(current), { withFileTypes: true }); } catch { continue; }
+    for (const entry of entries) {
+      const full = join(current, entry.name);
+      if (entry.isDirectory()) {
+        stack.push(full);
+      } else if (entry.isFile()) {
+        try { bytes += statSync(normWin(full)).size; } catch { /* ignore */ }
+      }
+    }
+  }
+  return bytes;
+}
+
 function bundlePlugin(nodeModulesRoot, npmName, destDir) {
   const pkgPath = join(nodeModulesRoot, ...npmName.split('/'));
   if (!existsSync(pkgPath)) {
@@ -846,7 +986,22 @@ exports.default = async function afterPack(context) {
   const platform = context.electronPlatformName; // 'win32' | 'darwin' | 'linux'
   const arch = resolveArch(context.arch);
 
-  console.log(`[after-pack] Target: ${platform}/${arch}`);
+  // Download-mode builds ship the shell only; scripts/make-download-config.mjs
+  // removes the "build/openclaw -> openclaw/" extraResources entry, so the mode
+  // is detectable from the config electron-builder was handed (no env var).
+  const configuredExtraResources = Array.isArray(context?.packager?.config?.extraResources)
+    ? context.packager.config.extraResources
+    : null;
+  const runtimeBundled = configuredExtraResources
+    ? configuredExtraResources.some(
+      (entry) => entry && typeof entry === 'object' && (entry.to === 'openclaw/' || entry.to === 'openclaw'),
+    )
+    : true;
+
+  console.log(`[after-pack] Target: ${platform}/${arch} (runtime=${runtimeBundled ? 'bundled' : 'download'})`);
+  if (!runtimeBundled) {
+    console.log('[after-pack] Download mode: skipping every bundled-runtime step.');
+  }
 
   const src = join(__dirname, '..', 'build', 'openclaw', 'node_modules');
 
@@ -870,27 +1025,29 @@ exports.default = async function afterPack(context) {
   }
 
   // 1. Copy node_modules (electron-builder skips it due to .gitignore)
-  const depCount = readdirSync(src, { withFileTypes: true })
-    .filter(d => d.isDirectory() && d.name !== '.bin')
-    .length;
+  const depCount = runtimeBundled
+    ? readdirSync(src, { withFileTypes: true }).filter(d => d.isDirectory() && d.name !== '.bin').length
+    : 0;
 
-  console.log(`[after-pack] Copying ${depCount} openclaw dependencies to ${dest} ...`);
-  cpSync(src, dest, { recursive: true });
-  console.log('[after-pack] ??openclaw node_modules copied.');
+  if (runtimeBundled) {
+    console.log(`[after-pack] Copying ${depCount} openclaw dependencies to ${dest} ...`);
+    cpSync(src, dest, { recursive: true });
+    console.log('[after-pack] ??openclaw node_modules copied.');
 
-  const missingRuntimePackages = ELECTRON_MAIN_RUNTIME_PACKAGES.filter((pkgName) => {
-    const pkgJson = join(dest, ...pkgName.split('/'), 'package.json');
-    return !existsSync(pkgJson);
-  });
-  if (missingRuntimePackages.length > 0) {
-    throw new Error(
-      `[after-pack] Missing required Electron main runtime packages after copy: ${missingRuntimePackages.join(', ')}`,
-    );
+    const missingRuntimePackages = ELECTRON_MAIN_RUNTIME_PACKAGES.filter((pkgName) => {
+      const pkgJson = join(dest, ...pkgName.split('/'), 'package.json');
+      return !existsSync(pkgJson);
+    });
+    if (missingRuntimePackages.length > 0) {
+      throw new Error(
+        `[after-pack] Missing required Electron main runtime packages after copy: ${missingRuntimePackages.join(', ')}`,
+      );
+    }
+
+    // Patch broken modules whose CJS transpiled output sets module.exports = undefined,
+    // causing TypeError in Node.js 22+ ESM interop.
+    patchBrokenModules(dest);
   }
-
-  // Patch broken modules whose CJS transpiled output sets module.exports = undefined,
-  // causing TypeError in Node.js 22+ ESM interop.
-  patchBrokenModules(dest);
 
   // 1.1 Bundle OpenClaw plugins directly from node_modules into packaged resources.
   //     This is intentionally done in afterPack (not extraResources) because:
@@ -925,6 +1082,19 @@ exports.default = async function afterPack(context) {
       }
       // Fix hardcoded plugin ID mismatches in compiled JS
       patchPluginIds(pluginDestDir, pluginId);
+
+      // Forced deduplication: drop every dependency the runtime already bundles
+      // (name-based, version-agnostic), record them in shared-deps.json, and
+      // rewrite the mirror's package.json. The dropped packages are copied back
+      // from the runtime into ~/.openclaw/extensions/node_modules when the
+      // channel is configured — see electron/utils/plugin-shared-deps.ts.
+      const dedup = deduplicatePluginAgainstRuntime(pluginDestDir, dest);
+      if (dedup.dropped.length > 0) {
+        console.log(
+          `[after-pack] ??${pluginId}: dropped ${dedup.dropped.length} runtime-provided packages ` +
+          `(${(dedup.bytesDropped / 1048576).toFixed(1)} MB), kept ${dedup.kept.length} private`,
+        );
+      }
     }
   }
 
@@ -943,7 +1113,7 @@ exports.default = async function afterPack(context) {
   // The built-in openclaw dist/extensions/feishu tree is redundant, and on macOS
   // its mirrored runtime deps significantly increase codesign file pressure.
   rmSync(join(packExtDir, 'feishu'), { recursive: true, force: true });
-  if (existsSync(buildExtDir)) {
+  if (runtimeBundled && existsSync(buildExtDir)) {
     let extNMCount = 0;
     let mergedPkgCount = 0;
     let prunedSharedDepCount = 0;

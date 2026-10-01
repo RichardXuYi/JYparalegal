@@ -597,3 +597,252 @@ pnpm run package:win          # 完整安装包（含 NSIS 模板补丁）
 3. **人工确认项**：splash 启动器的视觉与交接时机；Finish 页勾选后的 UAC 流程；安装器在真机上的完整走查（含覆盖升级与卸载）。
 4. **可选开关**：`GRANDPOEM_PRUNE_TS=1` 需要先跑一轮 doctor + 网关冒烟再开启；`GRANDPOEM_DEFENDER_DRY_RUN=1` 可在开发期跳过提权联调 UI。
 
+---
+
+## 9. 运行时版本核对与按需下载（已实现）
+
+### 9.1 背景与结论（调研结论）
+
+- **WorkBuddy（腾讯，同量级 Electron AI 应用）实测**：安装后 3,069 文件 / 1.34 GB，其中 `resources/app.asar` 是 **284 MB 单文件**（把 JS 全塞进 asar → 文件数塌缩），`resources/vendor/` 放 **node.zip 107 MB + PortableGit.zip 53.8 MB + python.zip 17.9 MB**（重运行时以压缩包随包分发、按需解压），另有 `RepairApp.exe` + `install-manifest.json`（113 条清单）做自检修复，以及 `update-progress.ps1` + `launch-transition-window.vbs` 过渡窗口。**三个 exe 全部腾讯有效签名**，`%LOCALAPPDATA%\WorkBuddy` 只有日志 → 运行期不下载任何东西。
+  → 他们靠 **签名 + asar 塌缩文件数 + 运行时 zip 化** 解决首启，**不是**下载式安装。
+- **ClawX（我们的上游）**：`electron-builder.yml` 与我们的打包模型同源，`win.verifyUpdateCodeSignature: false`（**上游也没有签名证书**），`asarUnpack` 显式解包 `**/node_modules/@trycua/**`（那 203 MB 的来源），**没有任何首启优化**。发布走 `oss.intelli-spectrum.com` + GitHub 双通道。
+- **官方机制**：未签名/无信誉 exe 首次运行会被 **Block at first sight** 扣住等云端判定，[cloud block timeout 默认 10 秒、最多再加 50 秒](https://learn.microsoft.com/en-us/defender-endpoint/configure-cloud-block-timeout-period-microsoft-defender-antivirus)（上限 60 秒），叠加本机代理不通 → 每次首启吃满超时。这正是"大概一分钟"的来源。同类报告：[Windows Defender slowing down Electron startup](https://stackoverflow.com/questions/67982430/windows-defender-slowing-down-electron-startup)。
+
+### 9.2 已实现
+
+| 部分 | 文件 | 说明 |
+|---|---|---|
+| 运行时定位 | `electron/utils/paths.ts` | `getOpenClawDir()` 优先级：`GRANDPOEM_RUNTIME_DIR` → `runtime/current.json`（校验可用性，失效即回退）→ 包内 `resources/openclaw`；新增 `getRuntimeRootDir()`（`%LOCALAPPDATA%\grandpoem-studio\runtime`，**不放 Roaming**）、`read/write/clearActiveRuntimePointer()`、`getOpenClawDirSource()`；`getOpenClawStatus()` 增加 `source` |
+| 清单与版本模型 | `electron/utils/runtime-manifest.ts` | `runtime-manifest.json` 读取（BOM 容错）、版本规范化与精确比对、按版本目录的安装标记、已安装版本列表/清理、consent 读写、`getRuntimeReadiness()` |
+| 归档产物 | `scripts/pack-openclaw-runtime.mjs`、`package.json` | `runtime:pack` 产出 `.tar.gz` + `runtime-manifest.json` + `runtime-required.txt`（`--archive-url`、`--copy-to` 暂存）；`runtime:verify` 校验 sha256/size/版本一致性 |
+| 下载/校验/解压/切换 | `electron/services/runtime-service.ts` | 下载用 Electron **`net`**（自动继承 `session.defaultSession` 代理，避开 devDependency `https-proxy-agent`）；`Range` 断点续传 + 空闲超时；流式 sha256；`tar.x` 解压（`preservePaths:false` 防穿越）→ 写标记 → 原子 rename → 写指针 → 保留 2 个版本；`cancel()` 真正 abort 请求；导入本地归档；回滚到上一版本/包内 |
+| Host 契约 | `shared/host-api/contract.ts`、`shared/host-events/contract.ts`、`electron/services/runtime-api.ts`、`electron/main/ipc-handlers.ts`、`src/lib/host-api.ts`、`src/lib/host-events.ts` | 新增 `runtime` 模块（status/manifest/install/cancel/rollback/importArchive/revealFolder）与 `runtime:{progress,stateChanged,log}` 事件组（preload 白名单由 `HOST_EVENT_CHANNELS` 自动覆盖） |
+| 启动屏 | `src/components/common/GatewayBootScreen.tsx` | 运行时未就绪时改为"运行时准备"分支：确定进度条、阶段文案、已下载/总量、取消/重试/选择本地安装包；consent 未决定时先问一次 |
+| 安装期检测 | `scripts/installer.nsh` | 读 `resources/runtime-required.txt` → 命中包内运行时或 `%LOCALAPPDATA%\...\runtime\<版本>\.grandpoem-runtime.json` 则跳过；否则 `MessageBox` 询问，结果写 `runtime-consent.json`（应用不再重复询问）。**下载主体仍在应用内**（进度/续传/校验/代理都可控） |
+| WorkBuddy 借鉴 ② | `resources/cli/win32/transition-window.ps1`、`launch-transition-window.vbs`、`scripts/installer.nsh` | 过渡窗口的 VBS+PS1 实现（`wscript` 隐藏中继，关闭条件=窗口出现/进程退出/硬超时）；快捷方式优先指向编译版 `grandpoem-launcher.exe`，**csc 缺失时自动回退**到 PS1/VBS |
+| 下载模式打包 | `scripts/make-download-config.mjs`、`scripts/after-pack.cjs`、`package.json` | `config:download` 从权威 `electron-builder.yml` 派生下载模式配置（去掉 `build/openclaw`、加清单/版本文件），避免第三份手工复制的配置漂移；after-pack 从**传入的配置**判定模式并跳过全部 bundled-runtime 步骤；`package:win:download` |
+| Defender 补强 | `resources/cli/win32/set-defender-exclusion.ps1`、`electron/utils/defender-exclusion.ts` | 排除目标加入 `%LOCALAPPDATA%\grandpoem-studio`（覆盖下载的运行时与懒加载缓存），否则刚下载的 4 万文件会在首次网关启动时被重新扫描 |
+
+### 9.3 实测数据（本次）
+
+对**未瘦身**的旧产物（40,721 文件 / 850.8 MB）打包：
+
+| 项 | 数值 |
+|---|---|
+| 归档 `openclaw-runtime-2026.9.6-win32-x64.tar.gz` | **255.3 MB** |
+| 打包耗时（gzip level 6） | 127 秒 |
+| 现有安装包（含运行时） | 422.1 MB |
+| 下载模式安装包（预估） | **约 165–175 MB** |
+
+即：用户总下载量基本不变（安装包 −255 MB，运行时 +255 MB），收益在**安装包体积、更新粒度、镜像/CDN 分发**，以及"把 4 万文件的写盘与首扫从首次点开挪到安装期"。瘦身后的运行时再打包会更小。
+
+### 9.4 与计划的偏差（有意为之）
+
+1. **下载在主进程用 `net`，解压也在主进程用 `tar`**，而不是计划里的 `utilityProcess` worker：worker 无法访问 Electron `net`（拿不到会话代理），而 `https-proxy-agent` 只是 devDependency；新增一个构建入口换来的隔离度不值这个复杂度。解压是异步流式的，进度按 250 ms 节流。
+2. **`--upload` 改为 `--copy-to`**：仓库里没有任何上传实现/凭据（`publish` 用的是自建 generic 源，electron-builder 的 generic provider 不支持上传），所以产物脚本只负责生成 + 校验 + 暂存，上传仍按现有发布流程手工/CI 完成。
+3. **`runtime:verify` 合并进同一脚本的 `--verify`**（少一个文件，覆盖相同）。
+4. **`assert:pack-size` 只挂在 `package:win:dir` 末尾**，不改 `package:win` 发布链路。
+
+### 9.5 尚未实现的计划项
+
+- **网关失败对话框的"下载运行时"动作**：`GatewaySuggestedAction`（`shared/types/gateway.ts:35`）目前是 `'retry' | 'viewLogs' | 'copyReport' | 'runDoctor'`，需要新增 `'installRuntime'`，在 `failure-taxonomy.ts` 增加匹配 `OpenClaw package not found at:` / `OpenClaw entry script not found at:` 的分类分支，并在 `GatewayFailureDialog.tsx` 加按钮 + 四语言文案。用户在主路径（启动屏）已经能完成下载；只有"跳过启动屏后"才需要这个入口。
+- **安装器内 BITS 预取变体**（计划里的 P3 可选路径）未做。
+
+### 9.6 插件依赖重复：实测与结论（未实施）
+
+早期口头分析里的"206 个重复包目录"是**按包名**统计的，把同名不同版本也算进去了，高估了可去重量。按"同名同版本"精确实测（`release/win-unpacked`，未瘦身树）：
+
+| 项 | 数值 |
+|---|---|
+| 运行时 `openclaw/node_modules` | 431 个包 / 487.9 MB |
+| 7 个插件镜像 node_modules 合计 | ≈ 255 MB |
+| **与运行时"同名同版本"→ 理论可去重** | **148 个包 / 42.2 MB** |
+| 与运行时"同名不同版本"→ 不能合并 | 17 个包 / 4.9 MB |
+| 插件独有（dingtalk 131.1 MB、wecom 45.3 MB 等自家 SDK） | 92 个包 / 207.5 MB |
+
+**为什么不能直接删**：插件镜像会被复制到 `~/.openclaw/extensions/<id>/` 运行，从该路径向上解析只能到 `~/.openclaw/extensions/node_modules` → `~/.openclaw/node_modules`，**到不了 app 内的 `resources/openclaw/node_modules`**。`after-pack.cjs` 里 macOS 分支那种"复用顶层依赖"的裁剪只对**跑在原地**的 built-in extension 成立，对复制出去的镜像是无效的。要去重就必须：
+
+1. 改成共享根 `~/.openclaw/extensions/node_modules`（要处理上面 17 个版本冲突），或
+2. 打包期把"与运行时同名同版本"的依赖从镜像里裁掉，并在安装插件时把共享依赖写到该共享根。
+
+两种方案的风险都落在"某个渠道运行时静默缺模块"——最难排查的那类故障，而收益只有 42–80 MB（占 1.63 GB 安装体积的 3–5%）。
+
+**结论（建议）**：不去重。改用已经建好的懒加载/下载通路——**把 7 个插件镜像也改成按需下载**（它们现在已经是单个 zip，只差从安装包挪到远端）：
+
+- 下载模式安装包再瘦约 **180 MB**；
+- 重复代码在"用哪个渠道装哪个"的前提下不再构成成本，**完全不动插件的依赖解析，零风险**；
+- 离线/内网走已实现的 `runtime.importArchive`（本地归档导入）；
+- 代价：添加渠道时多一次下载，需要进度 UI（可复用启动屏那套）。
+
+> 若将来仍要启用依赖去重，必须先在每个已配置渠道上跑通冒烟测试，并加一个启动自检（共享依赖缺包直接告警，而不是等渠道跑挂）。
+
+---
+
+## 11. 强制去重：同一包名只保留一份（已实现）
+
+### 11.1 目标与原则
+
+**目标**：最终安装态下，任意包名在运行时 bundle 与 7 个插件镜像之间**只存在一份物理副本**。
+
+**原则（用户明确要求）**：
+1. 只改 studio-frontend 仓库内的源码；不改 openclaw 本身（外部 npm 包）。
+2. **强行**按包名去重，**不看版本号**——运行时（openclaw）的副本永远胜出。
+3. 不做预设例外；插件若因版本替换而损坏，才修，修到能用为止。
+
+### 11.2 两段式实现
+
+**构建期**（`scripts/after-pack.cjs` → `deduplicatePluginAgainstRuntime()`，在每个插件 `bundlePlugin()` 之后调用）：
+
+1. 扫描运行时 bundle 顶层 `resources/openclaw/node_modules/` 得到包名集合（scoped 记为 `scope/name`）；
+2. 遍历插件镜像 `node_modules/`，**凡包名与运行时重合即删除**（`DEDUP_EXCEPTIONS` 除外，当前为空）；
+3. 删除后清掉空的 `@scope/` 目录；
+4. 把被删的包名写入镜像根的 `shared-deps.json`（`{ schema: 1, sharedDeps: [...] }`）；
+5. 从镜像自己的 `package.json` 的 `dependencies` / `optionalDependencies` / `peerDependencies` 中移除这些名字——镜像不再声明它没带的依赖。
+
+**安装期**（`electron/utils/plugin-install.ts` → `provisionSharedDeps()`，在镜像复制到 `~/.openclaw/extensions/<id>/` 之后调用）：
+
+1. 读镜像的 `shared-deps.json`；
+2. 把每个包从 `getOpenClawDir()/node_modules/` 复制到 **`~/.openclaw/extensions/node_modules/`**（共享根）；
+3. 幂等：目标已存在则跳过（不比较版本——强制去重的前提就是运行时版本唯一）；
+4. 任一包在运行时 bundle 里找不到时记录 `missing` 并告警（打包不一致，而非运行时故障），不抛异常、不阻断渠道配置流程。
+
+**为什么共享根能被解析到**：插件从 `~/.openclaw/extensions/<id>/` 运行，Node 的向上查找会依次访问 `<id>/node_modules` → `~/.openclaw/extensions/node_modules`，正好是共享根。一份副本服务所有已安装镜像。
+
+**为什么不用 symlink**：Windows 建符号链接需要提权或开发者模式；本仓库此前已因同样原因移除过基于 symlink 的 skill 安装方式。
+
+### 11.3 构建期断言
+
+`scripts/assert-single-copy.mjs`（接入 `package:win:dir` 末尾，脚本名 `assert:single-copy`）：
+
+- 比较运行时 bundle 与每个插件镜像的包名集合，**交集必须为空**；
+- 额外检查：凡在 `shared-deps.json` 里声明为"共享"的包名，**不得**再出现在镜像目录中（防止回填）；
+- `DEDUP_EXCEPTIONS` 中列出的名字按预期出现两次 → 只报告不失败；`--strict` 时即使有例外也失败；
+- 下载模式（无插件镜像）视为通过。
+
+这样将来升级 openclaw 或插件、或改动去重逻辑而引入重复时，构建会直接失败，而不是悄悄把重复打回包里。
+
+### 11.4 实测效果（对现有未瘦身产物模拟）
+
+| 插件 | 去重前 | 去重后 | 删除包数 | 保留私有包数 |
+|---|---|---|---|---|
+| dingtalk | 139.5 MB | 132.8 MB | 45 | 21 |
+| discord | 17.3 MB | 6.7 MB | 15 | 44 |
+| feishu-openclaw-plugin | 21.7 MB | 3.0 MB | 53 | 3 |
+| openclaw-weixin | 4.0 MB | 0.5 MB | 2 | 0 |
+| qqbot | 3.9 MB | 0.6 MB | 9 | 0 |
+| wecom | 50.2 MB | 46.8 MB | 40 | 15 |
+| whatsapp | 26.6 MB | 25.8 MB | 1 | 2 |
+| **合计** | **263.3 MB** | **216.2 MB** | **165** | **85** |
+
+- **节省 47.1 MB**；断言结果：**零重复包名**（同一包名只出现一次）。
+- 镜像总体积下降有限，是因为保留的私有依赖（dingtalk 自带 SDK/PDF 栈、wecom 的 `@wecom/*` CLI、whatsapp 的 baileys、discord 的 micromark 链）本来就不在运行时里——这些是插件的真实功能依赖，不是重复。
+- 与 §9.6 的差异说明：那里按"同名同版本"统计只有 42.2 MB 可安全去重；本方案按**包名强行去重**（含 17 条同名不同版本），因此受益面更大——这正是不看版本带来的收益。
+
+### 11.5 风险与已知边界
+
+1. **同名不同版本的替换**：17 条冲突中，`undici`(7→8)、`file-type`(21→22，v22 为纯 ESM) 等被强行替换为运行时版本。若某渠道因此挂掉，按既定协议处理：先修插件源码；只有确实无法修复时才把该包名加进 `scripts/openclaw-bundle-config.mjs` 的 `DEDUP_EXCEPTIONS`，并在注释里写清错误信息、渠道与复现步骤。
+2. **平台相关的原生包**：去重只看运行时**顶层**包名；同一目标平台下发包与运行时平台裁剪一致，因此 `missing` 预期为空。若出现，会在安装日志中以 `[plugin-shared-deps] Missing from the runtime bundle: ...` 告警。
+3. **必须逐渠道冒烟**：7 个渠道各连通一条消息。这是强统一的必要验证，`typecheck`/单测无法覆盖运行时 API 兼容性。
+4. **下载模式同样生效**：去重发生在插件镜像打包阶段，与是否随包分发无关；按需下载的插件包也因此更小。
+
+### 11.6 改动文件
+
+| 文件 | 改动 |
+|---|---|
+| `scripts/openclaw-bundle-config.mjs` | 新增 `DEDUP_EXCEPTIONS`（当前为空） |
+| `scripts/after-pack.cjs` | 新增 `deduplicatePluginAgainstRuntime()`、`prunePackageJsonDependencies()`、`directorySize()`；在插件打包循环中调用；导出到 `__test` |
+| `electron/utils/plugin-shared-deps.ts` | 新增：清单读取、共享依赖补给、已补给列表 |
+| `electron/utils/plugin-install.ts` | 安装成功后调用 `provisionSharedDeps(targetDir, extensionsRoot)` |
+| `scripts/assert-single-copy.mjs` | 新增断言 |
+| `package.json` | 新增 `assert:single-copy`，接入 `package:win:dir` |
+| `tests/unit/plugin-dedup.test.ts` | 新增 6 项 |
+| `tests/unit/plugin-shared-deps.test.ts` | 新增 17 项 |
+
+### 11.7 运行验证（A/B 对照，已实跑）
+
+用打包产物里的 `node.exe` + `openclaw.mjs`，把 `HOME` 指向一个模拟的 `~/.openclaw/extensions/`，对**去重版**与**原始版**各跑一遍真实网关：
+
+| 项 | 去重版 | 原始版 |
+|---|---|---|
+| 网关启动 | `http server listening (14 plugins)` | 相同 |
+| `doctor --json` | exit 0 / 35 checks | 相同 |
+| 渠道插件相关日志 | 无差异 | — |
+| 唯一告警 | `auth token missing`（无害） | 相同 |
+
+补充验证：
+- 7 个镜像去重后，**安装期从 runtime 补给 93 个包，缺失 0**；
+- feishu 被删的 **53 个包 100% 可从共享根解析**（含 `protobufjs`）；
+- 在插件目录内做真实 `import()`：dingtalk / wecom / qqbot / whatsapp / openclaw-weixin **全部依赖可导入**；discord 仅 `discord-api-types`（types-only，无运行时 import）、feishu 仅 `tsdown`/`vitest`（只在 `tsdown.config.js`，`dist/` 干净）两个探针误报。
+
+**结论**：去重前后运行时行为一致，机制本身不在运行时引入回归。仍未覆盖的是"用真实账号逐渠道收发消息"（强统一版本的兼容性风险只能在那里暴露）。
+
+### 11.8 已确认的上游缺陷（不在本次范围，勿重复排查）
+
+A/B 对照顺带确认两个**既存**问题，**原始版和去重版都存在**，属于 OpenClaw 侧缺陷，本次不修（后续可能需要删掉渠道再重新添加来规避）：
+
+1. **feishu 插件（openclaw-lark）注册失败**：原始版报 `Plugin dependency @types/node is missing from .../feishu-openclaw-plugin/node_modules/protobufjs`；去重版报 doctor capture 树里的 `ERR_PACKAGE_PATH_NOT_EXPORTED: './plugin-sdk' is not defined by "exports" in .../openclaw/package.json`。即该插件在本次改动**之前就已经装不起来**，本次只是让报错文本变了。
+2. **wecom 插件 id 不匹配**：`plugin id mismatch (config uses "wecom-openclaw-plugin", export uses "wecom")`，两版完全一致。
+
+因此 `DEDUP_EXCEPTIONS` **保持为空**——这两个问题都与去重无关，不应为此添加例外。
+
+### 11.9 独立测试结论（本机实跑）
+
+本轮由 AI 代替人工执行测试，结论如下。
+
+**（1）发现并修复一个真实的构建期测试缺陷：comms 门禁在 Windows 上静默空转**
+
+`scripts/comms/{replay,compare,baseline}.mjs` 用 `new URL(import.meta.url).pathname` 推导项目根目录。在 Windows 上该表达式返回 `/D:/Projects/.../replay.mjs`（且对非 ASCII 路径做百分号转义），`path.resolve()` 会把它拼成 `D:\D:\Projects\...`。
+
+- `baseline.mjs` 没有入口守卫，因此**报错退出**；
+- `replay.mjs` / `compare.mjs` 把 `main()` 放在 `isEntrypoint` 守卫之后，而该守卫由同一个损坏的路径计算，**恒为 false**——脚本打印没有任何输出、**退出码 0**，但什么都没做。
+
+即 `pnpm run comms:replay && pnpm run comms:compare` 这条 AGENTS.md 明确要求的通信改动门禁，在本机**从未真正执行过**，却一直"通过"。这是回归门禁最糟糕的失效方式：静默假绿。
+
+修复方式：三个脚本统一改用 `fileURLToPath(import.meta.url)`。修复后 `replay` 正常写出 `artifacts/comms/current-metrics.json`，`compare` 输出 42 项全 PASS 的报告。
+
+新增 `tests/unit/comms-gate.test.ts`（4 个用例）作为回归守卫：断言不再使用 `URL.pathname`、replay 必须产物落盘、指标跨次运行确定性一致、缺少必需场景时 compare 必须非 0 退出。该用例已反向验证——把 `replay.mjs` 还原成旧写法时 **4 个用例全部失败**，确认不是空转断言。
+
+**（2）comms 门禁覆盖不到本次改动（重要边界）**
+
+核对后确认：`replay.mjs` / `compare.mjs` / `baseline.mjs` **均不 import 任何 `electron/`、`src/`、`shared/` 代码**，只是对静态 JSONL 夹具做纯计算，因此改动前后指标逐字节相同。
+
+结论：本次去重/运行时改动 **不能**靠 comms 门禁证明。它的价值是守住通信路径不退化，而不是验证本次改动。本次改动的真实覆盖来自下面 (3)(4) 与既有单测。
+
+**（3）构建期去重：用真实产物做端到端验证（106 → 0）**
+
+从本机真实构建输入（`build/openclaw` 运行时 499 个包 + 7 个真实插件镜像）拼出与 `release/win-unpacked` 同构的产物目录，然后：
+
+| 步骤 | 结果 |
+|---|---|
+| 去重前 `assert:single-copy` | **FAIL，106 个包名同时存在于运行时与镜像** → 退出码 1 |
+| 执行真实 `deduplicatePluginAgainstRuntime()` | **dropped 178 / kept 91，释放 104.8 MB** |
+| `shared-deps.json` 与磁盘一致性 | 7/7 镜像均生成，**0 处不一致**（无"已声明共享却仍在盘上"） |
+| 去重后 `assert:single-copy` | **OK: every package name exists at most once** → 退出码 0 |
+| 去重后 `--strict` | 同样 PASS |
+
+镜像包数 **269 → 91**。这证明断言不是空转，也证明去重函数在真实依赖图上确实收敛到零重复。
+
+各镜像 dropped/kept：dingtalk 45/27（10.2MB）、discord 28/44（36.0MB）、feishu 53/3（41.3MB）、wecom 40/15（4.7MB）、qqbot 9/0（5.2MB）、openclaw-weixin 2/0（6.0MB）、whatsapp 1/2（1.5MB）。
+
+**（4）门禁全绿**
+
+| 门禁 | 结果 |
+|---|---|
+| `pnpm run test` | **80 passed / 11 files**（原 76 + 新增 4） |
+| `pnpm run typecheck`（node + web） | exit 0 |
+| `pnpm run lint:check` | exit 0（UI 规范门禁通过，扫描 16 个页面文件） |
+| `pnpm run comms:replay` + `comms:compare` | PASS（修复后**首次真正执行**） |
+
+**（5）尚未覆盖（需人工/真实账号）**
+
+- `release/win-unpacked` 是**改动前**的旧产物（无 `runtime-required.txt`、无插件归档），因此不能在它上面验证新逻辑；真实产物验证仍需 `pnpm run package:win:dir`。
+- 未做安装器真机安装测试（NSIS 运行时探测、Defender 排除项、过渡窗口）。
+- 未做各渠道真实账号收发消息的连通性冒烟，这是强制版本统一后唯一的剩余风险。
+
+**（6）测试过程备注**
+
+首次用目录联接（junction）构造夹具时，去重函数通过联接**删除了真实 `build/openclaw-plugins` 里的包**（该目录已被 gitignore，可重新生成）。已用 `pnpm run bundle:openclaw-plugins` 完整重建（feishu 恢复至 56 依赖、dingtalk 72、wecom 55，且无残留 `shared-deps.json`），并改为**复制而非联接**镜像目录，避免再次发生。该目录是构建中间产物，不影响仓库内容。
+
+
+
+
