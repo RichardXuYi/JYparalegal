@@ -37,6 +37,7 @@ import { createSessionsApi } from '../host-core/services/sessions-api';
 import { createChatApi } from '../host-core/services/chat-api';
 import { createCronApi } from '../host-core/services/cron-api';
 import { createSkillsApi } from '../host-core/services/skills-api';
+import { SkillHubService } from '../host-core/services/skills/skillhub-service';
 import { createUsageApi } from '../host-core/services/usage-api';
 import { createSyncApi } from '../host-core/services/sync-api';
 import { createAuthApi } from '../host-core/services/backend-auth-api';
@@ -112,6 +113,7 @@ export function createWebHost(appVersion: string): WebHost {
 
   const gatewayManager = new GatewayManager();
   const clawHubService = new ClawHubService();
+  const skillHubService = new SkillHubService();
   const gatewayRpcBackpressure = new GatewayRpcBackpressure();
 
   // Bridge gateway + host-side events (mirrors the desktop main process,
@@ -157,7 +159,7 @@ export function createWebHost(appVersion: string): WebHost {
     sessions: createSessionsApi({ gatewayManager }),
     chat: createChatApi({ gatewayManager }),
     cron: createCronApi({ gatewayManager }),
-    skills: createSkillsApi({ clawHubService, gatewayManager }),
+    skills: createSkillsApi({ clawHubService, skillHubService, gatewayManager }),
     usage: createUsageApi(),
     sync: createSyncApi(),
     auth: authApi,

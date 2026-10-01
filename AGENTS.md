@@ -1,4 +1,4 @@
-﻿# AGENTS.md — studio-web
+# AGENTS.md — studio-web
 
 ## Overview
 
@@ -7,6 +7,16 @@
 应用为**统一自适应 SPA**：单一 URL（`/`）运行时按设备选择桌面壳（`MainLayout`）或移动壳（`src/mobile/` 下的 `MobileLayout`），检测与手动覆盖逻辑见 `src/lib/device-shell.ts` + `src/hooks/use-device-shell.ts`；旧移动版 URL `/m/` 由 server 301 到 `/`（原 `studio-phone/` 包已退役并入本包）。
 
 > **与 studio-frontend 同步比对口径**：移动壳与设备检测为 web-only 新增——`src/mobile/`、`src/lib/device-shell.ts`、`src/hooks/use-device-shell.ts`、`src/hooks/use-is-mobile.ts`、`src/hooks/use-media-query.ts`、`src/styles/mobile.css`——不参与与 `studio-frontend/` 的逐文件同步比对；`App.tsx` 的双壳路由与 lazy 加载也是 web-only 差异。
+
+> **`shared/` 双向同步结论（2026-10-02 已对齐）**：`shared/` 下 53 个文件曾整体落后于 `studio-frontend/`（缺 24 个类型导出 + 约 20 个 i18n key），现已全量同步。`shared/` 是**复制关系而非共享包**，所以任何一侧新增都必须手动同步另一侧。
+>
+> 同步时**必须保留**的 web-only 内容（复制会破坏移动壳功能）：
+> - `shared/i18n/locales/{de,en,fr,zh}/common.json` 的 `gateway.banner.*`（reconnecting / reconnectingSimple / degraded / retry / details）——用于 `src/components/common/GatewayStatusBanner.tsx`。
+> - `shared/i18n/locales/{de,fr}/settings.json` 的 `appearance.shellMode*`（shellMode / shellModeDesc / shellAuto / shellDesktop / shellMobile）——用于 `src/components/settings/sections/AppearanceSection.tsx`。
+>
+> 校验方式：逐文件比较 `studio-frontend/shared/` 与 `studio-web/shared/`；判据是 **web 侧不得缺少 frontend 侧任何 key/行**（允许 web 多出 web-only key）。不要用整文件覆盖。
+>
+> **唯一有意保留的差异：`runtime.*`**。桌面版的 OpenClaw 运行时下载/导入/回滚（`shared/host-api/contract.ts` 的 `Runtime*` 类型 + `src/lib/host-api.ts` 的 `runtime` 模块 + `runtime:progress` 等事件）**不移植到 web**：web 宿主直接用 `node_modules/openclaw` 依赖，不存在"安装期按需下载运行时"的概念，也没有 `%LOCALAPPDATA%\grandpoem-studio\runtime` 这类落盘位置。因此 web 侧只同步了类型（contract 保持同构），未实现 `runtime` 服务模块，渲染层也不暴露 `runtime.*`。若日后要在 web 上支持，需要单独设计而非机械搬运。
 
 技术栈：Fastify 5 + `@fastify/websocket` + `@fastify/cookie`、`jsonwebtoken`、`tsx`、React 19 + Vite 7、Tailwind CSS 4 / Radix UI / Zustand、OpenClaw Gateway 子进程。
 

@@ -21,12 +21,132 @@ export type OpenClawDoctorResult = HostSuccess & {
 };
 export type OpenClawDoctorPayload = { mode: OpenClawDoctorMode };
 
+/**
+ * Windows-only startup acceleration.
+ *
+ * Registers the install directory (plus the app's runtime data directories) with
+ * Windows Defender. Real-time scanning of a freshly installed, unsigned, ~50k
+ * file application is the dominant cost of the first launch — see
+ * docs/startup-performance-plan.md (scheme 1).
+ */
+export type StartupAccelerationState = 'applied' | 'not-applied';
+
+export type StartupAccelerationErrorCode =
+  | 'UNSUPPORTED'
+  | 'NOT_ELEVATED'
+  | 'BLOCKED'
+  | 'INTERNAL';
+
+export type StartupAccelerationStatus = {
+  /** True only on Windows packaged builds. */
+  supported: boolean;
+  state: StartupAccelerationState;
+  /** Paths the app asks Defender to exclude. */
+  targets: string[];
+  /** ISO timestamp of the last run that verified the exclusion. */
+  lastVerifiedAt?: string;
+  /** True when the last attempt was blocked (e.g. Tamper Protection). */
+  blocked?: boolean;
+  /** True when the last attempt could not elevate. */
+  needsElevation?: boolean;
+  installDir?: string;
+};
+
+export type StartupAccelerationResult = HostSuccess & {
+  status: StartupAccelerationStatus;
+  code?: StartupAccelerationErrorCode;
+};
+
+/**
+ * OpenClaw runtime provisioning.
+ *
+ * The shell ships a build-time manifest pinning the runtime version it expects
+ * (`runtime-manifest.json`). The runtime itself can be bundled in the package or
+ * downloaded on demand into `%LOCALAPPDATA%\grandpoem-studio\runtime\<version>`.
+ * See docs/startup-performance-plan.md.
+ */
+export type RuntimeState =
+  | 'unknown'
+  | 'ready'
+  | 'missing'
+  | 'version-mismatch'
+  | 'downloading'
+  | 'verifying'
+  | 'extracting'
+  | 'activating'
+  | 'failed';
+
+export type RuntimeReadinessReason = 'ok' | 'missing' | 'version-mismatch' | 'no-manifest';
+export type RuntimeSource = 'override' | 'downloaded' | 'bundled';
+export type RuntimeConsent = 'granted' | 'denied' | 'unset';
+
+export type RuntimePhase =
+  | 'resolving'
+  | 'downloading'
+  | 'verifying'
+  | 'extracting'
+  | 'activating'
+  | 'done';
+
+export type RuntimeProgress = {
+  phase: RuntimePhase;
+  receivedBytes: number;
+  /** Null when the server did not announce a content length. */
+  totalBytes: number | null;
+  extractedEntries: number;
+  /** Expected file count from the manifest, when known. */
+  totalFiles: number | null;
+  bytesPerSecond?: number;
+  message?: string;
+};
+
+export type RuntimeStatus = {
+  state: RuntimeState;
+  ready: boolean;
+  reason: RuntimeReadinessReason;
+  source: RuntimeSource;
+  dir: string;
+  installedVersion: string | null;
+  desiredVersion: string | null;
+  manifestPresent: boolean;
+  consent: RuntimeConsent;
+  /** Versions present on disk, newest first. */
+  installedVersions: string[];
+  /** Present while a download/verify/extract run is in progress. */
+  progress?: RuntimeProgress;
+  error?: string;
+};
+
+/** Public view of the build-time manifest, for "約 XXX MB" style copy. */
+export type RuntimeManifestView = {
+  runtimeVersion: string;
+  platform?: string;
+  arch?: string;
+  archiveUrl?: string;
+  sha256?: string;
+  size?: number;
+  fileCount?: number;
+  minShellVersion?: string;
+};
+
+export type RuntimeInstallPayload = { consent?: boolean };
+export type RuntimeRollbackPayload = { version?: string };
+export type RuntimeImportPayload = { path: string };
+export type RuntimeActionResult = HostSuccess & { status: RuntimeStatus };
+export type RuntimeManifestResult = HostSuccess & { manifest: RuntimeManifestView | null };
+
 export type OpenClawStatusResult = {
   packageExists: boolean;
   isBuilt: boolean;
   entryPath: string;
   dir: string;
   version?: string;
+  /**
+   * Where the runtime was resolved from: the runtime bundled in the application
+   * package, a downloaded runtime, or an explicit env override.
+   * See docs/startup-performance-plan.md (runtime download plan).
+   */
+  source?: 'override' | 'downloaded' | 'bundled';
 };
 export type OpenClawCliCommandResult = HostSuccess & { command?: string };
 
@@ -141,6 +261,22 @@ export type AuthStateSnapshot = {
   user: AuthUser | null;
 };
 export type AuthLoginResult = HostSuccess & { user?: AuthUser | null; deviceId?: number };
+
+export type AuthRegisterPayload = {
+  phone: string;
+  password: string;
+  userType: 'PERSONAL' | 'ENTERPRISE';
+  companyName?: string;
+  unifiedCreditCode?: string;
+  legalPerson?: string;
+  contactEmail?: string;
+};
+export type AuthRegisterResult = HostSuccess & {
+  id?: number;
+  username?: string;
+  userType?: string;
+  companyId?: number | null;
+};
 
 export type AuthDevice = {
   id: number;
@@ -768,6 +904,11 @@ export type ClawHubOpenPayload = {
   slug?: string;
   baseDir?: string;
 };
+export type SkillHubPrepareResult = HostSuccess & { ready?: boolean };
+export type SkillHubSearchPayload = { query?: string };
+export type SkillHubSearchResult = HostSuccess & { results?: MarketplaceSkill[] };
+export type SkillHubInstallPayload = { slug: string };
+export type SkillHubUninstallPayload = { slug: string };
 
 // ---- Cross-platform skill sync (user-managed skills <-> backend) ----
 export type SkillSyncPlanItem = {
@@ -865,6 +1006,19 @@ export type DeliveryTargetsResult = HostSuccess & { targets: DeliveryChannelGrou
 export type HostApiContract = {
   app: {
     openClawDoctor: (payload: OpenClawDoctorPayload) => Omit<OpenClawDoctorResult, 'mode'>;
+    startupAccelerationStatus: () => StartupAccelerationStatus;
+    applyStartupAcceleration: () => StartupAccelerationResult;
+    removeStartupAcceleration: () => StartupAccelerationResult;
+    openDefenderSettings: () => HostSuccess;
+  };
+  runtime: {
+    status: () => RuntimeStatus;
+    manifest: () => RuntimeManifestResult;
+    install: (payload: RuntimeInstallPayload) => RuntimeActionResult;
+    cancel: () => RuntimeActionResult;
+    rollback: (payload: RuntimeRollbackPayload) => RuntimeActionResult;
+    importArchive: (payload: RuntimeImportPayload) => RuntimeActionResult;
+    revealFolder: () => HostSuccess;
   };
   openclaw: {
     status: () => OpenClawStatusResult;
@@ -1048,6 +1202,10 @@ export type HostApiContract = {
     clawhubUninstall: (payload: ClawHubUninstallPayload) => HostSuccess;
     clawhubOpenSkillReadme: (payload: ClawHubOpenPayload) => HostSuccess;
     clawhubOpenSkillPath: (payload: ClawHubOpenPayload) => HostSuccess;
+    skillhubPrepare: () => SkillHubPrepareResult;
+    skillhubSearch: (payload: SkillHubSearchPayload) => SkillHubSearchResult;
+    skillhubInstall: (payload: SkillHubInstallPayload) => HostSuccess;
+    skillhubUninstall: (payload: SkillHubUninstallPayload) => HostSuccess;
     sync: () => SkillSyncResult;
     syncStatus: () => SkillSyncStatusResult;
     upload: (payload: SkillUploadPayload) => SkillUploadResult;
@@ -1062,6 +1220,7 @@ export type HostApiContract = {
   };
   auth: {
     login: (payload: AuthLoginPayload) => AuthLoginResult;
+    register: (payload: AuthRegisterPayload) => AuthRegisterResult;
     logout: () => HostSuccess;
     me: () => AuthStateSnapshot;
     getState: () => AuthStateSnapshot;

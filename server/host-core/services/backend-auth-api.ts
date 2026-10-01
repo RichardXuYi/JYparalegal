@@ -11,6 +11,8 @@ import type { CompleteHostServiceRegistry } from '../main/ipc/host-contract';
 import type { GatewayManager } from '../gateway/manager';
 import type {
   AuthLoginResult,
+  AuthRegisterPayload,
+  AuthRegisterResult,
   AuthStateSnapshot,
   AuthUser,
   AuthDeviceListResult,
@@ -275,6 +277,42 @@ export function createAuthApi(ctx?: AuthApiContext): CompleteHostServiceRegistry
       });
       applyScopeChange(ctx, user.id);
       return { success: true, user, deviceId: typeof data.deviceId === 'number' ? data.deviceId : undefined };
+    },
+
+    register: async (payload: AuthRegisterPayload): Promise<AuthRegisterResult> => {
+      const phone = typeof payload?.phone === 'string' ? payload.phone.trim() : '';
+      const password = typeof payload?.password === 'string' ? payload.password : '';
+      if (!phone || !password) {
+        return { success: false, error: '请输入手机号和密码' };
+      }
+      const userType = payload.userType === 'ENTERPRISE' ? 'ENTERPRISE' : 'PERSONAL';
+      const body: Record<string, unknown> = { phone, password, userType };
+      if (userType === 'ENTERPRISE') {
+        body.companyName = typeof payload.companyName === 'string' ? payload.companyName.trim() : '';
+        if (payload.unifiedCreditCode) body.unifiedCreditCode = payload.unifiedCreditCode.trim();
+        if (payload.legalPerson) body.legalPerson = payload.legalPerson.trim();
+        if (payload.contactEmail) body.contactEmail = payload.contactEmail.trim();
+      }
+
+      let status: number;
+      let envelope: ApiEnvelope<{ id?: number; username?: string; userType?: string; companyId?: number | null }> | null;
+      try {
+        ({ status, envelope } = await postJson<{ id?: number; username?: string; userType?: string; companyId?: number | null }>('/api/auth/register-simple', body));
+      } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : '无法连接到服务器' };
+      }
+
+      if (!isOk(status, envelope) || !isRecord(envelope?.data)) {
+        return { success: false, error: envelope?.msg || '注册失败' };
+      }
+      const data = envelope!.data;
+      return {
+        success: true,
+        id: typeof data.id === 'number' ? data.id : undefined,
+        username: typeof data.username === 'string' ? data.username : undefined,
+        userType: typeof data.userType === 'string' ? data.userType : undefined,
+        companyId: typeof data.companyId === 'number' ? data.companyId : null,
+      };
     },
 
     logout: async () => {

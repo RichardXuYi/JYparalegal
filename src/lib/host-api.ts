@@ -3,6 +3,7 @@ import type {
   AgentUpdatePayload,
   AttachmentFileRef,
   AttachmentSourceRef,
+  AuthRegisterPayload,
   ChannelAccountsPayload,
   ChannelSaveConfigPayload,
   ChannelTargetsPayload,
@@ -31,6 +32,8 @@ import type {
   ShellOpenExternalPayload,
   ShellPathPayload,
   SkillQuickAccessPayload,
+  SkillHubPrepareResult,
+  SkillHubSearchResult,
   SkillUpdateConfigPayload,
   SkillUpdatePayload,
   SkillUploadPayload,
@@ -100,6 +103,15 @@ export const hostApi = {
       ...(await invokeHost('app', 'openClawDoctor', { mode })),
       mode,
     }),
+    // Windows-only in the desktop shell: register the install directory with
+    // Windows Defender so the first launch is not dominated by real-time
+    // scanning. The web host reports `supported: false` for these, so callers
+    // must branch on `status.supported` before offering the action.
+    // See docs/startup-performance-plan.md (scheme 1).
+    startupAccelerationStatus: () => invokeHost('app', 'startupAccelerationStatus'),
+    applyStartupAcceleration: () => invokeHost('app', 'applyStartupAcceleration'),
+    removeStartupAcceleration: () => invokeHost('app', 'removeStartupAcceleration'),
+    openDefenderSettings: () => invokeHost('app', 'openDefenderSettings'),
   },
   openclaw: {
     status: () => invokeHost('openclaw', 'status'),
@@ -376,6 +388,14 @@ export const hostApi = {
     clawhubOpenSkillPath: (input: { skillKey?: string; slug?: string; baseDir?: string }) => (
       invokeHost('skills', 'clawhubOpenSkillPath', input)
     ),
+    // SkillHub marketplace (skillhub.cn). Mirrors studio-frontend; the host runs
+    // the SkillHub Python CLI through the uv-managed interpreter.
+    skillhubPrepare: (): Promise<SkillHubPrepareResult> => invokeHost('skills', 'skillhubPrepare'),
+    skillhubSearch: (input: { query: string }): Promise<SkillHubSearchResult> => (
+      invokeHost('skills', 'skillhubSearch', input)
+    ),
+    skillhubInstall: (input: { slug: string }) => invokeHost('skills', 'skillhubInstall', input),
+    skillhubUninstall: (input: { slug: string }) => invokeHost('skills', 'skillhubUninstall', input),
   },
   usage: {
     recentTokenHistory: (limit?: number) => (
@@ -389,6 +409,7 @@ export const hostApi = {
   },
   auth: {
     login: (username: string, password: string, rememberMe?: boolean) => invokeHost('auth', 'login', { username, password, rememberMe }),
+    register: (payload: AuthRegisterPayload) => invokeHost('auth', 'register', payload),
     logout: () => invokeHost('auth', 'logout'),
     me: () => invokeHost('auth', 'me'),
     getState: () => invokeHost('auth', 'getState'),

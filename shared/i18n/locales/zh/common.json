@@ -66,12 +66,31 @@
     "starting": "网关启动中…",
     "reconnecting": "正在重新连接…",
     "failed": "网关故障",
-    "banner": {
-      "reconnecting": "正在重新连接… 第 {{attempt}}/{{max}} 次，{{seconds}} 秒后重试",
-      "reconnectingSimple": "正在重新连接… 第 {{attempt}}/{{max}} 次",
-      "degraded": "网关尚未完全就绪。",
+    "retry": "重试",
+    "boot": {
+      "tagline": "正在准备",
+      "title": "正在启动引擎…",
+      "elapsed": "已进行 {{seconds}} 秒…",
+      "hintFirstRun": "首次启动需要为引擎做一次性预热，大约 1 分钟。这一步只需等一次，之后打开软件会快很多。",
+      "hintWarm": "引擎就绪后即可开始使用，请稍候。",
+      "skip": "先进入应用"
+    },
+    "runtime": {
+      "preparing": "正在准备运行时…",
+      "needsDownload": "需要下载 OpenClaw 运行时（约 {{size}}）",
+      "downloading": "正在下载运行时 {{received}} / {{total}}",
+      "verifying": "正在校验下载文件…",
+      "extracting": "正在解压运行时（已解压 {{count}} 个文件）…",
+      "activating": "正在启用运行时…",
+      "consentAccept": "下载",
+      "consentDecline": "稍后",
+      "cancel": "取消",
       "retry": "重试",
-      "details": "详情"
+      "import": "选择本地安装包",
+      "declined": "已跳过下载，可稍后在设置中重新开始。",
+      "noManifest": "当前版本没有内置下载地址，请手动安装运行时。",
+      "versionInfo": "已安装 {{installed}} · 需要 {{desired}}",
+      "versionWanted": "需要版本 {{desired}}"
     },
     "popover": {
       "title": "网关状态",
@@ -114,6 +133,13 @@
         "rpc": "RPC 就绪",
         "config": "配置校验"
       }
+    },
+    "banner": {
+      "reconnecting": "正在重新连接… 第 {{attempt}}/{{max}} 次，{{seconds}} 秒后重试",
+      "reconnectingSimple": "正在重新连接… 第 {{attempt}}/{{max}} 次",
+      "degraded": "网关尚未完全就绪。",
+      "retry": "重试",
+      "details": "详情"
     }
   },
   "connection": {

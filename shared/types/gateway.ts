@@ -68,6 +68,9 @@ export interface GatewayStatus {
   nextRetryAt?: number;
   /** Reconnect budget ceiling, for "attempt n/max" rendering. */
   reconnectMaxAttempts?: number;
+  /** True while booting a gateway whose compile cache is empty (cold first
+   *  launch) — lets the renderer show the first-run preparing screen. */
+  firstRun?: boolean;
 }
 
 /**

@@ -65,12 +65,31 @@
     "starting": "Gateway wird gestartet…",
     "reconnecting": "Erneute Verbindung…",
     "failed": "Gateway fehlgeschlagen",
-    "banner": {
-      "reconnecting": "Erneute Verbindung… Versuch {{attempt}}/{{max}}, nächster Versuch in {{seconds}} s",
-      "reconnectingSimple": "Erneute Verbindung… Versuch {{attempt}}/{{max}}",
-      "degraded": "Gateway ist nicht voll betriebsbereit.",
+    "retry": "Erneut versuchen",
+    "boot": {
+      "tagline": "Wird vorbereitet",
+      "title": "Engine wird gestartet…",
+      "elapsed": "{{seconds}}s vergangen…",
+      "hintFirstRun": "Der Erststart führt ein einmaliges Engine-Aufwärmen durch, das etwa eine Minute dauert. Sie warten nur einmal — danach öffnet die App viel schneller.",
+      "hintWarm": "Die App ist einsatzbereit, sobald die Engine läuft. Bitte kurz gedulden.",
+      "skip": "App öffnen"
+    },
+    "runtime": {
+      "preparing": "Laufzeitumgebung wird vorbereitet…",
+      "needsDownload": "Die OpenClaw-Laufzeitumgebung muss heruntergeladen werden (ca. {{size}})",
+      "downloading": "Laufzeitumgebung wird geladen {{received}} / {{total}}",
+      "verifying": "Download wird geprüft…",
+      "extracting": "Laufzeitumgebung wird entpackt ({{count}} Dateien bisher)…",
+      "activating": "Laufzeitumgebung wird aktiviert…",
+      "consentAccept": "Herunterladen",
+      "consentDecline": "Später",
+      "cancel": "Abbrechen",
       "retry": "Erneut versuchen",
-      "details": "Details"
+      "import": "Lokales Archiv wählen",
+      "declined": "Download übersprungen. Sie können ihn später in den Einstellungen starten.",
+      "noManifest": "Dieser Build enthält keine Download-URL; installieren Sie die Laufzeitumgebung manuell.",
+      "versionInfo": "Installiert {{installed}} · benötigt {{desired}}",
+      "versionWanted": "Benötigt Version {{desired}}"
     },
     "popover": {
       "title": "Gateway-Status",
@@ -113,6 +132,13 @@
         "rpc": "RPC-Bereitschaft",
         "config": "Konfigurationsprüfung"
       }
+    },
+    "banner": {
+      "reconnecting": "Erneute Verbindung… Versuch {{attempt}}/{{max}}, nächster Versuch in {{seconds}} s",
+      "reconnectingSimple": "Erneute Verbindung… Versuch {{attempt}}/{{max}}",
+      "degraded": "Gateway ist nicht voll betriebsbereit.",
+      "retry": "Erneut versuchen",
+      "details": "Details"
     }
   },
   "connection": {

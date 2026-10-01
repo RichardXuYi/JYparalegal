@@ -65,12 +65,31 @@
     "starting": "Démarrage de la passerelle…",
     "reconnecting": "Reconnexion…",
     "failed": "Échec de la passerelle",
-    "banner": {
-      "reconnecting": "Reconnexion… tentative {{attempt}}/{{max}}, prochaine dans {{seconds}} s",
-      "reconnectingSimple": "Reconnexion… tentative {{attempt}}/{{max}}",
-      "degraded": "La passerelle n’est pas pleinement opérationnelle.",
+    "retry": "Réessayer",
+    "boot": {
+      "tagline": "Préparation en cours",
+      "title": "Démarrage du moteur…",
+      "elapsed": "{{seconds}}s écoulées…",
+      "hintFirstRun": "Le premier lancement effectue un préchauffage unique du moteur, qui prend environ une minute. Vous n'attendez qu'une fois — ensuite l'application s'ouvre beaucoup plus vite.",
+      "hintWarm": "L'application sera prête dès que le moteur sera lancé. Veuillez patienter.",
+      "skip": "Ouvrir l'application"
+    },
+    "runtime": {
+      "preparing": "Préparation de l'environnement d'exécution…",
+      "needsDownload": "L'environnement d'exécution OpenClaw doit être téléchargé (environ {{size}})",
+      "downloading": "Téléchargement de l'environnement {{received}} / {{total}}",
+      "verifying": "Vérification du téléchargement…",
+      "extracting": "Extraction de l'environnement ({{count}} fichiers jusqu'ici)…",
+      "activating": "Activation de l'environnement…",
+      "consentAccept": "Télécharger",
+      "consentDecline": "Plus tard",
+      "cancel": "Annuler",
       "retry": "Réessayer",
-      "details": "Détails"
+      "import": "Choisir une archive locale",
+      "declined": "Téléchargement ignoré. Vous pourrez le relancer plus tard dans les paramètres.",
+      "noManifest": "Cette version n'inclut pas d'URL de téléchargement ; installez l'environnement manuellement.",
+      "versionInfo": "Installé {{installed}} · requis {{desired}}",
+      "versionWanted": "Version requise {{desired}}"
     },
     "popover": {
       "title": "État de la passerelle",
@@ -113,6 +132,13 @@
         "rpc": "préparation RPC",
         "config": "validation de configuration"
       }
+    },
+    "banner": {
+      "reconnecting": "Reconnexion… tentative {{attempt}}/{{max}}, prochaine dans {{seconds}} s",
+      "reconnectingSimple": "Reconnexion… tentative {{attempt}}/{{max}}",
+      "degraded": "La passerelle n’est pas pleinement opérationnelle.",
+      "retry": "Réessayer",
+      "details": "Détails"
     }
   },
   "connection": {

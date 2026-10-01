@@ -1,6 +1,6 @@
 {
   "title": "Paramètres",
-  "subtitle": "Configurez votre expérience GrandPoem Paralegal Studio",
+  "subtitle": "Configurez votre expérience GrandPoem Studio",
   "nav": {
     "groupWorkspace": "Espace de travail",
     "groupApp": "Application",
@@ -88,13 +88,13 @@
     "shellAnimationDesc": "Fait dériver lentement l'arrière-plan aurora ; désactivez-la pour l'immobiliser et économiser l'énergie.",
     "language": "Langue",
     "menuLanguageUpdated": "Langue du menu mise à jour",
+    "launchAtStartup": "Lancer au démarrage du système",
+    "launchAtStartupDesc": "Lancer automatiquement GrandPoem Studio à la connexion",
     "shellMode": "Mode d'interface",
     "shellModeDesc": "Détecter l'appareil automatiquement ou forcer l'interface bureau/mobile",
     "shellAuto": "Auto",
     "shellDesktop": "Bureau",
-    "shellMobile": "Mobile",
-    "launchAtStartup": "Lancer au démarrage du système",
-    "launchAtStartupDesc": "Lancer automatiquement GrandPoem Paralegal Studio à la connexion"
+    "shellMobile": "Mobile"
   },
   "aiProviders": {
     "title": "Fournisseurs IA",
@@ -123,7 +123,7 @@
     "notRequired": "Non requis",
     "empty": {
       "title": "Aucun fournisseur configuré",
-      "desc": "Ajoutez un fournisseur IA pour commencer à utiliser GrandPoem Paralegal Studio",
+      "desc": "Ajoutez un fournisseur IA pour commencer à utiliser GrandPoem Studio",
       "cta": "Ajouter votre premier fournisseur"
     },
     "dialog": {
@@ -146,7 +146,7 @@
       "protocol": "Protocole",
       "advancedConfig": "Configuration avancée",
       "userAgent": "User-Agent",
-      "userAgentPlaceholder": "GrandPoem Paralegal Studio/1.0",
+      "userAgentPlaceholder": "GrandPoem Studio/1.0",
       "fallbackModels": "Modèles de secours",
       "fallbackProviders": "Fournisseurs de secours",
       "fallbackModelIds": "IDs des modèles de secours",
@@ -221,8 +221,9 @@
     "logs": "Journaux",
     "appLogs": "Journaux de l'application",
     "openFolder": "Ouvrir le dossier",
+    "logsLoadFailed": "(Échec du chargement des logs)",
     "autoStart": "Démarrage automatique",
-    "autoStartDesc": "Démarrer la passerelle quand GrandPoem Paralegal Studio se lance",
+    "autoStartDesc": "Démarrer la passerelle quand GrandPoem Studio se lance",
     "proxyTitle": "Proxy",
     "proxyDesc": "Router le trafic Electron et Passerelle via votre client proxy local.",
     "proxyServer": "Serveur proxy",
@@ -239,12 +240,11 @@
     "proxyBypassHelp": "Hôtes séparés par point-virgule, virgule ou retour à la ligne qui doivent se connecter directement.",
     "proxyRestartNote": "Enregistrer réapplique le réseau Electron et redémarre la passerelle immédiatement. Les redémarrages réguliers conservent les valeurs proxy du canal Telegram quand le proxy est désactivé ; enregistrez quand désactivé pour les effacer.",
     "proxySaved": "Paramètres proxy enregistrés",
-    "logsLoadFailed": "(Échec du chargement des logs)",
     "proxySaveFailed": "Échec de l'enregistrement des paramètres proxy"
   },
   "updates": {
     "title": "Mises à jour",
-    "description": "Gardez GrandPoem Paralegal Studio à jour",
+    "description": "Gardez GrandPoem Studio à jour",
     "autoCheck": "Vérification automatique",
     "autoCheckDesc": "Vérifier les mises à jour au démarrage",
     "autoDownload": "Notifications de mise à jour",
@@ -273,13 +273,13 @@
     "whatsNew": "Nouveautés :",
     "errorDetails": "Détails de l'erreur :",
     "toast": {
-      "availableTitle": "Mise à jour de GrandPoem Paralegal Studio disponible",
+      "availableTitle": "Mise à jour de GrandPoem Studio disponible",
       "availableDescription": "La version v{{version}} est disponible. Téléchargez-la quand vous êtes prêt.",
-      "downloadedTitle": "Mise à jour de GrandPoem Paralegal Studio prête",
+      "downloadedTitle": "Mise à jour de GrandPoem Studio prête",
       "downloadedDescription": "La version v{{version}} a été téléchargée. Redémarrez pour l'installer.",
       "unknownVersion": "nouvelle"
     },
-    "help": "GrandPoem Paralegal Studio vérifie les mises à jour automatiquement et vous avertit avant de télécharger ou installer."
+    "help": "GrandPoem Studio vérifie les mises à jour automatiquement et vous avertit avant de télécharger ou installer."
   },
   "advanced": {
     "title": "Avancé",
@@ -287,7 +287,7 @@
     "devMode": "Mode développeur",
     "devModeDesc": "Afficher les outils et raccourcis développeur",
     "telemetry": "Données d'utilisation anonymes",
-    "telemetryDesc": "Autoriser l'envoi de données d'utilisation anonymes pour améliorer GrandPoem Paralegal Studio"
+    "telemetryDesc": "Autoriser l'envoi de données d'utilisation anonymes pour améliorer GrandPoem Studio"
   },
   "developer": {
     "title": "Développeur",
@@ -328,6 +328,21 @@
     "doctorStdout": "Stdout",
     "doctorStderr": "Stderr",
     "doctorOutputEmpty": "(vide)",
+    "startupAcceleration": "Démarrage plus rapide",
+    "startupAccelerationDesc": "Ajoute le dossier d'installation à la liste d'exclusions de Windows Defender. L'analyse en temps réel d'une application fraîchement installée explique un premier lancement pouvant durer une minute. Droits administrateur requis ; l'exclusion est supprimée à la désinstallation.",
+    "startupAccelerationApply": "Ajouter l'exclusion",
+    "startupAccelerationRemove": "Supprimer l'exclusion",
+    "startupAccelerationOn": "Exclusion active",
+    "startupAccelerationOff": "Aucune exclusion",
+    "startupAccelerationVerifiedAt": "Vérifié",
+    "startupAccelerationBlocked": "Bloqué par Windows",
+    "startupAccelerationNeedsElevation": "Approbation administrateur refusée",
+    "startupAccelerationUnsupported": "Disponible uniquement dans la version Windows installée.",
+    "startupAccelerationApplied": "Exclusion de démarrage ajoutée",
+    "startupAccelerationRemoved": "Exclusion de démarrage supprimée",
+    "startupAccelerationFailed": "Impossible de mettre à jour l'exclusion Windows Defender",
+    "startupAccelerationManual": "Ouvrir la sécurité Windows",
+    "startupAccelerationManualFailed": "Impossible d'ouvrir la sécurité Windows",
     "copyFailed": "Échec de la copie",
     "cliInstalled": "openclaw CLI installé à {{path}}",
     "telemetryViewer": "Visionneuse de télémétrie",
@@ -347,7 +362,7 @@
   },
   "about": {
     "title": "À propos",
-    "appName": "GrandPoem Paralegal Studio",
+    "appName": "GrandPoem Studio",
     "tagline": "Assistant IA graphique",
     "basedOn": "Basé sur OpenClaw",
     "version": "Version {{version}}",

@@ -1,6 +1,6 @@
 {
   "title": "设置",
-  "subtitle": "配置您的 GrandPoem Paralegal Studio 体验",
+  "subtitle": "配置您的 GrandPoem Studio 体验",
   "nav": {
     "groupWorkspace": "工作区配置",
     "groupApp": "应用设置",
@@ -94,7 +94,7 @@
     "shellDesktop": "桌面",
     "shellMobile": "移动",
     "launchAtStartup": "开机自动启动",
-    "launchAtStartupDesc": "登录时自动启动 GrandPoem Paralegal Studio"
+    "launchAtStartupDesc": "登录时自动启动 GrandPoem Studio"
   },
   "aiProviders": {
     "title": "AI 提供商",
@@ -133,7 +133,7 @@
     "notRequired": "非必需",
     "empty": {
       "title": "未配置提供商",
-      "desc": "添加一个 AI 提供商以开始使用 GrandPoem Paralegal Studio",
+      "desc": "添加一个 AI 提供商以开始使用 GrandPoem Studio",
       "cta": "添加您的第一个提供商"
     },
     "dialog": {
@@ -167,7 +167,7 @@
       "protocol": "协议",
       "advancedConfig": "高级配置",
       "userAgent": "User-Agent",
-      "userAgentPlaceholder": "GrandPoem Paralegal Studio/1.0",
+      "userAgentPlaceholder": "GrandPoem Studio/1.0",
       "fallbackModels": "备用模型",
       "fallbackProviders": "备用提供商",
       "fallbackModelIds": "备用模型 ID",
@@ -245,7 +245,7 @@
     "appLogs": "应用日志",
     "openFolder": "打开文件夹",
     "autoStart": "自动启动网关",
-    "autoStartDesc": "GrandPoem Paralegal Studio 启动时自动启动网关",
+    "autoStartDesc": "GrandPoem Studio 启动时自动启动网关",
     "proxyTitle": "代理",
     "proxyDesc": "将 Electron 和网关流量通过本地代理客户端路由。",
     "proxyServer": "代理服务器",
@@ -267,7 +267,7 @@
   },
   "updates": {
     "title": "更新",
-    "description": "保持 GrandPoem Paralegal Studio 为最新版本",
+    "description": "保持 GrandPoem Studio 为最新版本",
     "autoCheck": "自动检查更新",
     "autoCheckDesc": "启动时检查更新",
     "autoDownload": "更新提示",
@@ -296,13 +296,13 @@
     "whatsNew": "更新内容:",
     "errorDetails": "错误详情:",
     "toast": {
-      "availableTitle": "GrandPoem Paralegal Studio 有可用更新",
+      "availableTitle": "GrandPoem Studio 有可用更新",
       "availableDescription": "版本 v{{version}} 已可用。准备好时即可下载。",
-      "downloadedTitle": "GrandPoem Paralegal Studio 更新已就绪",
+      "downloadedTitle": "GrandPoem Studio 更新已就绪",
       "downloadedDescription": "版本 v{{version}} 已下载完成。重启以安装。",
       "unknownVersion": "新版本"
     },
-    "help": "GrandPoem Paralegal Studio 会自动检查更新，并在下载或安装前提示您。"
+    "help": "GrandPoem Studio 会自动检查更新，并在下载或安装前提示您。"
   },
   "advanced": {
     "title": "高级",
@@ -310,7 +310,7 @@
     "devMode": "开发者模式",
     "devModeDesc": "显示开发者工具和快捷键",
     "telemetry": "匿名使用数据",
-    "telemetryDesc": "允许提供匿名基本使用数据以改进 GrandPoem Paralegal Studio"
+    "telemetryDesc": "允许提供匿名基本使用数据以改进 GrandPoem Studio"
   },
   "developer": {
     "title": "开发者",
@@ -351,6 +351,21 @@
     "doctorStdout": "标准输出",
     "doctorStderr": "标准错误",
     "doctorOutputEmpty": "(空)",
+    "startupAcceleration": "加速启动",
+    "startupAccelerationDesc": "把安装目录加入 Windows Defender 排除列表。首次启动慢，主要就是系统在实时扫描刚安装的程序。需要管理员授权；卸载时会自动移除该排除项。",
+    "startupAccelerationApply": "添加排除项",
+    "startupAccelerationRemove": "移除排除项",
+    "startupAccelerationOn": "排除项已生效",
+    "startupAccelerationOff": "未添加排除项",
+    "startupAccelerationVerifiedAt": "验证时间",
+    "startupAccelerationBlocked": "被 Windows 阻止",
+    "startupAccelerationNeedsElevation": "已拒绝管理员授权",
+    "startupAccelerationUnsupported": "仅在 Windows 已安装版本中可用。",
+    "startupAccelerationApplied": "已添加启动排除项",
+    "startupAccelerationRemoved": "已移除启动排除项",
+    "startupAccelerationFailed": "更新 Windows Defender 排除项失败",
+    "startupAccelerationManual": "打开 Windows 安全中心",
+    "startupAccelerationManualFailed": "打开 Windows 安全中心失败",
     "copyFailed": "复制失败",
     "cliInstalled": "openclaw CLI 已安装至 {{path}}",
     "telemetryViewer": "遥测查看器",
@@ -436,7 +451,7 @@
   },
   "about": {
     "title": "关于",
-    "appName": "GrandPoem Paralegal Studio",
+    "appName": "GrandPoem Studio",
     "tagline": "图形化 AI 助手",
     "basedOn": "基于 OpenClaw",
     "version": "版本 {{version}}",

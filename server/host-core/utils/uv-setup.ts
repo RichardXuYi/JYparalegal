@@ -106,6 +106,41 @@ export async function isPythonReady(): Promise<boolean> {
 }
 
 /**
+ * Resolve the absolute path of the managed Python 3.12 interpreter.
+ *
+ * `uv python find 3.12` prints the interpreter path on success. Callers that
+ * need to run a Python script (e.g. the SkillHub CLI) must use the absolute
+ * path so the invoked script is not resolved against PATH. Returns null when
+ * the interpreter is unavailable, so callers can surface a clear error instead
+ * of spawning a command that cannot exist.
+ */
+export async function resolveManagedPython(): Promise<string | null> {
+  const { bin: uvBin } = resolveUvBin();
+  const useShell = needsWinShell(uvBin);
+
+  return new Promise<string | null>((resolve) => {
+    try {
+      const child = spawn(useShell ? quoteForCmd(uvBin) : uvBin, ['python', 'find', '3.12'], {
+        shell: useShell,
+        windowsHide: true,
+      });
+
+      let stdout = '';
+      child.stdout?.on('data', (data: Buffer) => {
+        if (stdout.length < 8192) stdout += data.toString('utf-8');
+      });
+      child.on('close', (code) => {
+        const found = code === 0 ? stdout.trim().split(/\r?\n/).pop()?.trim() : '';
+        resolve(found && found.length > 0 ? found : null);
+      });
+      child.on('error', () => resolve(null));
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
+/**
  * Run `uv python install 3.12` once with the given environment.
  * Returns on success, throws with captured stderr on failure.
  */

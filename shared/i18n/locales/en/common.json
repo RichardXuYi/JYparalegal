@@ -66,12 +66,31 @@
     "starting": "Starting gateway…",
     "reconnecting": "Reconnecting…",
     "failed": "Gateway failed",
-    "banner": {
-      "reconnecting": "Reconnecting… attempt {{attempt}}/{{max}}, next try in {{seconds}}s",
-      "reconnectingSimple": "Reconnecting… attempt {{attempt}}/{{max}}",
-      "degraded": "The gateway is not fully operational.",
+    "retry": "Retry",
+    "boot": {
+      "tagline": "Getting ready",
+      "title": "Starting the engine…",
+      "elapsed": "{{seconds}}s elapsed…",
+      "hintFirstRun": "The first launch performs a one-time engine warm-up, which takes about a minute. You only wait once — afterwards the app opens much faster.",
+      "hintWarm": "The app will be ready as soon as the engine starts. Please hold on.",
+      "skip": "Enter the app"
+    },
+    "runtime": {
+      "preparing": "Preparing the runtime…",
+      "needsDownload": "The OpenClaw runtime needs to be downloaded (about {{size}})",
+      "downloading": "Downloading the runtime {{received}} / {{total}}",
+      "verifying": "Verifying the download…",
+      "extracting": "Extracting the runtime ({{count}} files so far)…",
+      "activating": "Activating the runtime…",
+      "consentAccept": "Download",
+      "consentDecline": "Later",
+      "cancel": "Cancel",
       "retry": "Retry",
-      "details": "Details"
+      "import": "Choose a local archive",
+      "declined": "Download skipped. You can start it again later from Settings.",
+      "noManifest": "This build has no runtime download URL; install the runtime manually.",
+      "versionInfo": "Installed {{installed}} · needs {{desired}}",
+      "versionWanted": "Needs version {{desired}}"
     },
     "popover": {
       "title": "Gateway status",
@@ -114,6 +133,13 @@
         "rpc": "RPC readiness",
         "config": "config validation"
       }
+    },
+    "banner": {
+      "reconnecting": "Reconnecting… attempt {{attempt}}/{{max}}, next try in {{seconds}}s",
+      "reconnectingSimple": "Reconnecting… attempt {{attempt}}/{{max}}",
+      "degraded": "The gateway is not fully operational.",
+      "retry": "Retry",
+      "details": "Details"
     }
   },
   "connection": {

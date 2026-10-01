@@ -1,6 +1,6 @@
 {
   "title": "Settings",
-  "subtitle": "Configure your GrandPoem Paralegal Studio experience",
+  "subtitle": "Configure your GrandPoem Studio experience",
   "nav": {
     "groupWorkspace": "Workspace",
     "groupApp": "Application",
@@ -94,7 +94,7 @@
     "shellDesktop": "Desktop",
     "shellMobile": "Mobile",
     "launchAtStartup": "Launch at system startup",
-    "launchAtStartupDesc": "Automatically launch GrandPoem Paralegal Studio when you log in"
+    "launchAtStartupDesc": "Automatically launch GrandPoem Studio when you log in"
   },
   "aiProviders": {
     "title": "AI Providers",
@@ -133,7 +133,7 @@
     "notRequired": "Not required",
     "empty": {
       "title": "No providers configured",
-      "desc": "Add an AI provider to start using GrandPoem Paralegal Studio",
+      "desc": "Add an AI provider to start using GrandPoem Studio",
       "cta": "Add Your First Provider"
     },
     "dialog": {
@@ -167,7 +167,7 @@
       "protocol": "Protocol",
       "advancedConfig": "Advanced configuration",
       "userAgent": "User-Agent",
-      "userAgentPlaceholder": "GrandPoem Paralegal Studio/1.0",
+      "userAgentPlaceholder": "GrandPoem Studio/1.0",
       "fallbackModels": "Fallback Models",
       "fallbackProviders": "Fallback Providers",
       "fallbackModelIds": "Fallback Model IDs",
@@ -245,7 +245,7 @@
     "appLogs": "Application Logs",
     "openFolder": "Open Folder",
     "autoStart": "Auto-start Gateway",
-    "autoStartDesc": "Start Gateway when GrandPoem Paralegal Studio launches",
+    "autoStartDesc": "Start Gateway when GrandPoem Studio launches",
     "proxyTitle": "Proxy",
     "proxyDesc": "Route Electron and Gateway traffic through your local proxy client.",
     "proxyServer": "Proxy Server",
@@ -267,7 +267,7 @@
   },
   "updates": {
     "title": "Updates",
-    "description": "Keep GrandPoem Paralegal Studio up to date",
+    "description": "Keep GrandPoem Studio up to date",
     "autoCheck": "Auto-check for updates",
     "autoCheckDesc": "Check for updates on startup",
     "autoDownload": "Update prompts",
@@ -296,13 +296,13 @@
     "whatsNew": "What's New:",
     "errorDetails": "Error Details:",
     "toast": {
-      "availableTitle": "GrandPoem Paralegal Studio update available",
+      "availableTitle": "GrandPoem Studio update available",
       "availableDescription": "Version v{{version}} is available. Download it when you're ready.",
-      "downloadedTitle": "GrandPoem Paralegal Studio update ready",
+      "downloadedTitle": "GrandPoem Studio update ready",
       "downloadedDescription": "Version v{{version}} has been downloaded. Restart to install it.",
       "unknownVersion": "new"
     },
-    "help": "GrandPoem Paralegal Studio checks for updates automatically and prompts you before downloading or installing."
+    "help": "GrandPoem Studio checks for updates automatically and prompts you before downloading or installing."
   },
   "advanced": {
     "title": "Advanced",
@@ -310,7 +310,7 @@
     "devMode": "Developer Mode",
     "devModeDesc": "Show developer tools and shortcuts",
     "telemetry": "Anonymous Usage Data",
-    "telemetryDesc": "Allow providing anonymous basic usage data to improve GrandPoem Paralegal Studio"
+    "telemetryDesc": "Allow providing anonymous basic usage data to improve GrandPoem Studio"
   },
   "developer": {
     "title": "Developer",
@@ -351,6 +351,21 @@
     "doctorStdout": "Stdout",
     "doctorStderr": "Stderr",
     "doctorOutputEmpty": "(empty)",
+    "startupAcceleration": "Faster startup",
+    "startupAccelerationDesc": "Add the installation folder to the Windows Defender exclusion list. Real-time scanning of a freshly installed app is what makes the very first launch take up to a minute. Administrator approval is required, and the exclusion is removed on uninstall.",
+    "startupAccelerationApply": "Add exclusion",
+    "startupAccelerationRemove": "Remove exclusion",
+    "startupAccelerationOn": "Exclusion active",
+    "startupAccelerationOff": "No exclusion",
+    "startupAccelerationVerifiedAt": "Verified",
+    "startupAccelerationBlocked": "Blocked by Windows",
+    "startupAccelerationNeedsElevation": "Administrator approval declined",
+    "startupAccelerationUnsupported": "Only available in the installed Windows build.",
+    "startupAccelerationApplied": "Startup exclusion added",
+    "startupAccelerationRemoved": "Startup exclusion removed",
+    "startupAccelerationFailed": "Could not update the Windows Defender exclusion",
+    "startupAccelerationManual": "Open Windows Security",
+    "startupAccelerationManualFailed": "Could not open Windows Security",
     "copyFailed": "Failed to copy",
     "cliInstalled": "openclaw CLI installed at {{path}}",
     "telemetryViewer": "Telemetry Viewer",
@@ -436,7 +451,7 @@
   },
   "about": {
     "title": "About",
-    "appName": "GrandPoem Paralegal Studio",
+    "appName": "GrandPoem Studio",
     "tagline": "Graphical AI Assistant",
     "basedOn": "Based on OpenClaw",
     "version": "Version {{version}}",
