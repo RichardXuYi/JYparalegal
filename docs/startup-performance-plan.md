@@ -839,6 +839,100 @@ A/B 对照顺带确认两个**既存**问题，**原始版和去重版都存在*
 - 未做安装器真机安装测试（NSIS 运行时探测、Defender 排除项、过渡窗口）。
 - 未做各渠道真实账号收发消息的连通性冒烟，这是强制版本统一后唯一的剩余风险。
 
+### 11.10 真实产物打包结论（2026-10-02 实跑）
+
+按 `package:win:dir` + NSIS 全量打包，产物与验证结论如下。
+
+**产物**
+
+| 产物 | 体积 | 说明 |
+|---|---|---|
+| `release/win-unpacked/` | 1039.4 MB / 38,887 文件 | 免安装目录版 |
+| `release/GrandPoem Studio-1.5.0-win-x64.exe` | **338.9 MB** | NSIS 安装包 |
+| `latest.yml` / `.blockmap` | — | 自动更新元数据（sha512 + size 已写入） |
+
+对比改动前的旧安装包 **422.1 MB，缩小 83.2 MB（-19.7%）**。
+
+**去重在真实产物上得到验证（新脚本 `assert-archive-dedup.mjs`）**
+
+打包后插件被压成 7 个 `.zip`，原先的 `assert-single-copy.mjs` 只看未压缩目录，因此在这类产物上会**空转通过**（与 §11.9 的 comms 门禁同一类"假绿"）。新增脚本真正解包检查，结果：
+
+| 插件 | 镜像包数 | 声明共享 | 与运行时重叠 |
+|---|---|---|---|
+| dingtalk | 21 | 45 | **0** |
+| discord | 44 | 15 | **0** |
+| feishu-openclaw-plugin | 3 | 53 | **0** |
+| wecom | 15 | 40 | **0** |
+| qqbot / openclaw-weixin / whatsapp | 0–2 | 1–9 | **0** |
+
+构建日志实测：**删除 165 个包、节省 47.3 MB**，与 §11.4 的模拟完全一致。
+
+**本次打包暴露的两个既有问题（非本次改动引入，均未修）**
+
+1. **`assert:pack-size` 仍然失败**：实际 38,887 文件 > 预算 35,000（超 3,887）。预算与脚本来自 `cc05c82`，说明这条门禁在本次改动前就已不通过。构成：`openclaw/` 运行时占 38,640 文件（99.4%），其余仅 247。
+   - 即便开启 `GRANDPOEM_PRUNE_TS=1` 删掉 3,831 个 `.ts`，仍为 35,056，**仍超 56 个**——需要同时处理别的类别或重新评估预算。
+   - 276 MB / 近 4 万文件的压缩包**功能上不受影响**，纯粹是"预算门禁"未达标。
+
+2. **产物里存在重复的 `resources/resources/` 目录树**（209 文件 / 4.1 MB）：`extraResources` 中 `from: resources/...` 的条目被再复制了一层。`electron-builder.yml` 我未改动（来自 5fb8dac），属既有配置问题，代价很小但应修。
+
+**环境问题（与代码无关，已绕过）**
+
+- `github.com:443` 在本机不可达（TCP 超时；`objects.githubusercontent.com` / `nodejs.org` / `ghproxy.net` 正常）。导致 `prep:win-binaries` 失败。绕过：经 ghproxy.net 取得 uv/node/agent-browser（校验 `MZ` 头）。
+- `electron-builder` 同样需要 GitHub → 用 `ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/` 通过。
+- `tar.exe` 无法处理本仓库路径中的零宽字符（U+200C）→ 全部改用 `Expand-Archive`。
+- `patch-nsis-win.mjs` 在 NSIS 模板尚未解出时**固定返回 1**（既有行为，来自 5fb8dac），会让 `pnpm run package:win` 的退出码为 1，即使安装包已成功产出——排查时勿被误导。
+
+**仍未做**：安装器真机安装测试、各渠道真实账号连通性冒烟。
+
+### 11.11 登录/注册与后端联调结论（2026-10-02，真实后端实测）
+
+针对"登录/注册是否被默认放行"和"客户端能否接上远程后端"两个问题做了实测。
+
+**结论一：桌面端（studio-frontend）没有被放行。**
+
+- `electron/` 内**不存在** `DISABLE_AUTH` / `skipAuth` / `bypassAuth` 等开关。
+- 未登录访问 `/api/auth/me` → **401**；伪造 token → **401**；错误密码 → **400 用户名或密码错误**。
+- 唯一的"离线放行"在 `resolveSessionState()`：**仅当本地已有 token+user** 且后端网络不可达时保留会话（第 213-215 行：无 token 直接返回未认证）。全新安装无法借此进入。
+- 需要留意的是**第 241-247 行**：后端返回 5xx / 402 / 403 / 畸形响应时也会保留会话。这是为了避免后端抖动把用户踢下线并触发 Gateway 重启，属于有意设计，但意味着"后端故障期间本地会话继续有效"。
+
+**结论二：studio-web 存在一个真实放行开关（当前未启用）。**
+
+- `server/src/env.ts`：`AUTH_DISABLED = process.env.DISABLE_AUTH === '1'`。
+- 开启后 `verifySessionCookie()` 直接返回 `{ sub: 'dev' }`，且 `/auth/me` 返回 `{ isAuthenticated: true, user: { id: 0, username: 'dev' } }`（`server/src/auth.ts` 第 42-44、163-167 行）。
+- 仅在 `.env.example` 里以注释形式出现（`# DISABLE_AUTH=1`），**实际配置未开启**；实测该 host 启动日志为 `auth enabled`。
+
+**结论三：studio-web 的后端地址此前是断的（已修）。**
+
+`server/src/env.ts` 定义了 `BACKEND_URL`，但 `services/backend-auth-api.ts` 的 `getBaseUrl()` 只读 `JY_API_BASE_URL`，于是 `.env` 与部署配置里的 `BACKEND_URL=https://studio.grandpoem.com` **从未生效**，web 宿主会退回 `localhost:8181`。
+
+已改为 `JY_API_BASE_URL || BACKEND_URL || localhost:8181`，与桌面端保持同名覆盖变量。修复前 web 宿主只认 localhost；修复后实测可直连远程后端（见下）。
+
+**联调实测（真实后端 `studio.grandpoem.com`）**
+
+| 场景 | 结果 |
+|---|---|
+| 桌面端 auth 契约（只读探测，不写数据） | **6/6 PASS** — 未登录/伪造 token/错误密码/缺参数注册/无效 refresh 全部被拒 |
+| 桌面端完整链路 ×2 账号 | **24/24 PASS** — 注册→登录→me→devices→refresh→登出 |
+| studio-web 宿主 HTTP 链路 | **10/10 PASS** — 本机 8799 端口的真实 host 直连远程后端 |
+
+关键实测细节：
+
+- 登录返回 `{code:0,msg:"登录成功",data:{user,accessToken,refreshToken,deviceId}}`，与客户端解析完全一致。
+- **登出只吊销 refresh token**（`AuthController.logout` 调 `tokenService.revoke`），access token 是无状态 JWT，到过期前仍可用（实测登出后 `/me` 仍 200）——这是 JWT 正常行为；refresh token 实测**立即 401**。客户端本身会清本地状态，不受影响。
+- web 宿主登出会下发 `jy_studio_session=; Max-Age=0; Expires=Thu, 01 Jan 1970`，浏览器丢弃后 `/auth/me` 实测 **401**。
+- web 宿主设备列表能取到真实 IP 与设备名（`Windows 10.0.26300 - Studio Web`）。
+- `/devices`、`/auth/devices` 均要求鉴权，未登录 401。
+
+**环境提醒（可能影响你本机调试）**
+
+本机存在**用户级**环境变量 `JY_API_BASE_URL=http://47.116.163.57:8181`（User 作用域，非本次改动引入），会被任何从你会话启动的进程继承，**包括打包后的 EXE**。它优先于代码内默认值，因此本机运行时会走明文 HTTP + IP，而非 `https://studio.grandpoem.com`。
+
+两个地址实测指向同一台机器（`studio.grandpoem.com` → `47.116.163.57`），功能完全一致（注册/登录均 200 OK）。但发布给客户前建议清理该变量，以免：
+1. 走明文 HTTP，凭据与 token 无 TLS 保护；
+2. 把 IP 写死进客户端行为，后端换 IP 即失效。
+
+**仍未覆盖**：企业账号（`userType: ENTERPRISE`）注册、短信验证码登录、SSO 桥接，以及桌面客户端真机 UI 的手动登录点击流程。
+
 **（6）测试过程备注**
 
 首次用目录联接（junction）构造夹具时，去重函数通过联接**删除了真实 `build/openclaw-plugins` 里的包**（该目录已被 gitignore，可重新生成）。已用 `pnpm run bundle:openclaw-plugins` 完整重建（feishu 恢复至 56 依赖、dingtalk 72、wecom 55，且无残留 `shared-deps.json`），并改为**复制而非联接**镜像目录，避免再次发生。该目录是构建中间产物，不影响仓库内容。
