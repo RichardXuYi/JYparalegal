@@ -22,10 +22,24 @@ import { isRecord } from './payload-utils';
 import { setActiveScopeUser } from '../utils/user-scope';
 import { platform, release, arch } from 'node:os';
 
+/**
+ * Base URL of the Spring Boot backend.
+ *
+ * Resolution order:
+ *   1. JY_API_BASE_URL  — same override the desktop client honours
+ *      (studio-frontend/electron/services/backend-auth-api.ts), so a single
+ *      variable configures both clients.
+ *   2. BACKEND_URL      — the web host's own configured backend (server/src/env.ts).
+ *   3. localhost:8181   — local development default.
+ *
+ * Reading BACKEND_URL here matters: it is what `.env` and the deploy config
+ * actually set, and it was previously defined but never consulted, so a
+ * deployed web host fell back to localhost instead of the real backend.
+ */
 const DEFAULT_BASE_URL = 'http://localhost:8181';
 
 function getBaseUrl(): string {
-  const raw = process.env.JY_API_BASE_URL?.trim();
+  const raw = process.env.JY_API_BASE_URL?.trim() || process.env.BACKEND_URL?.trim();
   const base = raw && raw.length > 0 ? raw : DEFAULT_BASE_URL;
   return base.replace(/\/+$/, '');
 }
